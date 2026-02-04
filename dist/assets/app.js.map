@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/main.ts"],
+  "sourcesContent": ["console.log(\"app loaded\");\r\n"],
+  "mappings": ";;;;;;AAAA;AAAA;AAAA,YAAQ,IAAI,YAAY;AAAA;AAAA;",
+  "names": []
+}

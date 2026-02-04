@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/audio/worklet.ts"],
+  "sourcesContent": ["// Minimal placeholder worklet so bundling works.\r\nclass PassthroughProcessor extends AudioWorkletProcessor {\r\n  process(_inputs: Float32Array[][]) {\r\n    return true;\r\n  }\r\n}\r\n\r\nregisterProcessor(\"passthrough\", PassthroughProcessor);\r\n"],
+  "mappings": ";;;;;;AAAA;AAAA;AACA,QAAM,uBAAN,cAAmC,sBAAsB;AAAA,MACvD,QAAQ,SAA2B;AACjC,eAAO;AAAA,MACT;AAAA,IACF;AAEA,sBAAkB,eAAe,oBAAoB;AAAA;AAAA;",
+  "names": []
+}
