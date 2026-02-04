@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../../src/audio/worklet.ts"],
-  "sourcesContent": ["// Minimal placeholder worklet so bundling works.\r\nclass PassthroughProcessor extends AudioWorkletProcessor {\r\n  process(_inputs: Float32Array[][]) {\r\n    return true;\r\n  }\r\n}\r\n\r\nregisterProcessor(\"passthrough\", PassthroughProcessor);\r\n"],
-  "mappings": ";;;;;;AAAA;AAAA;AACA,QAAM,uBAAN,cAAmC,sBAAsB;AAAA,MACvD,QAAQ,SAA2B;AACjC,eAAO;AAAA,MACT;AAAA,IACF;AAEA,sBAAkB,eAAe,oBAAoB;AAAA;AAAA;",
+  "sourcesContent": ["/// <reference lib=\"webworker\" />\r\n\r\nclass PassthroughProcessor extends AudioWorkletProcessor {\r\n  private sent = false;\r\n\r\n  process(inputs: Float32Array[][]) {\r\n    // Prove the worklet is actually running by sending one message back.\r\n    if (!this.sent) {\r\n      this.sent = true;\r\n      this.port.postMessage({ type: \"worklet-ready\", sampleRate });\r\n    }\r\n\r\n    // We'll process real audio later; for now just keep the node alive.\r\n    // inputs[0][0] is the first channel's samples if present.\r\n    return true;\r\n  }\r\n}\r\n\r\nregisterProcessor(\"passthrough\", PassthroughProcessor);\r\n"],
+  "mappings": ";;;;;;;;;AAAA;AAAA;AAEA,QAAM,uBAAN,cAAmC,sBAAsB;AAAA,MAAzD;AAAA;AACE,4BAAQ,QAAO;AAAA;AAAA,MAEf,QAAQ,QAA0B;AAEhC,YAAI,CAAC,KAAK,MAAM;AACd,eAAK,OAAO;AACZ,eAAK,KAAK,YAAY,EAAE,MAAM,iBAAiB,WAAW,CAAC;AAAA,QAC7D;AAIA,eAAO;AAAA,MACT;AAAA,IACF;AAEA,sBAAkB,eAAe,oBAAoB;AAAA;AAAA;",
   "names": []
 }

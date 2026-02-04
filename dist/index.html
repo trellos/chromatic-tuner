@@ -2,12 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Chromatic Tuner</title>
+    <link rel="stylesheet" href="/style.css" />
   </head>
+
   <body>
-    <button id="start">Start</button>
-    <div id="output"></div>
+    <main>
+      <h1>Chromatic Tuner</h1>
+
+      <button id="start">Start</button>
+
+      <div id="status"></div>
+
+      <div id="reading">
+        <div id="note"></div>
+        <div id="cents"></div>
+      </div>
+    </main>
 
     <script type="module" src="/assets/app.js"></script>
   </body>
