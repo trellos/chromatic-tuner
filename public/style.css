@@ -1,14 +1,121 @@
 body {
   font-family: system-ui, sans-serif;
-  margin: 24px;
+  margin: 0;
+  padding: 24px;
+  background-color: #f9fafb;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+main {
+  max-width: 500px;
+  width: 100%;
+}
+
+h1 {
+  text-align: center;
+  margin: 0 0 24px 0;
+  color: #1f2937;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* Strobe Tuner Visualization */
+.strobe-tuner {
+  width: 280px;
+  height: 280px;
+  margin: 0 auto 32px;
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.05));
+}
+
+/* SVG Strobe Pattern */
+.strobe-tuner svg {
+  width: 280px;
+  height: 280px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: center;
+}
+
+.strobe-tuner.idle svg {
+  opacity: 0.5;
+}
+
+.strobe-tuner.detecting svg {
+  opacity: 1;
 }
 
 #reading {
-  margin-top: 16px;
-  font-size: 24px;
+  text-align: center;
+  margin: 32px 0;
+}
+
+#note {
+  font-size: 48px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+#cents {
+  font-size: 20px;
+  color: #6b7280;
+  margin-top: 12px;
+  font-weight: 500;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  letter-spacing: 0.5px;
 }
 
 #status {
-  margin-top: 12px;
-  opacity: 0.8;
+  text-align: center;
+  margin-top: 24px;
+  padding: 12px;
+  font-size: 14px;
+  color: #6b7280;
+  border-radius: 6px;
+  background-color: #f3f4f6;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  body {
+    padding: 16px;
+  }
+
+  h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .strobe-tuner {
+    width: 240px;
+    height: 240px;
+    margin-bottom: 24px;
+  }
+
+  #note {
+    font-size: 40px;
+  }
+
+  #cents {
+    font-size: 18px;
+  }
 }

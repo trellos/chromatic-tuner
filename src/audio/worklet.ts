@@ -186,8 +186,8 @@ class TunerProcessor extends AudioWorkletProcessor {
     // explicitly checking lengths.
     if (inputs.length < 1) return true;
     const in0 = inputs[0];
-    if (!in0 || in0.length < 1) return true;
-    const chan0 = in0[0];
+    if (!in0 || in0.length < 2) return true;
+    const chan0 = in0[1]; // Use stereo channel 1 (right channel)
     if (!chan0 || chan0.length === 0) return true;
 
     this.pushBlock(chan0);
