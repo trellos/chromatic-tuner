@@ -219,7 +219,7 @@ async function startAudio() {
   await audioContext.resume();
 
   setStatus("Loading worklet module…");
-  await audioContext.audioWorklet.addModule("/assets/worklet.js");
+  await audioContext.audioWorklet.addModule("./assets/worklet.js");
 
   setStatus("Creating audio graph…");
   const source = audioContext.createMediaStreamSource(micStream);
