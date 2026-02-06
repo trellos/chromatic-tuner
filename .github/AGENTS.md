@@ -4,6 +4,8 @@
 
 This is a **web-based chromatic musical instrument tuner** using Web Audio API with real-time pitch detection. It runs as a simple Express dev server serving a static HTML app that processes microphone input through an AudioWorklet.
 
+It is designed to look like a Peterson Strobe Tuner, providing accurate note and cents offset readings with minimal latency and jitter.
+
 ### Key Components
 
 - **[src/main.ts](../src/main.ts)**: Browser UI layer - manages AudioContext, handles microphone stream, displays note/cents readings with debouncing logic
@@ -13,7 +15,7 @@ This is a **web-based chromatic musical instrument tuner** using Web Audio API w
 
 ### Data Flow
 
-1. User clicks "Start" → requests microphone permission via getUserMedia()
+1. Requests microphone permission via getUserMedia()
 2. Audio input → MediaStreamSource → AudioWorkletNode (tuner)
 3. Worklet samples continuously, analyzes every ~50ms (20 Hz hop rate)
 4. Worklet sends pitch messages: `{type: "pitch", freqHz, confidence, rms}`
