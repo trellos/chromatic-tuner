@@ -8,6 +8,34 @@ const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 const A4 = 440;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
+async function createAudioContext(
+  AudioCtx: typeof AudioContext
+): Promise<AudioContext> {
+  if (!isIOS) {
+    return new AudioCtx({ latencyHint: "interactive" });
+  }
+
+  // iOS Safari can report a "bad" audio context on first init.
+  // Warm up with a short silent buffer, then create the real context.
+  try {
+    const warmup = new AudioCtx({ latencyHint: "interactive" });
+    await warmup.resume();
+    const buffer = warmup.createBuffer(1, 1, warmup.sampleRate);
+    const source = warmup.createBufferSource();
+    source.buffer = buffer;
+    source.connect(warmup.destination);
+    source.start(0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (warmup.state !== "closed") {
+      await warmup.close();
+    }
+  } catch {
+    // If warmup fails, fall back to a normal context.
+  }
+
+  return new AudioCtx({ latencyHint: "interactive" });
+}
+
 // Initialize SVG strobe visualizer - Peterson-style two concentric dashed arcs
 function initializeStrobeVisualizer(): void {
   if (!strobeVisualizerEl) return;
@@ -208,7 +236,7 @@ async function startAudio() {
   if (!AudioCtx) {
     throw new Error("AudioContext is not available in this browser.");
   }
-  const ctx = new AudioCtx({ latencyHint: "interactive" });
+  const ctx = await createAudioContext(AudioCtx);
   audioContext = ctx;
   await ctx.resume();
   if (!ctx) {
