@@ -208,9 +208,9 @@ async function startAudio() {
   if (!AudioCtx) {
     throw new Error("AudioContext is not available in this browser.");
   }
-  audioContext = new AudioCtx({ latencyHint: "interactive" });
-  await audioContext.resume();
-  const ctx = audioContext;
+  const ctx = new AudioCtx({ latencyHint: "interactive" });
+  audioContext = ctx;
+  await ctx.resume();
   if (!ctx) {
     throw new Error("AudioContext failed to initialize.");
   }
@@ -227,11 +227,31 @@ async function startAudio() {
   setStatus("Creating audio graph…");
   const source = ctx.createMediaStreamSource(micStream);
   workletNode = new AudioWorkletNode(ctx, "tuner");
-  
-  const gainNode = audioContext.createGain();
-  gainNode.gain.value = isIOS ? 1.2 : 3; // Avoid iOS clipping
 
-  source.connect(gainNode);
+  const highPass = ctx.createBiquadFilter();
+  highPass.type = "highpass";
+  highPass.frequency.value = 70;
+  highPass.Q.value = 0.707;
+
+  const lowPass = ctx.createBiquadFilter();
+  lowPass.type = "lowpass";
+  lowPass.frequency.value = 1200;
+  lowPass.Q.value = 0.707;
+
+  const compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = -30;
+  compressor.knee.value = 18;
+  compressor.ratio.value = 3;
+  compressor.attack.value = 0.01;
+  compressor.release.value = 0.2;
+
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = isIOS ? 2.2 : 3; // Compressor helps prevent clipping
+
+  source.connect(highPass);
+  highPass.connect(lowPass);
+  lowPass.connect(compressor);
+  compressor.connect(gainNode);
   gainNode.connect(workletNode);
   workletNode.connect(ctx.destination);
 
