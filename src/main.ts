@@ -162,10 +162,6 @@ function updateStrobeVisualizerRotation(centsValue: number | null, isDetecting: 
     // Normalize offsets to avoid huge numbers
     currentRotation = currentRotation % 400;
     currentDotsRotation = currentDotsRotation % 400;
-  } else {
-    // Reset offset when not detecting
-    currentRotation = 0;
-    currentDotsRotation = 0;
   }
 
   // Apply dash offset to both circles (opposite directions)
