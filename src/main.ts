@@ -7,7 +7,7 @@ const strobeVisualizerEl = document.getElementById("strobe-visualizer");
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 const A4 = 440;
 
-// Initialize SVG strobe visualizer - Peterson-style two concentric dashed circles
+// Initialize SVG strobe visualizer - Peterson-style two concentric dashed arcs
 function initializeStrobeVisualizer(): void {
   if (!strobeVisualizerEl) return;
   
@@ -17,50 +17,37 @@ function initializeStrobeVisualizer(): void {
   svg.setAttribute("height", "280");
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   
-  // Create clip path to show only top semicircle
-  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-  const clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
-  clipPath.setAttribute("id", "semicircleClip");
-  
-  const clipPath_rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  clipPath_rect.setAttribute("x", "0");
-  clipPath_rect.setAttribute("y", "0");
-  clipPath_rect.setAttribute("width", "280");
-  clipPath_rect.setAttribute("height", "140");
-  
-  clipPath.appendChild(clipPath_rect);
-  defs.appendChild(clipPath);
-  svg.appendChild(defs);
-  
-  // Outer dashed circle (larger radius)
-  const outerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  outerCircle.setAttribute("cx", "140");
-  outerCircle.setAttribute("cy", "140");
-  outerCircle.setAttribute("r", "130");
-  outerCircle.setAttribute("fill", "none");
-  outerCircle.setAttribute("clip-path", "url(#semicircleClip)");
-  outerCircle.style.stroke = "#808080";
-  outerCircle.style.strokeWidth = "12";
-  outerCircle.style.strokeDasharray = "8, 24";
-  outerCircle.style.strokeDashoffset = "0";
-  
-  strobeDots = outerCircle as any; // Reuse to track the animated element
-  svg.appendChild(outerCircle);
-  
-  // Inner dashed circle (smaller radius)
-  const innerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  innerCircle.setAttribute("cx", "140");
-  innerCircle.setAttribute("cy", "140");
-  innerCircle.setAttribute("r", "116");
-  innerCircle.setAttribute("fill", "none");
-  innerCircle.setAttribute("clip-path", "url(#semicircleClip)");
-  innerCircle.style.stroke = "#808080";
-  innerCircle.style.strokeWidth = "12";
-  innerCircle.style.strokeDasharray = "12, 12";
-  innerCircle.style.strokeDashoffset = "0";
-  
-  overlayRing = innerCircle as any;
-  svg.appendChild(innerCircle);
+  const createArcPath = (radius: number): SVGPathElement => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    // Top semicircle from left to right.
+    const startX = 140 - radius;
+    const startY = 140;
+    const endX = 140 + radius;
+    const endY = 140;
+    path.setAttribute("d", `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`);
+    path.setAttribute("fill", "none");
+    return path;
+  };
+
+  // Outer dashed arc (larger radius)
+  const outerArc = createArcPath(130);
+  outerArc.style.stroke = "#808080";
+  outerArc.style.strokeWidth = "12";
+  outerArc.style.strokeDasharray = "8 24";
+  outerArc.style.strokeDashoffset = "0";
+
+  strobeDots = outerArc as any; // Reuse to track the animated element
+  svg.appendChild(outerArc);
+
+  // Inner dashed arc (smaller radius)
+  const innerArc = createArcPath(116);
+  innerArc.style.stroke = "#808080";
+  innerArc.style.strokeWidth = "12";
+  innerArc.style.strokeDasharray = "12 12";
+  innerArc.style.strokeDashoffset = "0";
+
+  overlayRing = innerArc as any;
+  svg.appendChild(innerArc);
 
   strobeVisualizerEl.appendChild(svg);
 }
@@ -75,8 +62,8 @@ let candidateMidi: number | null = null;
 let candidateCount = 0;
 
 let centsEma: number | null = null;
-let overlayRing: SVGCircleElement | null = null;
-let strobeDots: SVGGElement | null = null;
+let overlayRing: SVGPathElement | null = null;
+let strobeDots: SVGPathElement | null = null;
 
 function freqToMidi(freqHz: number): number {
   return Math.round(12 * Math.log2(freqHz / A4) + 69);
@@ -179,7 +166,7 @@ function updateStrobeVisualizer(centsValue: number | null, isDetecting: boolean)
   // Update circle stroke colors based on detection state
   const svg = strobeVisualizerEl.querySelector("svg");
   if (svg) {
-    const circles = svg.querySelectorAll("circle");
+    const circles = svg.querySelectorAll("circle, path");
     const strokeColor = isDetecting ? "#8b5cf6" : "#808080";
     circles.forEach((circle: any) => {
       circle.style.stroke = strokeColor;
@@ -199,6 +186,10 @@ let workletNode: AudioWorkletNode | null = null;
 let animationFrameId: number | null = null;
 
 async function startAudio() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("Microphone access not available. On iOS Safari this requires HTTPS (secure context).");
+  }
+
   setStatus("Requesting microphone permission…");
 
   micStream = await navigator.mediaDevices.getUserMedia({
@@ -314,27 +305,44 @@ async function startAudio() {
 }
 
 // Auto-start audio on page load
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
 window.addEventListener("DOMContentLoaded", async () => {
   setReading(null, null);
-  setStatus("Initializing audio...");
+  setStatus(isIOS ? "Tap to start audio..." : "Initializing audio...");
 
-  try {
-    await startAudio();
-  } catch (err) {
-    console.error(err);
-    
-    let errorMsg = "Error starting audio";
-    if (err instanceof Error) {
-      if (err.name === "NotAllowedError" || err.message.includes("permission")) {
-        errorMsg = "Microphone permission denied. Please allow microphone access to use the tuner.";
-      } else if (err.name === "NotFoundError" || err.message.includes("no device")) {
-        errorMsg = "No microphone found. Please connect a microphone and try again.";
-      } else {
-        errorMsg = `Error: ${err.message}`;
+  const startWithHandling = async () => {
+    try {
+      await startAudio();
+    } catch (err) {
+      console.error(err);
+      
+      let errorMsg = "Error starting audio";
+      if (err instanceof Error) {
+        if (err.name === "NotAllowedError" || err.message.includes("permission")) {
+          errorMsg = "Microphone permission denied. Please allow microphone access to use the tuner.";
+        } else if (err.name === "NotFoundError" || err.message.includes("no device")) {
+          errorMsg = "No microphone found. Please connect a microphone and try again.";
+        } else {
+          errorMsg = `Error: ${err.message}`;
+        }
       }
+      
+      setStatus(errorMsg);
+      updateStrobeVisualizer(null, false);
     }
-    
-    setStatus(errorMsg);
-    updateStrobeVisualizer(null, false);
+  };
+
+  if (isIOS) {
+    const onFirstInteraction = () => {
+      document.removeEventListener("click", onFirstInteraction);
+      document.removeEventListener("touchend", onFirstInteraction);
+      startWithHandling();
+    };
+    document.addEventListener("click", onFirstInteraction, { once: true });
+    document.addEventListener("touchend", onFirstInteraction, { once: true, passive: true });
+  } else {
+    await startWithHandling();
   }
 });
+
