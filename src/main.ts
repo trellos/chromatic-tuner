@@ -321,6 +321,15 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).M
 window.addEventListener("DOMContentLoaded", async () => {
   setReading(null, null);
   setStatus(isIOS ? "Tap to start audio..." : "Initializing audio...");
+  document.body.classList.add("status-hidden");
+
+  if (strobeVisualizerEl) {
+    const toggleStatus = () => {
+      document.body.classList.toggle("status-hidden");
+    };
+    strobeVisualizerEl.addEventListener("click", toggleStatus);
+    strobeVisualizerEl.addEventListener("touchend", toggleStatus, { passive: true });
+  }
 
   const startWithHandling = async () => {
     try {
