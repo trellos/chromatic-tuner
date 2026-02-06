@@ -269,6 +269,7 @@ async function startAudio() {
     const rms: number = Number(data.rms ?? 0);
     const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
     const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
+    const effSr: number | null = Number.isFinite(data.effSr) ? Number(data.effSr) : null;
 
     if (freqHz == null) {
         // Reset state when no pitch
@@ -328,10 +329,14 @@ async function startAudio() {
     const note = midiToNoteName(lockedMidi);
     updateStrobeVisualizer(centsEma, true);
     setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
-    const debug =
-      tau !== null && cmnd !== null
-        ? ` tau=${tau.toFixed(1)} cmnd=${cmnd.toFixed(3)}`
-        : "";
+    const debugParts: string[] = [];
+    if (tau !== null && cmnd !== null) {
+      debugParts.push(`tau=${tau.toFixed(1)} cmnd=${cmnd.toFixed(3)}`);
+    }
+    if (effSr !== null) {
+      debugParts.push(`effSR=${effSr.toFixed(0)}`);
+    }
+    const debug = debugParts.length ? ` ${debugParts.join(" ")}` : "";
     setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
     return;
   }

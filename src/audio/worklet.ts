@@ -9,6 +9,7 @@ type WorkletMessage =
       rms: number;
       tau?: number;
       cmnd?: number;
+      effSr?: number;
     };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -298,6 +299,7 @@ class TunerProcessor extends AudioWorkletProcessor {
       rms,
       tau,
       cmnd,
+      effSr: this.effectiveSampleRate ?? undefined,
     };
     this.port.postMessage(msg);
 
