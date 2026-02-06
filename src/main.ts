@@ -202,7 +202,12 @@ async function startAudio() {
   });
 
   setStatus("Creating AudioContext…");
-  audioContext = new AudioContext({ latencyHint: "interactive" });
+  const AudioCtx =
+    (window as any).AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) {
+    throw new Error("AudioContext is not available in this browser.");
+  }
+  audioContext = new AudioCtx({ latencyHint: "interactive" });
   await audioContext.resume();
 
   setStatus("Loading worklet module…");
