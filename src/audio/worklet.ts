@@ -10,6 +10,7 @@ type WorkletMessage =
       tau?: number;
       cmnd?: number;
       effSr?: number;
+      zcHz?: number;
     };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -117,6 +118,25 @@ class TunerProcessor extends AudioWorkletProcessor {
       sumSq += v * v;
     }
     return Math.sqrt(sumSq / x.length);
+  }
+
+  private zeroCrossingFreq(x: Float32Array, sr: number): number | null {
+    const n = x.length;
+    if (n < 2) return null;
+    let mean = 0;
+    for (let i = 0; i < n; i++) mean += x[i] ?? 0;
+    mean /= n;
+    let crossings = 0;
+    let prev = (x[0] ?? 0) - mean;
+    for (let i = 1; i < n; i++) {
+      const cur = (x[i] ?? 0) - mean;
+      if ((prev <= 0 && cur > 0) || (prev >= 0 && cur < 0)) crossings++;
+      prev = cur;
+    }
+    const seconds = n / sr;
+    if (seconds <= 0) return null;
+    const freq = (crossings / 2) / seconds;
+    return Number.isFinite(freq) ? freq : null;
   }
 
   /**
@@ -288,6 +308,7 @@ class TunerProcessor extends AudioWorkletProcessor {
       this.yinDiff,
       this.yinCMND
     );
+    const zcHz = this.zeroCrossingFreq(this.analysisBuf, sr);
 
     // Gate on confidence
     const ok = freqHz !== null && confidence > 0.5;
@@ -300,6 +321,7 @@ class TunerProcessor extends AudioWorkletProcessor {
       tau,
       cmnd,
       effSr: this.effectiveSampleRate ?? undefined,
+      zcHz: zcHz ?? undefined,
     };
     this.port.postMessage(msg);
 

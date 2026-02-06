@@ -270,6 +270,7 @@ async function startAudio() {
     const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
     const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
     const effSr: number | null = Number.isFinite(data.effSr) ? Number(data.effSr) : null;
+    const zcHz: number | null = Number.isFinite(data.zcHz) ? Number(data.zcHz) : null;
 
     if (freqHz == null) {
         // Reset state when no pitch
@@ -335,6 +336,9 @@ async function startAudio() {
     }
     if (effSr !== null) {
       debugParts.push(`effSR=${effSr.toFixed(0)}`);
+    }
+    if (zcHz !== null) {
+      debugParts.push(`zc=${zcHz.toFixed(2)}`);
     }
     const debug = debugParts.length ? ` ${debugParts.join(" ")}` : "";
     setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
