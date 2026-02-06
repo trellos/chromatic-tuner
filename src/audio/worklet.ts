@@ -18,6 +18,7 @@ class TunerProcessor extends AudioWorkletProcessor {
   private analysisBuf: Float32Array;
   private yinDiff: Float32Array;
   private yinCMND: Float32Array;
+  private mixBuf: Float32Array | null = null;
 
   constructor() {
     super();
@@ -186,13 +187,29 @@ class TunerProcessor extends AudioWorkletProcessor {
     // explicitly checking lengths.
     if (inputs.length < 1) return true;
     const in0 = inputs[0];
-    if (!in0 || in0.length < 2) return true;
-    const chan0 = in0[1]; // Use stereo channel 1 (right channel)
+    if (!in0 || in0.length < 1) return true;
+    const chan0 = in0[0]; // Mono or left
     if (!chan0 || chan0.length === 0) return true;
 
-    this.pushBlock(chan0);
+    let input = chan0;
+    if (in0.length > 1) {
+      const chan1 = in0[1]; // Right channel if present
+      if (chan1 && chan1.length === chan0.length) {
+        if (!this.mixBuf || this.mixBuf.length !== chan0.length) {
+          this.mixBuf = new Float32Array(chan0.length);
+        }
+        for (let i = 0; i < chan0.length; i++) {
+          const a = chan0[i] ?? 0;
+          const b = chan1[i] ?? 0;
+          this.mixBuf[i] = (a + b) * 0.5;
+        }
+        input = this.mixBuf;
+      }
+    }
 
-    this.framesUntilAnalysis -= chan0.length;
+    this.pushBlock(input);
+
+    this.framesUntilAnalysis -= input.length;
     if (this.framesUntilAnalysis > 0) return true;
     this.framesUntilAnalysis += this.hopFrames;
 

@@ -211,6 +211,12 @@ async function startAudio() {
   await audioContext.resume();
 
   setStatus("Loading worklet module…");
+  if (!audioContext.audioWorklet) {
+    throw new Error(
+      "AudioWorklet is not supported in this browser. Please use a newer iOS Safari.",
+    );
+  }
+
   await audioContext.audioWorklet.addModule("./assets/worklet.js");
 
   setStatus("Creating audio graph…");
