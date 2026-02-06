@@ -80,6 +80,17 @@ Dev script uses **separate esbuild contexts** for app and worklet, allowing inde
 - **Audio settings**: Adjust `hopFrames`, `windowSize`, confidence threshold, or frequency range in worklet constructor
 - **Note display**: Change `NOTE_NAMES` array or octave offset in `midiToNoteName()`
 
+## iOS Workarounds (Important)
+
+These changes exist specifically to address iOS Safari audio capture quirks.
+
+- **AudioContext warm-up**: `createAudioContext()` performs a short silent-buffer warm-up on iOS before creating the real context. This avoids a "bad" initial context state some iOS versions can enter.
+- **iOS ScriptProcessor fallback**: On iOS, a `ScriptProcessorNode` runs in parallel with the AudioWorklet and supplies the *actual* pitch used for display. This bypasses iOS AudioWorklet capture anomalies.
+- **Wall-clock sample-rate correction**: The ScriptProcessor path measures an effective sample rate using `performance.now()` and uses that for pitch detection (`wallSR`). This compensates for timebase skew in mic capture.
+- **Low-pass assist for acoustic guitars**: iOS ScriptProcessor path runs YIN on both the raw signal and a low-pass filtered signal (~500 Hz) and prefers the low-pass estimate when it is more reliable. This reduces harmonic locking (e.g., E string reading as A).
+- **Internal 440 Hz test tone**: Long-press the strobe on iOS toggles a built-in 440 Hz oscillator (`mode=osc`) that bypasses the mic path. This is used to validate analyzer correctness when mic input is suspect.
+- **Debug mode flag**: Add `?debug` to the URL to reveal the status/debug panel. The flag is controlled by `SHOW_STATUS` in `src/main.ts`.
+
 ## Session Notes (Handoff)
 
 - UI: `#reading` (note + cents) moved inside `#strobe-visualizer` and positioned so the text sits within the semicircle.
