@@ -25,11 +25,54 @@ main {
 
 h1 {
   text-align: center;
-  margin: 0 0 24px 0;
-  color: #1f2937;
-  font-size: 28px;
-  font-weight: 600;
+  margin: 0 0 36px 0;
   min-height: 34px;
+}
+
+.hero-title {
+  position: relative;
+  display: inline-block;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 6px 10px 18px;
+  color: transparent;
+  background: linear-gradient(90deg, #a855f7 0%, #86efac 55%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-rendering: geometricPrecision;
+}
+
+.hero-title::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: #0f172a;
+  text-shadow:
+    1px 1px #a855f7,
+    2px 2px #b794f4,
+    3px 3px #86efac,
+    4px 4px #9ef2c1,
+    5px 5px #93c5fd,
+    6px 6px #b6d4fe,
+    7px 7px #cfe4ff;
+}
+
+.hero-title::after {
+  content: "===[ T U N A ]===";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 8px);
+  font-size: 12px;
+  letter-spacing: 0.35em;
+  color: #94a3b8;
+  white-space: pre;
 }
 
 /* Strobe Tuner Visualization */
@@ -154,9 +197,19 @@ body.status-hidden #status {
   }
 
   h1 {
-    font-size: 24px;
     margin-bottom: 20px;
     min-height: 30px;
+  }
+
+  .hero-title {
+    font-size: 46px;
+    letter-spacing: 0.25em;
+    padding-bottom: 16px;
+  }
+
+  .hero-title::after {
+    font-size: 10px;
+    letter-spacing: 0.3em;
   }
 
   .strobe-tuner {
