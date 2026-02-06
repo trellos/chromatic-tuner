@@ -242,7 +242,7 @@ class TunerProcessor extends AudioWorkletProcessor {
     this.copyLatestWindow(this.analysisBuf);
 
     const rms = this.computeRms(this.analysisBuf);
-    if (rms < 0.004) {
+    if (rms < 0.002) {
       const msg: WorkletMessage = { type: "pitch", freqHz: null, confidence: 0, rms };
       this.port.postMessage(msg);
       return true;
@@ -256,7 +256,7 @@ class TunerProcessor extends AudioWorkletProcessor {
     );
 
     // Gate on confidence
-    const ok = freqHz !== null && confidence > 0.6;
+    const ok = freqHz !== null && confidence > 0.5;
 
     const msg: WorkletMessage = {
       type: "pitch",
