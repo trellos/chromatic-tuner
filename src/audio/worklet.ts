@@ -2,7 +2,14 @@
 
 type WorkletMessage =
   | { type: "worklet-ready"; sampleRate: number; bufferSize: number }
-  | { type: "pitch"; freqHz: number | null; confidence: number; rms: number };
+  | {
+      type: "pitch";
+      freqHz: number | null;
+      confidence: number;
+      rms: number;
+      tau?: number;
+      cmnd?: number;
+    };
 
 type WorkletConfigMessage = { type: "config"; inputSampleRate: number };
 
@@ -105,12 +112,12 @@ class TunerProcessor extends AudioWorkletProcessor {
     sr: number,
     diff: Float32Array,
     cmnd: Float32Array
-  ): { freqHz: number | null; confidence: number } {
+  ): { freqHz: number | null; confidence: number; tau: number; cmnd: number } {
     const n = x.length;
     const maxTau = diff.length; // == cmnd.length
 
     // Need at least a few taus to do anything
-    if (n < 4 || maxTau < 4) return { freqHz: null, confidence: 0 };
+    if (n < 4 || maxTau < 4) return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
 
     // 1) Difference function d(tau)
     diff.fill(0);
@@ -169,19 +176,19 @@ class TunerProcessor extends AudioWorkletProcessor {
         }
       }
       tauEstimate = minTau;
-      if (tauEstimate <= 0) return { freqHz: null, confidence: 0 };
+      if (tauEstimate <= 0) return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
     }
 
     // 4) Parabolic interpolation (safe indexing)
-    // Prefer longer-period candidates if they are nearly as good.
-    // This helps avoid octave-high estimates on noisy inputs.
+    // Prefer shorter-period candidates if they are nearly as good.
+    // This helps avoid subharmonic picks on clean inputs.
     let bestTau = tauEstimate;
-    for (let multiple = 2; multiple <= 3; multiple++) {
-      const candidate = tauEstimate * multiple;
-      if (candidate + 1 > tauMax) break;
+    for (let divisor = 2; divisor <= 3; divisor++) {
+      const candidate = Math.floor(tauEstimate / divisor);
+      if (candidate - 1 < tauMin) continue;
       const candVal = cmnd[candidate] ?? 1;
       const bestVal = cmnd[bestTau] ?? 1;
-      if (candVal <= bestVal + 0.05) bestTau = candidate;
+      if (candVal <= bestVal + 0.08) bestTau = candidate;
     }
 
     const t = clamp(bestTau, 2, maxTau - 2);
@@ -199,10 +206,10 @@ class TunerProcessor extends AudioWorkletProcessor {
 
     // Clamp frequency to tuner band
     if (freqHz === null || freqHz < 60 || freqHz > 1200) {
-      return { freqHz: null, confidence: 0 };
+      return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
     }
 
-    return { freqHz, confidence };
+    return { freqHz, confidence, tau: betterTau, cmnd: x1 };
   }
 
   process(inputs: Float32Array[][]): boolean {
@@ -240,7 +247,7 @@ class TunerProcessor extends AudioWorkletProcessor {
     }
 
     const sr = this.inputSampleRate ?? sampleRate;
-    const { freqHz, confidence } = this.yinDetect(
+    const { freqHz, confidence, tau, cmnd } = this.yinDetect(
       this.analysisBuf,
       sr,
       this.yinDiff,
@@ -255,6 +262,8 @@ class TunerProcessor extends AudioWorkletProcessor {
       freqHz: ok ? freqHz : null,
       confidence,
       rms,
+      tau,
+      cmnd,
     };
     this.port.postMessage(msg);
 
