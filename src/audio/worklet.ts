@@ -126,7 +126,7 @@ class TunerProcessor extends AudioWorkletProcessor {
     }
 
     // 3) Find first dip below threshold
-    const threshold = 0.15;
+    const threshold = 0.005;
     let tauEstimate = -1;
 
     for (let tau = 2; tau < maxTau; tau++) {
