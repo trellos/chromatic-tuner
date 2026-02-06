@@ -23,6 +23,7 @@ class TunerProcessor extends AudioWorkletProcessor {
   private framesUntilAnalysis: number;
 
   private analysisBuf: Float32Array;
+  private window: Float32Array;
   private yinDiff: Float32Array;
   private yinCMND: Float32Array;
 
@@ -37,6 +38,11 @@ class TunerProcessor extends AudioWorkletProcessor {
 
     const windowSize = 4096;
     this.analysisBuf = new Float32Array(windowSize);
+    this.window = new Float32Array(windowSize);
+    for (let i = 0; i < windowSize; i++) {
+      // Hann window to reduce spectral leakage and DC bias effects.
+      this.window[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (windowSize - 1)));
+    }
 
     const maxTau = Math.floor(windowSize / 2);
     this.yinDiff = new Float32Array(maxTau);
@@ -109,14 +115,18 @@ class TunerProcessor extends AudioWorkletProcessor {
     // Need at least a few taus to do anything
     if (n < 4 || maxTau < 4) return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
 
-    // 1) Difference function d(tau)
+    // 1) Difference function d(tau), with DC removal + Hann window
+    let mean = 0;
+    for (let i = 0; i < n; i++) mean += x[i] ?? 0;
+    mean /= n;
+
     diff.fill(0);
     for (let tau = 1; tau < maxTau; tau++) {
       let sum = 0;
       const limit = n - tau;
       for (let i = 0; i < limit; i++) {
-        const a = x[i] ?? 0;
-        const b = x[i + tau] ?? 0;
+        const a = ((x[i] ?? 0) - mean) * (this.window[i] ?? 1);
+        const b = ((x[i + tau] ?? 0) - mean) * (this.window[i + tau] ?? 1);
         const d = a - b;
         sum += d * d;
       }
@@ -132,25 +142,21 @@ class TunerProcessor extends AudioWorkletProcessor {
       cmnd[tau] = runningSum > 0 ? (v * tau) / runningSum : 1;
     }
 
-    // 3) Find first dip below threshold within a realistic frequency range.
-    // This avoids picking ultra-short taus (sharp bias) on noisy inputs.
-    const threshold = 0.02;
+    // 3) Find best local minimum within a realistic frequency range.
+    // This is more stable than "first dip" on resampled/mobile inputs.
+    const threshold = 0.2;
     const tauMin = Math.max(2, Math.floor(sr / 1200)); // max freq
     const tauMax = Math.min(maxTau - 1, Math.floor(sr / 70)); // min freq
     let tauEstimate = -1;
+    let bestVal = Number.POSITIVE_INFINITY;
 
-    for (let tau = tauMin; tau <= tauMax; tau++) {
-      const v = cmnd[tau] ?? 1;
-      if (v < threshold) {
-        // walk to local minimum
-        while (tau + 1 <= tauMax) {
-          const cur = cmnd[tau] ?? 1;
-          const nxt = cmnd[tau + 1] ?? 1;
-          if (nxt < cur) tau++;
-          else break;
-        }
+    for (let tau = tauMin + 1; tau < tauMax; tau++) {
+      const prev = cmnd[tau - 1] ?? 1;
+      const cur = cmnd[tau] ?? 1;
+      const next = cmnd[tau + 1] ?? 1;
+      if (cur <= prev && cur <= next && cur < bestVal) {
+        bestVal = cur;
         tauEstimate = tau;
-        break;
       }
     }
 
@@ -166,7 +172,12 @@ class TunerProcessor extends AudioWorkletProcessor {
         }
       }
       tauEstimate = minTau;
+      bestVal = minVal;
       if (tauEstimate <= 0) return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
+    }
+
+    if (bestVal > threshold) {
+      return { freqHz: null, confidence: 0, tau: 0, cmnd: bestVal };
     }
 
     // 4) Candidate refinement: consider subharmonics and harmonics with a small penalty.
@@ -184,7 +195,7 @@ class TunerProcessor extends AudioWorkletProcessor {
       const candidate = Math.round(raw);
       if (candidate - 1 < tauMin || candidate + 1 > tauMax) continue;
       const ratio = Math.abs(Math.log2(candidate / tauEstimate));
-      const penalty = 0.03 * ratio;
+      const penalty = 0.04 * ratio;
       const candVal = cmnd[candidate] ?? 1;
       const score = candVal + penalty;
       if (score < bestScore) {
