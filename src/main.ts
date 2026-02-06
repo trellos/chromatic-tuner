@@ -185,6 +185,7 @@ let audioContext: AudioContext | null = null;
 let micStream: MediaStream | null = null;
 let workletNode: AudioWorkletNode | null = null;
 let animationFrameId: number | null = null;
+let inputSampleRate: number | null = null;
 
 async function startAudio() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -201,6 +202,14 @@ async function startAudio() {
       channelCount: 1,
     },
   });
+
+  const track = micStream.getAudioTracks()[0];
+  if (track?.getSettings) {
+    const settings = track.getSettings();
+    if (typeof settings.sampleRate === "number") {
+      inputSampleRate = settings.sampleRate;
+    }
+  }
 
   setStatus("Creating AudioContext…");
   const AudioCtx =
@@ -223,6 +232,9 @@ async function startAudio() {
   setStatus("Creating audio graph…");
   const source = audioContext.createMediaStreamSource(micStream);
   workletNode = new AudioWorkletNode(audioContext, "tuner");
+  if (inputSampleRate) {
+    workletNode.port.postMessage({ type: "config", inputSampleRate });
+  }
   
   const gainNode = audioContext.createGain();
   gainNode.gain.value = isIOS ? 1.2 : 3; // Avoid iOS clipping
@@ -235,7 +247,8 @@ async function startAudio() {
     const data = ev.data as any;
 
   if (data?.type === "worklet-ready") {
-    setStatus(`Worklet ready. sr=${data.sampleRate}, ring=${data.bufferSize}`);
+    const inSr = inputSampleRate ? `, inputSR=${inputSampleRate}` : "";
+    setStatus(`Worklet ready. sr=${data.sampleRate}${inSr}, ring=${data.bufferSize}`);
     return;
   }
 

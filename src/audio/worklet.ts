@@ -4,6 +4,8 @@ type WorkletMessage =
   | { type: "worklet-ready"; sampleRate: number; bufferSize: number }
   | { type: "pitch"; freqHz: number | null; confidence: number; rms: number };
 
+type WorkletConfigMessage = { type: "config"; inputSampleRate: number };
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -18,6 +20,7 @@ class TunerProcessor extends AudioWorkletProcessor {
   private analysisBuf: Float32Array;
   private yinDiff: Float32Array;
   private yinCMND: Float32Array;
+  private inputSampleRate: number | null = null;
 
   constructor() {
     super();
@@ -41,6 +44,13 @@ class TunerProcessor extends AudioWorkletProcessor {
       bufferSize: this.ring.length,
     };
     this.port.postMessage(msg);
+
+    this.port.onmessage = (ev) => {
+      const data = ev.data as WorkletConfigMessage | null;
+      if (data?.type === "config" && typeof data.inputSampleRate === "number") {
+        this.inputSampleRate = data.inputSampleRate;
+      }
+    };
   }
 
   private pushBlock(input: Float32Array): void {
@@ -229,9 +239,10 @@ class TunerProcessor extends AudioWorkletProcessor {
       return true;
     }
 
+    const sr = this.inputSampleRate ?? sampleRate;
     const { freqHz, confidence } = this.yinDetect(
       this.analysisBuf,
-      sampleRate,
+      sr,
       this.yinDiff,
       this.yinCMND
     );
