@@ -219,19 +219,23 @@ async function startAudio() {
   }
   audioContext = new AudioCtx({ latencyHint: "interactive" });
   await audioContext.resume();
+  const ctx = audioContext;
+  if (!ctx) {
+    throw new Error("AudioContext failed to initialize.");
+  }
 
   setStatus("Loading worklet module…");
-  if (!audioContext.audioWorklet) {
+  if (!ctx.audioWorklet) {
     throw new Error(
       "AudioWorklet is not supported in this browser. Please use a newer iOS Safari.",
     );
   }
 
-  await audioContext.audioWorklet.addModule("./assets/worklet.js");
+  await ctx.audioWorklet.addModule("./assets/worklet.js");
 
   setStatus("Creating audio graph…");
-  const source = audioContext.createMediaStreamSource(micStream);
-  workletNode = new AudioWorkletNode(audioContext, "tuner");
+  const source = ctx.createMediaStreamSource(micStream);
+  workletNode = new AudioWorkletNode(ctx, "tuner");
   if (inputSampleRate) {
     workletNode.port.postMessage({ type: "config", inputSampleRate });
   }
@@ -241,7 +245,7 @@ async function startAudio() {
 
   source.connect(gainNode);
   gainNode.connect(workletNode);
-  workletNode.connect(audioContext.destination);
+  workletNode.connect(ctx.destination);
 
   workletNode.port.onmessage = (ev) => {
     const data = ev.data as any;
@@ -256,6 +260,8 @@ async function startAudio() {
     const freqHz: number | null = data.freqHz ?? null;
     const confidence: number = Number(data.confidence ?? 0);
     const rms: number = Number(data.rms ?? 0);
+    const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
+    const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
 
     if (freqHz == null) {
         // Reset state when no pitch
@@ -315,7 +321,11 @@ async function startAudio() {
     const note = midiToNoteName(lockedMidi);
     updateStrobeVisualizer(centsEma, true);
     setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
-    setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}`);
+    const debug =
+      tau !== null && cmnd !== null
+        ? ` tau=${tau.toFixed(1)} cmnd=${cmnd.toFixed(3)}`
+        : "";
+    setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
     return;
   }
   };
