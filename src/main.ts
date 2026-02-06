@@ -449,13 +449,18 @@ async function startAudio() {
     const ring = new Float32Array(ringSize);
     let writeIndex = 0;
     const analysisBuf = new Float32Array(windowSize);
+    const lpBuf = new Float32Array(windowSize);
     const diff = new Float32Array(windowSize / 2);
     const cmnd = new Float32Array(windowSize / 2);
+    const diffLp = new Float32Array(windowSize / 2);
+    const cmndLp = new Float32Array(windowSize / 2);
     const window = createHannWindow(windowSize);
     const hopFrames = Math.floor(ctx.sampleRate / 20);
     let framesUntilAnalysis = hopFrames;
     let wallSampleCounter = 0;
     let wallLastTime = performance.now();
+    const lpCutoff = 500;
+    const lpAlpha = (2 * Math.PI * lpCutoff) / (ctx.sampleRate + 2 * Math.PI * lpCutoff);
 
     const pushBlock = (input: Float32Array) => {
       const n = input.length;
@@ -509,16 +514,46 @@ async function startAudio() {
         scriptPitchConf = 0;
         return;
       }
+
+      // Simple low-pass to emphasize fundamentals for acoustic guitar.
+      let y = lpBuf[0] ?? 0;
+      for (let i = 0; i < analysisBuf.length; i++) {
+        const x = analysisBuf[i] ?? 0;
+        y = y + lpAlpha * (x - y);
+        lpBuf[i] = y;
+      }
+
       const srForAnalysis = scriptWallSr ?? ctx.sampleRate;
-      const { freqHz, confidence } = yinDetectMain(
+      const full = yinDetectMain(
         analysisBuf,
         srForAnalysis,
         diff,
         cmnd,
         window
       );
-      scriptPitchHz = freqHz;
-      scriptPitchConf = confidence;
+      const low = yinDetectMain(
+        lpBuf,
+        srForAnalysis,
+        diffLp,
+        cmndLp,
+        window
+      );
+
+      // Prefer the low-passed estimate if it is confident and not wildly different.
+      let chosen = full;
+      if (low.freqHz !== null && low.confidence > 0.6) {
+        if (full.freqHz == null || low.confidence >= full.confidence + 0.05) {
+          chosen = low;
+        } else if (full.freqHz !== null) {
+          const ratio = full.freqHz / low.freqHz;
+          if (ratio > 1.2 && ratio < 2.2) {
+            chosen = low;
+          }
+        }
+      }
+
+      scriptPitchHz = chosen.freqHz;
+      scriptPitchConf = chosen.confidence;
     };
 
     gainNode.connect(scriptNode);
