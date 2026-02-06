@@ -351,6 +351,7 @@ let animationFrameId: number | null = null;
 let scriptNode: ScriptProcessorNode | null = null;
 let scriptPitchHz: number | null = null;
 let scriptPitchConf = 0;
+let scriptWallSr: number | null = null;
 let useTestTone = false;
 let testOsc: OscillatorNode | null = null;
 let micGainNode: GainNode | null = null;
@@ -453,6 +454,8 @@ async function startAudio() {
     const window = createHannWindow(windowSize);
     const hopFrames = Math.floor(ctx.sampleRate / 20);
     let framesUntilAnalysis = hopFrames;
+    let wallSampleCounter = 0;
+    let wallLastTime = performance.now();
 
     const pushBlock = (input: Float32Array) => {
       const n = input.length;
@@ -481,6 +484,21 @@ async function startAudio() {
       const input = ev.inputBuffer.getChannelData(0);
       if (!input || input.length === 0) return;
       pushBlock(input);
+      wallSampleCounter += input.length;
+      const nowMs = performance.now();
+      const dt = (nowMs - wallLastTime) / 1000;
+      if (dt >= 0.2) {
+        const measured = wallSampleCounter / dt;
+        if (Number.isFinite(measured) && measured > 1000) {
+          const alpha = 0.2;
+          scriptWallSr =
+            scriptWallSr == null
+              ? measured
+              : scriptWallSr + alpha * (measured - scriptWallSr);
+        }
+        wallSampleCounter = 0;
+        wallLastTime = nowMs;
+      }
       framesUntilAnalysis -= input.length;
       if (framesUntilAnalysis > 0) return;
       framesUntilAnalysis += hopFrames;
@@ -491,9 +509,10 @@ async function startAudio() {
         scriptPitchConf = 0;
         return;
       }
+      const srForAnalysis = scriptWallSr ?? ctx.sampleRate;
       const { freqHz, confidence } = yinDetectMain(
         analysisBuf,
-        ctx.sampleRate,
+        srForAnalysis,
         diff,
         cmnd,
         window
@@ -518,13 +537,18 @@ async function startAudio() {
   }
 
   if (data?.type === "pitch") {
-    const freqHz: number | null = data.freqHz ?? null;
-    const confidence: number = Number(data.confidence ?? 0);
+    let freqHz: number | null = data.freqHz ?? null;
+    let confidence: number = Number(data.confidence ?? 0);
     const rms: number = Number(data.rms ?? 0);
     const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
     const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
     const effSr: number | null = Number.isFinite(data.effSr) ? Number(data.effSr) : null;
     const zcHz: number | null = Number.isFinite(data.zcHz) ? Number(data.zcHz) : null;
+
+    if (isIOS && scriptPitchHz !== null) {
+      freqHz = scriptPitchHz;
+      confidence = scriptPitchConf;
+    }
 
     if (freqHz == null) {
         // Reset state when no pitch
@@ -597,6 +621,9 @@ async function startAudio() {
     if (isIOS) {
       const sp = scriptPitchHz !== null ? scriptPitchHz.toFixed(2) : "null";
       debugParts.push(`sp=${sp}`);
+      if (scriptWallSr !== null) {
+        debugParts.push(`wallSR=${scriptWallSr.toFixed(0)}`);
+      }
     }
     if (useTestTone) {
       debugParts.push("mode=osc");
