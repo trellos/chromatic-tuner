@@ -26,6 +26,9 @@ class TunerProcessor extends AudioWorkletProcessor {
   private window: Float32Array;
   private yinDiff: Float32Array;
   private yinCMND: Float32Array;
+  private sampleCounter = 0;
+  private lastTime = 0;
+  private effectiveSampleRate: number | null = null;
 
   constructor() {
     super();
@@ -69,6 +72,24 @@ class TunerProcessor extends AudioWorkletProcessor {
       this.writeIndex += chunk;
       if (this.writeIndex >= len) this.writeIndex -= len;
       i += chunk;
+    }
+
+    // Track effective sample rate (iOS may drop samples).
+    this.sampleCounter += n;
+    const now = currentTime;
+    if (this.lastTime === 0) this.lastTime = now;
+    const dt = now - this.lastTime;
+    if (dt >= 0.5) {
+      const measured = this.sampleCounter / dt;
+      if (Number.isFinite(measured) && measured > 1000) {
+        const alpha = 0.2;
+        this.effectiveSampleRate =
+          this.effectiveSampleRate == null
+            ? measured
+            : this.effectiveSampleRate + alpha * (measured - this.effectiveSampleRate);
+      }
+      this.sampleCounter = 0;
+      this.lastTime = now;
     }
   }
 
@@ -259,9 +280,10 @@ class TunerProcessor extends AudioWorkletProcessor {
       return true;
     }
 
+    const sr = this.effectiveSampleRate ?? sampleRate;
     const { freqHz, confidence, tau, cmnd } = this.yinDetect(
       this.analysisBuf,
-      sampleRate,
+      sr,
       this.yinDiff,
       this.yinCMND
     );
