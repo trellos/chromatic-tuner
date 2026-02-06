@@ -129,6 +129,133 @@ function median(values: number[]): number {
   return a.length % 2 ? (a[mid] ?? 0) : ((a[mid - 1] ?? 0) + (a[mid] ?? 0)) / 2;
 }
 
+function computeRms(x: Float32Array): number {
+  let sumSq = 0;
+  for (let i = 0; i < x.length; i++) {
+    const v = x[i] ?? 0;
+    sumSq += v * v;
+  }
+  return Math.sqrt(sumSq / x.length);
+}
+
+function createHannWindow(n: number): Float32Array {
+  const w = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    w[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1)));
+  }
+  return w;
+}
+
+function yinDetectMain(
+  x: Float32Array,
+  sr: number,
+  diff: Float32Array,
+  cmnd: Float32Array,
+  window: Float32Array
+): { freqHz: number | null; confidence: number; tau: number; cmnd: number } {
+  const n = x.length;
+  const maxTau = diff.length;
+  if (n < 4 || maxTau < 4) return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
+
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += x[i] ?? 0;
+  mean /= n;
+
+  diff.fill(0);
+  for (let tau = 1; tau < maxTau; tau++) {
+    let sum = 0;
+    const limit = n - tau;
+    for (let i = 0; i < limit; i++) {
+      const a = ((x[i] ?? 0) - mean) * (window[i] ?? 1);
+      const b = ((x[i + tau] ?? 0) - mean) * (window[i + tau] ?? 1);
+      const d = a - b;
+      sum += d * d;
+    }
+    diff[tau] = sum;
+  }
+
+  cmnd[0] = 1;
+  let runningSum = 0;
+  for (let tau = 1; tau < maxTau; tau++) {
+    runningSum += diff[tau] ?? 0;
+    const v = diff[tau] ?? 0;
+    cmnd[tau] = runningSum > 0 ? (v * tau) / runningSum : 1;
+  }
+
+  const threshold = 0.2;
+  const tauMin = Math.max(2, Math.floor(sr / 1200));
+  const tauMax = Math.min(maxTau - 1, Math.floor(sr / 70));
+  let tauEstimate = -1;
+  let bestVal = Number.POSITIVE_INFINITY;
+
+  for (let tau = tauMin + 1; tau < tauMax; tau++) {
+    const prev = cmnd[tau - 1] ?? 1;
+    const cur = cmnd[tau] ?? 1;
+    const next = cmnd[tau + 1] ?? 1;
+    if (cur <= prev && cur <= next && cur < bestVal) {
+      bestVal = cur;
+      tauEstimate = tau;
+    }
+  }
+
+  if (tauEstimate === -1) {
+    let minVal = Number.POSITIVE_INFINITY;
+    let minTau = -1;
+    for (let tau = tauMin; tau <= tauMax; tau++) {
+      const v = cmnd[tau] ?? 1;
+      if (v < minVal) {
+        minVal = v;
+        minTau = tau;
+      }
+    }
+    tauEstimate = minTau;
+    bestVal = minVal;
+    if (tauEstimate <= 0) return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
+  }
+
+  if (bestVal > threshold) {
+    return { freqHz: null, confidence: 0, tau: 0, cmnd: bestVal };
+  }
+
+  let bestTau = tauEstimate;
+  let bestScore = cmnd[bestTau] ?? 1;
+  const candidates = [
+    tauEstimate / 2,
+    tauEstimate / 3,
+    tauEstimate * 2,
+    tauEstimate * 3,
+  ];
+
+  for (const raw of candidates) {
+    const candidate = Math.round(raw);
+    if (candidate - 1 < tauMin || candidate + 1 > tauMax) continue;
+    const ratio = Math.abs(Math.log2(candidate / tauEstimate));
+    const penalty = 0.04 * ratio;
+    const candVal = cmnd[candidate] ?? 1;
+    const score = candVal + penalty;
+    if (score < bestScore) {
+      bestScore = score;
+      bestTau = candidate;
+    }
+  }
+
+  const t = Math.max(2, Math.min(bestTau, maxTau - 2));
+  const x0 = cmnd[t - 1] ?? 1;
+  const x1 = cmnd[t] ?? 1;
+  const x2 = cmnd[t + 1] ?? 1;
+
+  const denom = 2 * x1 - x2 - x0;
+  const betterTau = denom !== 0 ? t + (x2 - x0) / (2 * denom) : t;
+  const freqHz = betterTau > 0 ? sr / betterTau : null;
+  const confidence = Math.max(0, Math.min(1, 1 - x1));
+
+  if (freqHz === null || freqHz < 60 || freqHz > 1200) {
+    return { freqHz: null, confidence: 0, tau: 0, cmnd: 1 };
+  }
+
+  return { freqHz, confidence, tau: betterTau, cmnd: x1 };
+}
+
 function wrapCents(c: number): number {
   // Keep cents in [-50, +50) relative to the chosen nearest note
   // (your cents calc already does this, but this is a safety clamp)
@@ -144,6 +271,14 @@ function setStatus(msg: string) {
 function setReading(note: string | null, cents: string | null) {
   if (noteEl) noteEl.textContent = note ?? "";
   if (centsEl) centsEl.textContent = cents ?? "";
+}
+
+function setTestToneEnabled(enabled: boolean) {
+  useTestTone = enabled;
+  if (micGainNode && oscGainNode) {
+    micGainNode.gain.value = enabled ? 0 : 1;
+    oscGainNode.gain.value = enabled ? 1 : 0;
+  }
 }
 
 let currentRotation = 0;
@@ -213,6 +348,13 @@ let audioContext: AudioContext | null = null;
 let micStream: MediaStream | null = null;
 let workletNode: AudioWorkletNode | null = null;
 let animationFrameId: number | null = null;
+let scriptNode: ScriptProcessorNode | null = null;
+let scriptPitchHz: number | null = null;
+let scriptPitchConf = 0;
+let useTestTone = false;
+let testOsc: OscillatorNode | null = null;
+let micGainNode: GainNode | null = null;
+let oscGainNode: GainNode | null = null;
 
 async function startAudio() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -276,12 +418,96 @@ async function startAudio() {
   const gainNode = ctx.createGain();
   gainNode.gain.value = isIOS ? 2.2 : 3; // Compressor helps prevent clipping
 
-  source.connect(highPass);
+  const micGain = ctx.createGain();
+  micGain.gain.value = 1;
+  micGainNode = micGain;
+
+  const oscGain = ctx.createGain();
+  oscGain.gain.value = 0;
+  oscGainNode = oscGain;
+
+  testOsc = ctx.createOscillator();
+  testOsc.type = "sine";
+  testOsc.frequency.value = 440;
+  testOsc.start();
+
+  source.connect(micGain);
+  micGain.connect(highPass);
+  testOsc.connect(oscGain);
+  oscGain.connect(highPass);
   highPass.connect(lowPass);
   lowPass.connect(compressor);
   compressor.connect(gainNode);
   gainNode.connect(workletNode);
   workletNode.connect(ctx.destination);
+
+  if (isIOS) {
+    scriptNode = ctx.createScriptProcessor(2048, 1, 1);
+    const windowSize = 4096;
+    const ringSize = 16384;
+    const ring = new Float32Array(ringSize);
+    let writeIndex = 0;
+    const analysisBuf = new Float32Array(windowSize);
+    const diff = new Float32Array(windowSize / 2);
+    const cmnd = new Float32Array(windowSize / 2);
+    const window = createHannWindow(windowSize);
+    const hopFrames = Math.floor(ctx.sampleRate / 20);
+    let framesUntilAnalysis = hopFrames;
+
+    const pushBlock = (input: Float32Array) => {
+      const n = input.length;
+      let i = 0;
+      while (i < n) {
+        const spaceToEnd = ringSize - writeIndex;
+        const chunk = Math.min(spaceToEnd, n - i);
+        ring.set(input.subarray(i, i + chunk), writeIndex);
+        writeIndex += chunk;
+        if (writeIndex >= ringSize) writeIndex -= ringSize;
+        i += chunk;
+      }
+    };
+
+    const copyLatestWindow = (dest: Float32Array) => {
+      let idx = writeIndex - dest.length;
+      while (idx < 0) idx += ringSize;
+      for (let i = 0; i < dest.length; i++) {
+        dest[i] = ring[idx] ?? 0;
+        idx++;
+        if (idx >= ringSize) idx = 0;
+      }
+    };
+
+    scriptNode.onaudioprocess = (ev) => {
+      const input = ev.inputBuffer.getChannelData(0);
+      if (!input || input.length === 0) return;
+      pushBlock(input);
+      framesUntilAnalysis -= input.length;
+      if (framesUntilAnalysis > 0) return;
+      framesUntilAnalysis += hopFrames;
+      copyLatestWindow(analysisBuf);
+      const rms = computeRms(analysisBuf);
+      if (rms < 0.002) {
+        scriptPitchHz = null;
+        scriptPitchConf = 0;
+        return;
+      }
+      const { freqHz, confidence } = yinDetectMain(
+        analysisBuf,
+        ctx.sampleRate,
+        diff,
+        cmnd,
+        window
+      );
+      scriptPitchHz = freqHz;
+      scriptPitchConf = confidence;
+    };
+
+    gainNode.connect(scriptNode);
+    const spSink = ctx.createGain();
+    spSink.gain.value = 0;
+    scriptNode.connect(spSink);
+    spSink.connect(ctx.destination);
+  }
 
   workletNode.port.onmessage = (ev) => {
     const data = ev.data as any;
@@ -368,6 +594,13 @@ async function startAudio() {
     if (zcHz !== null) {
       debugParts.push(`zc=${zcHz.toFixed(2)}`);
     }
+    if (isIOS) {
+      const sp = scriptPitchHz !== null ? scriptPitchHz.toFixed(2) : "null";
+      debugParts.push(`sp=${sp}`);
+    }
+    if (useTestTone) {
+      debugParts.push("mode=osc");
+    }
     const debug = debugParts.length ? ` ${debugParts.join(" ")}` : "";
     setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
     return;
@@ -394,6 +627,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       document.body.classList.toggle("status-hidden");
     };
     let touchToggledAt = 0;
+    let testToneTimer: number | null = null;
     strobeVisualizerEl.addEventListener("click", () => {
       // iOS fires click after touchend; suppress double-toggle.
       if (Date.now() - touchToggledAt < 500) return;
@@ -404,9 +638,28 @@ window.addEventListener("DOMContentLoaded", async () => {
       () => {
         touchToggledAt = Date.now();
         toggleStatus();
+        if (testToneTimer !== null) {
+          clearTimeout(testToneTimer);
+          testToneTimer = null;
+        }
       },
       { passive: true }
     );
+    if (isIOS) {
+      strobeVisualizerEl.addEventListener(
+        "touchstart",
+        () => {
+          if (testToneTimer !== null) return;
+          testToneTimer = window.setTimeout(() => {
+            testToneTimer = null;
+            setTestToneEnabled(!useTestTone);
+            document.body.classList.remove("status-hidden");
+            setStatus(useTestTone ? "Test tone ON (440 Hz)" : "Test tone OFF");
+          }, 600);
+        },
+        { passive: true }
+      );
+    }
   }
 
   const startWithHandling = async () => {
