@@ -18,7 +18,6 @@ class TunerProcessor extends AudioWorkletProcessor {
   private analysisBuf: Float32Array;
   private yinDiff: Float32Array;
   private yinCMND: Float32Array;
-  private mixBuf: Float32Array | null = null;
 
   constructor() {
     super();
@@ -195,15 +194,9 @@ class TunerProcessor extends AudioWorkletProcessor {
     if (in0.length > 1) {
       const chan1 = in0[1]; // Right channel if present
       if (chan1 && chan1.length === chan0.length) {
-        if (!this.mixBuf || this.mixBuf.length !== chan0.length) {
-          this.mixBuf = new Float32Array(chan0.length);
-        }
-        for (let i = 0; i < chan0.length; i++) {
-          const a = chan0[i] ?? 0;
-          const b = chan1[i] ?? 0;
-          this.mixBuf[i] = (a + b) * 0.5;
-        }
-        input = this.mixBuf;
+        const rms0 = this.computeRms(chan0);
+        const rms1 = this.computeRms(chan1);
+        input = rms1 > rms0 ? chan1 : chan0;
       }
     }
 
