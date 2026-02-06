@@ -125,17 +125,18 @@ class TunerProcessor extends AudioWorkletProcessor {
       cmnd[tau] = runningSum > 0 ? (v * tau) / runningSum : 1;
     }
 
-    // 3) Find first dip below threshold
-    // iOS mic input tends to be noisier; a slightly looser threshold
-    // reduces octave errors from the global-min fallback.
-    const threshold = 0.08;
+    // 3) Find first dip below threshold within a realistic frequency range.
+    // This avoids picking ultra-short taus (sharp bias) on noisy inputs.
+    const threshold = 0.02;
+    const tauMin = Math.max(2, Math.floor(sr / 1200)); // max freq
+    const tauMax = Math.min(maxTau - 1, Math.floor(sr / 70)); // min freq
     let tauEstimate = -1;
 
-    for (let tau = 2; tau < maxTau; tau++) {
+    for (let tau = tauMin; tau <= tauMax; tau++) {
       const v = cmnd[tau] ?? 1;
       if (v < threshold) {
         // walk to local minimum
-        while (tau + 1 < maxTau) {
+        while (tau + 1 <= tauMax) {
           const cur = cmnd[tau] ?? 1;
           const nxt = cmnd[tau + 1] ?? 1;
           if (nxt < cur) tau++;
@@ -147,10 +148,10 @@ class TunerProcessor extends AudioWorkletProcessor {
     }
 
     if (tauEstimate === -1) {
-      // fallback: global min
+      // fallback: global min in range
       let minVal = Number.POSITIVE_INFINITY;
       let minTau = -1;
-      for (let tau = 2; tau < maxTau; tau++) {
+      for (let tau = tauMin; tau <= tauMax; tau++) {
         const v = cmnd[tau] ?? 1;
         if (v < minVal) {
           minVal = v;
@@ -167,7 +168,7 @@ class TunerProcessor extends AudioWorkletProcessor {
     let bestTau = tauEstimate;
     for (let multiple = 2; multiple <= 3; multiple++) {
       const candidate = tauEstimate * multiple;
-      if (candidate + 1 >= maxTau) break;
+      if (candidate + 1 > tauMax) break;
       const candVal = cmnd[candidate] ?? 1;
       const bestVal = cmnd[bestTau] ?? 1;
       if (candVal <= bestVal + 0.05) bestTau = candidate;
