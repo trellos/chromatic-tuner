@@ -7,6 +7,7 @@ const strobeVisualizerEl = document.getElementById("strobe-visualizer");
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 const A4 = 440;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+const SHOW_STATUS = new URLSearchParams(window.location.search).has("debug");
 
 async function createAudioContext(
   AudioCtx: typeof AudioContext
@@ -681,32 +682,38 @@ async function startAudio() {
 // Auto-start audio on page load
 window.addEventListener("DOMContentLoaded", async () => {
   setReading(null, null);
-  setStatus(isIOS ? "Tap to start audio..." : "Initializing audio...");
-  document.body.classList.add("status-hidden");
+  if (SHOW_STATUS) {
+    setStatus("Initializing audio...");
+    document.body.classList.remove("status-hidden");
+  } else {
+    document.body.classList.add("status-hidden");
+  }
 
   if (strobeVisualizerEl) {
-    const toggleStatus = () => {
-      document.body.classList.toggle("status-hidden");
-    };
-    let touchToggledAt = 0;
     let testToneTimer: number | null = null;
-    strobeVisualizerEl.addEventListener("click", () => {
-      // iOS fires click after touchend; suppress double-toggle.
-      if (Date.now() - touchToggledAt < 500) return;
-      toggleStatus();
-    });
-    strobeVisualizerEl.addEventListener(
-      "touchend",
-      () => {
-        touchToggledAt = Date.now();
+    if (SHOW_STATUS) {
+      const toggleStatus = () => {
+        document.body.classList.toggle("status-hidden");
+      };
+      let touchToggledAt = 0;
+      strobeVisualizerEl.addEventListener("click", () => {
+        // iOS fires click after touchend; suppress double-toggle.
+        if (Date.now() - touchToggledAt < 500) return;
         toggleStatus();
-        if (testToneTimer !== null) {
-          clearTimeout(testToneTimer);
-          testToneTimer = null;
-        }
-      },
-      { passive: true }
-    );
+      });
+      strobeVisualizerEl.addEventListener(
+        "touchend",
+        () => {
+          touchToggledAt = Date.now();
+          toggleStatus();
+          if (testToneTimer !== null) {
+            clearTimeout(testToneTimer);
+            testToneTimer = null;
+          }
+        },
+        { passive: true }
+      );
+    }
     if (isIOS) {
       strobeVisualizerEl.addEventListener(
         "touchstart",
@@ -740,22 +747,29 @@ window.addEventListener("DOMContentLoaded", async () => {
           errorMsg = `Error: ${err.message}`;
         }
       }
-      
-      setStatus(errorMsg);
+
+      if (isIOS && err instanceof Error && err.name === "NotAllowedError") {
+        // On iOS, prompt for a tap only if needed.
+        if (SHOW_STATUS) {
+          setStatus("Tap to start audio...");
+        }
+        const onFirstInteraction = () => {
+          document.removeEventListener("click", onFirstInteraction);
+          document.removeEventListener("touchend", onFirstInteraction);
+          startWithHandling();
+        };
+        document.addEventListener("click", onFirstInteraction, { once: true });
+        document.addEventListener("touchend", onFirstInteraction, { once: true, passive: true });
+        return;
+      }
+
+      if (SHOW_STATUS) {
+        setStatus(errorMsg);
+      }
       updateStrobeVisualizer(null, false);
     }
   };
 
-  if (isIOS) {
-    const onFirstInteraction = () => {
-      document.removeEventListener("click", onFirstInteraction);
-      document.removeEventListener("touchend", onFirstInteraction);
-      startWithHandling();
-    };
-    document.addEventListener("click", onFirstInteraction, { once: true });
-    document.addEventListener("touchend", onFirstInteraction, { once: true, passive: true });
-  } else {
-    await startWithHandling();
-  }
+  await startWithHandling();
 });
 
