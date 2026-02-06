@@ -79,3 +79,12 @@ Dev script uses **separate esbuild contexts** for app and worklet, allowing inde
 - **UI enhancements**: Edit main.ts message handler, maintain the median/EMA filtering pipeline
 - **Audio settings**: Adjust `hopFrames`, `windowSize`, confidence threshold, or frequency range in worklet constructor
 - **Note display**: Change `NOTE_NAMES` array or octave offset in `midiToNoteName()`
+
+## Session Notes (Handoff)
+
+- UI: `#reading` (note + cents) moved inside `#strobe-visualizer` and positioned so the text sits within the semicircle.
+- Status text: now toggles visibility on tuner tap (hidden by default via `body.status-hidden`).
+- Status placement: positioned just below the semicircle midline, not below the full circle.
+- iOS: mic requires HTTPS. Added guard for missing `getUserMedia`. Audio input now blends stereo channels (uses mono if only channel 0 exists).
+- SVG: strobe arcs are now SVG paths (top semicircle) instead of clipped circles (better iOS rendering).
+- CSS: strobe SVG sized to 100% to avoid offset on mobile.
