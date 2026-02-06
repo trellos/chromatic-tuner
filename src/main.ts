@@ -349,8 +349,20 @@ window.addEventListener("DOMContentLoaded", async () => {
     const toggleStatus = () => {
       document.body.classList.toggle("status-hidden");
     };
-    strobeVisualizerEl.addEventListener("click", toggleStatus);
-    strobeVisualizerEl.addEventListener("touchend", toggleStatus, { passive: true });
+    let touchToggledAt = 0;
+    strobeVisualizerEl.addEventListener("click", () => {
+      // iOS fires click after touchend; suppress double-toggle.
+      if (Date.now() - touchToggledAt < 500) return;
+      toggleStatus();
+    });
+    strobeVisualizerEl.addEventListener(
+      "touchend",
+      () => {
+        touchToggledAt = Date.now();
+        toggleStatus();
+      },
+      { passive: true }
+    );
   }
 
   const startWithHandling = async () => {
