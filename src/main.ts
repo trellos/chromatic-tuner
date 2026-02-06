@@ -6,6 +6,7 @@ const strobeVisualizerEl = document.getElementById("strobe-visualizer");
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 const A4 = 440;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
 // Initialize SVG strobe visualizer - Peterson-style two concentric dashed arcs
 function initializeStrobeVisualizer(): void {
@@ -224,7 +225,7 @@ async function startAudio() {
   workletNode = new AudioWorkletNode(audioContext, "tuner");
   
   const gainNode = audioContext.createGain();
-  gainNode.gain.value = 3; // Modest amplification
+  gainNode.gain.value = isIOS ? 1.2 : 3; // Avoid iOS clipping
 
   source.connect(gainNode);
   gainNode.connect(workletNode);
@@ -316,8 +317,6 @@ async function startAudio() {
 }
 
 // Auto-start audio on page load
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-
 window.addEventListener("DOMContentLoaded", async () => {
   setReading(null, null);
   setStatus(isIOS ? "Tap to start audio..." : "Initializing audio...");

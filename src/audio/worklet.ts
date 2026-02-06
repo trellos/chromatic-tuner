@@ -126,7 +126,9 @@ class TunerProcessor extends AudioWorkletProcessor {
     }
 
     // 3) Find first dip below threshold
-    const threshold = 0.005;
+    // iOS mic input tends to be noisier; a slightly looser threshold
+    // reduces octave errors from the global-min fallback.
+    const threshold = 0.08;
     let tauEstimate = -1;
 
     for (let tau = 2; tau < maxTau; tau++) {
@@ -160,7 +162,18 @@ class TunerProcessor extends AudioWorkletProcessor {
     }
 
     // 4) Parabolic interpolation (safe indexing)
-    const t = clamp(tauEstimate, 2, maxTau - 2);
+    // Prefer longer-period candidates if they are nearly as good.
+    // This helps avoid octave-high estimates on noisy inputs.
+    let bestTau = tauEstimate;
+    for (let multiple = 2; multiple <= 3; multiple++) {
+      const candidate = tauEstimate * multiple;
+      if (candidate + 1 >= maxTau) break;
+      const candVal = cmnd[candidate] ?? 1;
+      const bestVal = cmnd[bestTau] ?? 1;
+      if (candVal <= bestVal + 0.05) bestTau = candidate;
+    }
+
+    const t = clamp(bestTau, 2, maxTau - 2);
     const x0 = cmnd[t - 1] ?? 1;
     const x1 = cmnd[t] ?? 1;
     const x2 = cmnd[t + 1] ?? 1;
