@@ -99,8 +99,8 @@ let candidateCount = 0;
 let centsEma: number | null = null;
 let overlayRing: SVGPathElement | null = null;
 let strobeDots: SVGPathElement | null = null;
-const TUNA_TILE_SIZE = 18;
-const TUNA_TILE_PITCH = 28;
+const TUNA_TILE_COUNT = 42;
+const TUNA_FIELD_SIZE = 280;
 let tunaTiles: HTMLSpanElement[] = [];
 let tunaFieldReady = false;
 
@@ -263,51 +263,26 @@ function wrapCents(c: number): number {
   return c;
 }
 
-function getTunaFieldMetrics(): { width: number; height: number; cols: number; rows: number; count: number } {
-  const width = tunaFieldEl?.clientWidth ?? 720;
-  const height = tunaFieldEl?.clientHeight ?? 520;
-  const cols = Math.max(1, Math.floor(width / TUNA_TILE_PITCH));
-  const rows = Math.max(1, Math.floor(height / TUNA_TILE_PITCH));
-  const count = cols * rows;
-  return { width, height, cols, rows, count };
-}
-
-function ensureTunaTilePool(targetCount: number): void {
-  if (!tunaFieldEl) return;
-
-  if (tunaTiles.length > targetCount) {
-    for (let i = tunaTiles.length - 1; i >= targetCount; i--) {
-      tunaTiles[i]?.remove();
-      tunaTiles.pop();
-    }
-  }
-
-  if (tunaTiles.length < targetCount) {
-    const fragment = document.createDocumentFragment();
-    for (let i = tunaTiles.length; i < targetCount; i++) {
-      const tile = document.createElement("span");
-      tile.className = "tuna-tile";
-      fragment.appendChild(tile);
-      tunaTiles.push(tile);
-    }
-    tunaFieldEl.appendChild(fragment);
-  }
-}
-
 function createTunaField(): void {
   if (!tunaFieldEl || tunaFieldReady) return;
 
-  const metrics = getTunaFieldMetrics();
-  ensureTunaTilePool(metrics.count);
+  const fragment = document.createDocumentFragment();
+  tunaTiles = [];
+
+  for (let i = 0; i < TUNA_TILE_COUNT; i++) {
+    const tile = document.createElement("span");
+    tile.className = "tuna-tile";
+    fragment.appendChild(tile);
+    tunaTiles.push(tile);
+  }
+
+  tunaFieldEl.appendChild(fragment);
   tunaFieldReady = true;
 }
 
 function updateTunaField(centsValue: number | null, isDetecting: boolean): void {
   if (!tunaFieldEl) return;
   if (!tunaFieldReady) createTunaField();
-
-  const metrics = getTunaFieldMetrics();
-  ensureTunaTilePool(metrics.count);
   if (tunaTiles.length === 0) return;
 
   const boundedCents = centsValue == null ? 0 : Math.max(-50, Math.min(50, centsValue));
@@ -330,41 +305,32 @@ function updateTunaField(centsValue: number | null, isDetecting: boolean): void 
   tunaFieldEl.classList.toggle("is-sharp", direction > 0);
   tunaFieldEl.classList.toggle("is-flat", direction < 0);
 
-  const centerX = metrics.width / 2;
-  const centerY = metrics.height * 0.56;
-  const turns = 7.2;
+  const center = TUNA_FIELD_SIZE / 2;
+  const turns = 4.1;
   const spiralStart = -Math.PI / 2;
-  const spiralRadius = Math.min(metrics.width, metrics.height) * 0.4;
   const sharpNudge = 16 * sharpness;
   const flatNudge = 16 * flatness;
 
   tunaTiles.forEach((tile, index) => {
-    const t = tunaTiles.length <= 1 ? 0 : index / (tunaTiles.length - 1);
+    const t = (index + 1) / TUNA_TILE_COUNT;
     const angle = spiralStart + t * Math.PI * 2 * turns;
-    const radius = t * spiralRadius;
+    const radius = t * (TUNA_FIELD_SIZE * 0.33);
 
-    const spiralX = centerX + Math.cos(angle) * radius;
-    const spiralY = centerY + Math.sin(angle) * radius;
+    const spiralX = center + Math.cos(angle) * radius;
+    const spiralY = center + Math.sin(angle) * radius;
 
-    const col = index % metrics.cols;
-    const row = Math.floor(index / metrics.cols);
-    const gridBaseX = ((col + 0.5) / metrics.cols) * metrics.width;
-    const gridBaseY = ((row + 0.5) / metrics.rows) * metrics.height;
+    const col = index % 7;
+    const row = Math.floor(index / 7);
+    const gridBaseX = 36 + col * 34;
+    const gridBaseY = 34 + row * 36;
 
-    const sharpWarp =
-      (row % 2 === 0 ? 1 : -1) * sharpNudge +
-      Math.sin(col * 1.4 + row * 0.6) * (6 + sharpNudge * 0.25);
-    const flatWarp =
-      (col % 2 === 0 ? -1 : 1) * flatNudge +
-      Math.cos(col * 0.55 + row * 1.15) * (6 + flatNudge * 0.25);
+    const sharpWarp = ((row % 2 === 0 ? 1 : -1) * sharpNudge) + Math.sin(col * 1.4 + row * 0.6) * (6 + sharpNudge * 0.25);
+    const flatWarp = ((col % 2 === 0 ? -1 : 1) * flatNudge) + Math.cos(col * 0.55 + row * 1.15) * (6 + flatNudge * 0.25);
     const driftX = sharpness > 0 ? sharpWarp : -flatWarp;
-    const driftY =
-      sharpness > 0
-        ? Math.cos(row * 0.95 + col * 0.35) * (8 + sharpNudge * 0.2)
-        : Math.sin(col * 1.12 + row * 0.42) * (8 + flatNudge * 0.2);
+    const driftY = sharpness > 0 ? Math.cos(row * 0.95 + col * 0.35) * (8 + sharpNudge * 0.2) : Math.sin(col * 1.12 + row * 0.42) * (8 + flatNudge * 0.2);
 
-    const gridX = Math.max(10, Math.min(metrics.width - 10, gridBaseX + driftX));
-    const gridY = Math.max(10, Math.min(metrics.height - 10, gridBaseY + driftY));
+    const gridX = gridBaseX + driftX;
+    const gridY = gridBaseY + driftY;
 
     const x = spiralX + (gridX - spiralX) * detune;
     const y = spiralY + (gridY - spiralY) * detune;
@@ -372,8 +338,6 @@ function updateTunaField(centsValue: number | null, isDetecting: boolean): void 
 
     tile.style.left = `${x.toFixed(2)}px`;
     tile.style.top = `${y.toFixed(2)}px`;
-    tile.style.width = `${TUNA_TILE_SIZE}px`;
-    tile.style.height = `${TUNA_TILE_SIZE}px`;
     tile.style.transform = `translate(-50%, -50%) rotate(${localRotation.toFixed(2)}deg)`;
     tile.style.opacity = `${(0.2 + (isDetecting ? 0.58 : 0) + detune * 0.18).toFixed(3)}`;
   });
