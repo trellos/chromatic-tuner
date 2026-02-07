@@ -97,6 +97,7 @@ export function createDrumMachineMode(): ModeDefinition {
   let uiAbort: AbortController | null = null;
   let playheadTimeouts: number[] = [];
   let resizeObserver: ResizeObserver | null = null;
+  let hasSeedPattern = false;
 
   const setKitLabel = () => {
     if (kitLabel) {
@@ -352,6 +353,32 @@ export function createDrumMachineMode(): ModeDefinition {
         setBackbeat();
         setHatEights();
         break;
+    }
+  };
+
+  const applyStandardRock = () => {
+    setSignature("4/4");
+    const grid = drumMockEl?.querySelector<HTMLElement>(
+      '.drum-grid[data-signature="4/4"]'
+    );
+    if (!grid) return;
+    const rows = grid.querySelectorAll<HTMLElement>(".drum-row");
+    rows.forEach(clearRow);
+    const kick = rows[0];
+    const snare = rows[1];
+    const hat = rows[2];
+    if (kick) {
+      setStep(kick, 0, true);
+      setStep(kick, 8, true);
+    }
+    if (snare) {
+      setStep(snare, 4, true);
+      setStep(snare, 12, true);
+    }
+    if (hat) {
+      for (let i = 0; i < 16; i += 2) {
+        setStep(hat, i, true);
+      }
     }
   };
 
@@ -639,6 +666,10 @@ export function createDrumMachineMode(): ModeDefinition {
     setKitLabel();
     attachUi();
     scheduleLayoutSync();
+    if (!hasSeedPattern) {
+      applyStandardRock();
+      hasSeedPattern = true;
+    }
   };
 
   const exit = () => {

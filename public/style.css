@@ -701,7 +701,9 @@ body.status-hidden #status {
   border: 1px solid rgba(12, 16, 32, 0.12);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
   width: var(--drum-grid-width, auto);
-  max-width: 100%;
+  min-width: var(--drum-grid-width, auto);
+  max-width: var(--drum-grid-width, 100%);
+  box-sizing: border-box;
 }
 
 .drum-tempo {
@@ -957,6 +959,21 @@ body.drum-fullscreen .drum-rotator {
 body.drum-fullscreen .drum-ui {
   transform: scale(1.1);
   transform-origin: center;
+}
+
+@supports (-webkit-touch-callout: none) {
+  body {
+    min-height: 100svh;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
+    height: 100svh;
+  }
+
+  .drum-rotator {
+    width: min(640px, 82svh);
+    height: min(420px, 70svw);
+  }
 }
 
 /* Responsive Design */

@@ -151,19 +151,21 @@
                 <div class="drum-row" data-voice="kick">
                   <div class="drum-label">Kick</div>
                   <div class="drum-steps">
-                    <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
+                    <button class="step" type="button"></button>
+                    <button class="step" type="button"></button>
+                    <button class="step" type="button"></button>
+                    <button class="step" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
                     <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
@@ -174,15 +176,13 @@
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
                     <button class="step" type="button"></button>
@@ -194,21 +194,21 @@
                   <div class="drum-label">Hat</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                     <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
+                    <button class="step" type="button"></button>
                   </div>
                 </div>
                 <div class="drum-row" data-voice="perc">
@@ -377,9 +377,6 @@
               </div>
               </div>
             </div>
-            <div class="drum-footer">
-              <div class="mode-chip">Kit: Neon Tuna</div>
-            </div>
           </div>
         </article>
       </section>
@@ -409,6 +406,27 @@
       </button>
     </main>
 
+    <script>
+      (() => {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const unlock = () => {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 0;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.01);
+          ctx.resume().finally(() => ctx.close());
+          window.removeEventListener("touchstart", unlock);
+          window.removeEventListener("pointerdown", unlock);
+        };
+        window.addEventListener("touchstart", unlock, { once: true, passive: true });
+        window.addEventListener("pointerdown", unlock, { once: true, passive: true });
+      })();
+    </script>
     <script type="module" src="./assets/app.js"></script>
   </body>
 </html>
