@@ -320,8 +320,8 @@ class TunerProcessor extends AudioWorkletProcessor {
       rms,
       tau,
       cmnd,
-      effSr: this.effectiveSampleRate ?? undefined,
-      zcHz: zcHz ?? undefined,
+      ...(this.effectiveSampleRate != null ? { effSr: this.effectiveSampleRate } : {}),
+      ...(zcHz != null ? { zcHz } : {}),
     };
     this.port.postMessage(msg);
 
