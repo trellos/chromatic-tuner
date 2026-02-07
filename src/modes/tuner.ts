@@ -4,6 +4,7 @@ const statusEl = document.getElementById("status");
 const noteEl = document.getElementById("note");
 const centsEl = document.getElementById("cents");
 const strobeVisualizerEl = document.getElementById("strobe-visualizer");
+const tunaFieldEl = document.getElementById("tuna-field");
 
 
 
@@ -98,6 +99,10 @@ let candidateCount = 0;
 let centsEma: number | null = null;
 let overlayRing: SVGPathElement | null = null;
 let strobeDots: SVGPathElement | null = null;
+const TUNA_TILE_SIZE = 18;
+const TUNA_TILE_PITCH = 28;
+let tunaTiles: HTMLSpanElement[] = [];
+let tunaFieldReady = false;
 
 function freqToMidi(freqHz: number): number {
   return Math.round(12 * Math.log2(freqHz / A4) + 69);
@@ -258,6 +263,122 @@ function wrapCents(c: number): number {
   return c;
 }
 
+function getTunaFieldMetrics(): { width: number; height: number; cols: number; rows: number; count: number } {
+  const width = tunaFieldEl?.clientWidth ?? 720;
+  const height = tunaFieldEl?.clientHeight ?? 520;
+  const cols = Math.max(1, Math.floor(width / TUNA_TILE_PITCH));
+  const rows = Math.max(1, Math.floor(height / TUNA_TILE_PITCH));
+  const count = cols * rows;
+  return { width, height, cols, rows, count };
+}
+
+function ensureTunaTilePool(targetCount: number): void {
+  if (!tunaFieldEl) return;
+
+  if (tunaTiles.length > targetCount) {
+    for (let i = tunaTiles.length - 1; i >= targetCount; i--) {
+      tunaTiles[i]?.remove();
+      tunaTiles.pop();
+    }
+  }
+
+  if (tunaTiles.length < targetCount) {
+    const fragment = document.createDocumentFragment();
+    for (let i = tunaTiles.length; i < targetCount; i++) {
+      const tile = document.createElement("span");
+      tile.className = "tuna-tile";
+      fragment.appendChild(tile);
+      tunaTiles.push(tile);
+    }
+    tunaFieldEl.appendChild(fragment);
+  }
+}
+
+function createTunaField(): void {
+  if (!tunaFieldEl || tunaFieldReady) return;
+
+  const metrics = getTunaFieldMetrics();
+  ensureTunaTilePool(metrics.count);
+  tunaFieldReady = true;
+}
+
+function updateTunaField(centsValue: number | null, isDetecting: boolean): void {
+  if (!tunaFieldEl) return;
+  if (!tunaFieldReady) createTunaField();
+
+  const metrics = getTunaFieldMetrics();
+  ensureTunaTilePool(metrics.count);
+  if (tunaTiles.length === 0) return;
+
+  const boundedCents = centsValue == null ? 0 : Math.max(-50, Math.min(50, centsValue));
+  const detune = Math.abs(boundedCents) / 50;
+  const direction = boundedCents === 0 ? 0 : Math.sign(boundedCents);
+  const sharpness = Math.max(0, boundedCents) / 50;
+  const flatness = Math.max(0, -boundedCents) / 50;
+
+  tunaFieldEl.style.setProperty("--detune", detune.toFixed(3));
+  tunaFieldEl.style.setProperty("--sharpness", sharpness.toFixed(3));
+  tunaFieldEl.style.setProperty("--flatness", flatness.toFixed(3));
+  tunaFieldEl.style.setProperty("--state-rotation", `${(direction * detune * 8).toFixed(2)}deg`);
+
+  if (!isDetecting || centsValue === null) {
+    tunaFieldEl.classList.remove("is-detecting", "is-sharp", "is-flat");
+    return;
+  }
+
+  tunaFieldEl.classList.add("is-detecting");
+  tunaFieldEl.classList.toggle("is-sharp", direction > 0);
+  tunaFieldEl.classList.toggle("is-flat", direction < 0);
+
+  const centerX = metrics.width / 2;
+  const centerY = metrics.height * 0.56;
+  const turns = 7.2;
+  const spiralStart = -Math.PI / 2;
+  const spiralRadius = Math.min(metrics.width, metrics.height) * 0.4;
+  const sharpNudge = 16 * sharpness;
+  const flatNudge = 16 * flatness;
+
+  tunaTiles.forEach((tile, index) => {
+    const t = tunaTiles.length <= 1 ? 0 : index / (tunaTiles.length - 1);
+    const angle = spiralStart + t * Math.PI * 2 * turns;
+    const radius = t * spiralRadius;
+
+    const spiralX = centerX + Math.cos(angle) * radius;
+    const spiralY = centerY + Math.sin(angle) * radius;
+
+    const col = index % metrics.cols;
+    const row = Math.floor(index / metrics.cols);
+    const gridBaseX = ((col + 0.5) / metrics.cols) * metrics.width;
+    const gridBaseY = ((row + 0.5) / metrics.rows) * metrics.height;
+
+    const sharpWarp =
+      (row % 2 === 0 ? 1 : -1) * sharpNudge +
+      Math.sin(col * 1.4 + row * 0.6) * (6 + sharpNudge * 0.25);
+    const flatWarp =
+      (col % 2 === 0 ? -1 : 1) * flatNudge +
+      Math.cos(col * 0.55 + row * 1.15) * (6 + flatNudge * 0.25);
+    const driftX = sharpness > 0 ? sharpWarp : -flatWarp;
+    const driftY =
+      sharpness > 0
+        ? Math.cos(row * 0.95 + col * 0.35) * (8 + sharpNudge * 0.2)
+        : Math.sin(col * 1.12 + row * 0.42) * (8 + flatNudge * 0.2);
+
+    const gridX = Math.max(10, Math.min(metrics.width - 10, gridBaseX + driftX));
+    const gridY = Math.max(10, Math.min(metrics.height - 10, gridBaseY + driftY));
+
+    const x = spiralX + (gridX - spiralX) * detune;
+    const y = spiralY + (gridY - spiralY) * detune;
+    const localRotation = direction * detune * 14 + Math.sin(index * 1.618) * 6 * detune;
+
+    tile.style.left = `${x.toFixed(2)}px`;
+    tile.style.top = `${y.toFixed(2)}px`;
+    tile.style.width = `${TUNA_TILE_SIZE}px`;
+    tile.style.height = `${TUNA_TILE_SIZE}px`;
+    tile.style.transform = `translate(-50%, -50%) rotate(${localRotation.toFixed(2)}deg)`;
+    tile.style.opacity = `${(0.2 + (isDetecting ? 0.58 : 0) + detune * 0.18).toFixed(3)}`;
+  });
+}
+
 function setStatus(msg: string) {
   if (statusEl) statusEl.textContent = msg;
 }
@@ -331,12 +452,14 @@ function updateStrobeVisualizer(centsValue: number | null, isDetecting: boolean)
     });
   }
 
+  updateTunaField(centsValue, isDetecting);
   updateStrobeVisualizerRotation(centsValue, isDetecting);
 }
 
 setStatus("Idle");
 setReading(null, null);
 initializeStrobeVisualizer();
+createTunaField();
 
 let audioContext: AudioContext | null = null;
 let micStream: MediaStream | null = null;
