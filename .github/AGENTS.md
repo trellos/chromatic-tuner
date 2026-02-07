@@ -69,6 +69,7 @@ Dev script uses **separate esbuild contexts** for app and worklet, allowing inde
 3. **Cents are always relative to the locked MIDI note** (Â±50 range), not absolute pitch
 4. **RMS gating**: silence detection at < 0.01, confidence must exceed 0.75 for output
 5. **Ring buffer in worklet** (16384 samples): circular buffer for streaming input, maintains write index with wrapping
+6. **Command**: Design layouts to look good across all mobile browsers, regardless of resolution or aspect ratio (use adaptive/responsive CSS rather than device-specific tweaks).
 
 ## External Integration Points
 
