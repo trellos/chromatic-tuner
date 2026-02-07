@@ -2,15 +2,18 @@
 
 ## Architecture Overview
 
-This is a **web-based chromatic musical instrument tuner** using Web Audio API with real-time pitch detection. It runs as a simple Express dev server serving a static HTML app that processes microphone input through an AudioWorklet.
+This is a **web-based multi-mode music tool** (Chromatic Tuner, Metronome, Drum Machine) using the Web Audio API with real-time pitch detection. It runs as a simple Express dev server serving a static HTML app that processes microphone input through an AudioWorklet.
 
 It is designed to look like a Peterson Strobe Tuner, providing accurate note and cents offset readings with minimal latency and jitter.
 
 ### Key Components
 
-- **[src/main.ts](../src/main.ts)**: Browser UI layer - manages AudioContext, handles microphone stream, displays note/cents readings with debouncing logic
+- **[src/main.ts](../src/main.ts)**: Browser UI layer - mode carousel, fullscreen toggle, screen visibility, lifecycle hooks for modes
+- **[src/modes/tuner.ts](../src/modes/tuner.ts)**: Tuner implementation and lifecycle (AudioContext, mic, strobe UI)
+- **[src/modes/metronome.ts](../src/modes/metronome.ts)**: Metronome UI + audio scheduler (tempo dial, time menu, beat pulse)
+- **[src/modes/drum-machine.ts](../src/modes/drum-machine.ts)**: Drum machine UI + sequencer (grid playback, playhead, beat menu)
 - **[src/audio/worklet.ts](../src/audio/worklet.ts)**: AudioWorklet processor - runs in audio thread, implements YIN pitch detection algorithm
-- **[public/index.html](../public/index.html)**: Minimal static HTML with buttons and display elements
+- **[public/index.html](../public/index.html)**: Multi-mode HTML layout (carousel, screens, controls)
 - **[scripts/build.mjs](../scripts/build.mjs)** & **[scripts/dev.mjs](../scripts/dev.mjs)**: esbuild configuration for bundling main app and worklet separately
 
 ### Data Flow
@@ -25,7 +28,7 @@ It is designed to look like a Peterson Strobe Tuner, providing accurate note and
 ## Critical Development Patterns
 
 ### AudioWorklet as Separate Bundle
-The worklet **must be a separate JS file** that the browser fetches via `audioContext.audioWorklet.addModule("/assets/worklet.js")`. The build system handles this automatically - **do not bundle worklet.ts into main.ts**.
+The worklet **must be a separate JS file** that the browser fetches via `audioContext.audioWorklet.addModule("./assets/worklet.js")`. The build system handles this automatically - **do not bundle worklet.ts into main.ts**.
 
 ### YIN Pitch Detection Implementation
 The worklet uses the **YIN algorithm** with these steps:
@@ -73,10 +76,30 @@ Dev script uses **separate esbuild contexts** for app and worklet, allowing inde
 - **getUserMedia**: Requests microphone with AGC/echo-cancellation/noise-suppression disabled (critical for tuning accuracy)
 - **Express**: Serves static files only - no API logic
 
+## Mode Lifecycle & Fullscreen
+
+- Modes are registered in `src/modes/*` and expose `onEnter`/`onExit` hooks.
+- `main.ts` calls lifecycle hooks when switching modes.
+- Fullscreen behavior is **only** supported for Drum Machine; other modes disable the toggle.
+- Fullscreen hides the carousel/header and shows the in-mode exit button.
+
+## Metronome Behavior
+
+- Tempo is adjusted via the rotary dial (pointer drag, wheel, keyboard arrows).
+- Time menu supports `4/4`, `3/4`, `6/8`, and `No Accent` for accent control.
+- Metronome schedules ahead with a short lookahead timer and pulses the starburst on beat.
+
+## Drum Machine Behavior
+
+- Uses a 4-row step grid (Kick, Snare, Hat, Perc) with 16 steps for 4/4 and 12 for 3/4 or 6/8.
+- Playhead is a moving column highlight plus playhead bar.
+- Tempo is adjustable via +/- buttons in the rotated toolbar.
+- Beat menu applies preset patterns (Rock, Shuffle, Disco, Half-Time, Breakbeat, Afrobeat, Minimal).
+
 ## When Adding Features
 
 - **New tuning algorithms**: Modify `yinDetect()` in worklet.ts, test with various instrument frequencies
-- **UI enhancements**: Edit main.ts message handler, maintain the median/EMA filtering pipeline
+- **UI enhancements**: Update mode files and HTML/CSS; keep mode lifecycle logic in `main.ts`
 - **Audio settings**: Adjust `hopFrames`, `windowSize`, confidence threshold, or frequency range in worklet constructor
 - **Note display**: Change `NOTE_NAMES` array or octave offset in `midiToNoteName()`
 
