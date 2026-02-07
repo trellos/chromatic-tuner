@@ -1,4 +1,4 @@
-const statusEl = document.getElementById("status");
+﻿const statusEl = document.getElementById("status");
 const noteEl = document.getElementById("note");
 const centsEl = document.getElementById("cents");
 const strobeVisualizerEl = document.getElementById("strobe-visualizer");
@@ -111,17 +111,6 @@ function midiToNoteName(midi: number): string {
   const name = NOTE_NAMES[((midi % 12) + 12) % 12];
   const octave = Math.floor(midi / 12) - 1; // MIDI octave convention
   return `${name}${octave}`;
-}
-
-let lastMidi: number | null = null;
-let lastFreq: number | null = null;
-
-function smoothFreq(newFreq: number): number {
-  // simple 1-pole low-pass on frequency
-  if (lastFreq == null) return (lastFreq = newFreq);
-  const alpha = 0.25; // higher = more responsive, lower = smoother
-  lastFreq = lastFreq + alpha * (newFreq - lastFreq);
-  return lastFreq;
 }
 
 function median(values: number[]): number {
@@ -358,12 +347,27 @@ let testOsc: OscillatorNode | null = null;
 let micGainNode: GainNode | null = null;
 let oscGainNode: GainNode | null = null;
 
+function cleanupAudio(): void {
+  if (micStream) {
+    for (const track of micStream.getTracks()) {
+      track.stop();
+    }
+    micStream = null;
+  }
+  if (audioContext && audioContext.state !== "closed") {
+    void audioContext.close();
+  }
+  audioContext = null;
+  workletNode = null;
+  scriptNode = null;
+}
+
 async function startAudio() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error("Microphone access not available. On iOS Safari this requires HTTPS (secure context).");
   }
 
-  setStatus("Requesting microphone permission…");
+  setStatus("Requesting microphone permissionâ€¦");
 
   micStream = await navigator.mediaDevices.getUserMedia({
     audio: {
@@ -374,7 +378,7 @@ async function startAudio() {
     },
   });
 
-  setStatus("Creating AudioContext…");
+  setStatus("Creating AudioContextâ€¦");
   const AudioCtx =
     (window as any).AudioContext || (window as any).webkitAudioContext;
   if (!AudioCtx) {
@@ -387,7 +391,7 @@ async function startAudio() {
     throw new Error("AudioContext failed to initialize.");
   }
 
-  setStatus("Loading worklet module…");
+  setStatus("Loading worklet moduleâ€¦");
   if (!ctx.audioWorklet) {
     throw new Error(
       "AudioWorklet is not supported in this browser. Please use a newer iOS Safari.",
@@ -396,7 +400,7 @@ async function startAudio() {
 
   await ctx.audioWorklet.addModule("./assets/worklet.js");
 
-  setStatus("Creating audio graph…");
+  setStatus("Creating audio graphâ€¦");
   const source = ctx.createMediaStreamSource(micStream);
   workletNode = new AudioWorkletNode(ctx, "tuner");
 
@@ -567,26 +571,26 @@ async function startAudio() {
   workletNode.port.onmessage = (ev) => {
     const data = ev.data as any;
 
-  if (data?.type === "worklet-ready") {
-    setStatus(`Worklet ready. sr=${data.sampleRate}, ring=${data.bufferSize}`);
-    return;
-  }
-
-  if (data?.type === "pitch") {
-    let freqHz: number | null = data.freqHz ?? null;
-    let confidence: number = Number(data.confidence ?? 0);
-    const rms: number = Number(data.rms ?? 0);
-    const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
-    const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
-    const effSr: number | null = Number.isFinite(data.effSr) ? Number(data.effSr) : null;
-    const zcHz: number | null = Number.isFinite(data.zcHz) ? Number(data.zcHz) : null;
-
-    if (isIOS && scriptPitchHz !== null) {
-      freqHz = scriptPitchHz;
-      confidence = scriptPitchConf;
+    if (data?.type === "worklet-ready") {
+      setStatus(`Worklet ready. sr=${data.sampleRate}, ring=${data.bufferSize}`);
+      return;
     }
 
-    if (freqHz == null) {
+    if (data?.type === "pitch") {
+      let freqHz: number | null = data.freqHz ?? null;
+      let confidence: number = Number(data.confidence ?? 0);
+      const rms: number = Number(data.rms ?? 0);
+      const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
+      const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
+      const effSr: number | null = Number.isFinite(data.effSr) ? Number(data.effSr) : null;
+      const zcHz: number | null = Number.isFinite(data.zcHz) ? Number(data.zcHz) : null;
+
+      if (isIOS && scriptPitchHz !== null && scriptPitchConf > 0.5) {
+        freqHz = scriptPitchHz;
+        confidence = scriptPitchConf;
+      }
+
+      if (freqHz == null) {
         // Reset state when no pitch
         history.length = 0;
         lockedMidi = null;
@@ -596,78 +600,77 @@ async function startAudio() {
 
         updateStrobeVisualizer(null, false);
         setReading(null, null);
-        setStatus(`No pitch (rms=${rms.toFixed(4)}, conf=${confidence.toFixed(2)})`);        return;
-    }
+        setStatus(`No pitch (rms=${rms.toFixed(4)}, conf=${confidence.toFixed(2)})`);
+        return;
+      }
 
-    // Convert to midi/note first
-    const midi = freqToMidi(freqHz);
-    const centsRaw = wrapCents(centsOffFromMidi(freqHz, midi));
+      // Convert to midi/note first
+      const midi = freqToMidi(freqHz);
+      const centsRaw = wrapCents(centsOffFromMidi(freqHz, midi));
 
-    history.push({ midi, cents: centsRaw, hz: freqHz, conf: confidence, rms });
-    if (history.length > HISTORY_N) history.shift();
+      history.push({ midi, cents: centsRaw, hz: freqHz, conf: confidence, rms });
+      if (history.length > HISTORY_N) history.shift();
 
-    // Median filter to kill spikes
-    const medMidi = Math.round(median(history.map(h => h.midi)));
-    const medCents = median(history.map(h => h.cents));
-
-    // Note lock: require the new note to persist for a few frames
-    if (lockedMidi == null) {
+      // Median filter to kill spikes
+      const medMidi = Math.round(median(history.map(h => h.midi)));
+      // Note lock: require the new note to persist for a few frames
+      if (lockedMidi == null) {
         lockedMidi = medMidi;
-    } else if (medMidi !== lockedMidi) {
+      } else if (medMidi !== lockedMidi) {
         if (candidateMidi !== medMidi) {
-            candidateMidi = medMidi;
-            candidateCount = 1;
+          candidateMidi = medMidi;
+          candidateCount = 1;
         } else {
-            candidateCount++;
+          candidateCount++;
         }
 
-        // Require persistence. At ~20 Hz, 3 frames ≈ 150 ms.
+        // Require persistence. At ~20 Hz, 3 frames approx 150 ms.
         const framesToSwitch = 3;
         if (candidateCount >= framesToSwitch) {
-            lockedMidi = candidateMidi;
-            candidateMidi = null;
-            candidateCount = 0;
-            centsEma = null; // reset smoothing when note changes
-        }   
-    } else {
+          lockedMidi = candidateMidi;
+          candidateMidi = null;
+          candidateCount = 0;
+          centsEma = null; // reset smoothing when note changes
+        }
+      } else {
         // same note, clear candidate
         candidateMidi = null;
         candidateCount = 0;
-    }
-
-    // Smooth cents with EMA (on the locked note)
-    if( lockedMidi == null ) return; // should not happen
-    const centsForLocked = wrapCents(centsOffFromMidi(freqHz, lockedMidi));
-    const alpha = 0.2; // responsiveness vs smoothness
-    centsEma = centsEma == null ? centsForLocked : (centsEma + alpha * (centsForLocked - centsEma));
-
-    const note = midiToNoteName(lockedMidi);
-    updateStrobeVisualizer(centsEma, true);
-    setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
-    const debugParts: string[] = [];
-    if (tau !== null && cmnd !== null) {
-      debugParts.push(`tau=${tau.toFixed(1)} cmnd=${cmnd.toFixed(3)}`);
-    }
-    if (effSr !== null) {
-      debugParts.push(`effSR=${effSr.toFixed(0)}`);
-    }
-    if (zcHz !== null) {
-      debugParts.push(`zc=${zcHz.toFixed(2)}`);
-    }
-    if (isIOS) {
-      const sp = scriptPitchHz !== null ? scriptPitchHz.toFixed(2) : "null";
-      debugParts.push(`sp=${sp}`);
-      if (scriptWallSr !== null) {
-        debugParts.push(`wallSR=${scriptWallSr.toFixed(0)}`);
       }
+
+      // Smooth cents with EMA (on the locked note)
+      if (lockedMidi == null) return; // should not happen
+      const centsForLocked = wrapCents(centsOffFromMidi(freqHz, lockedMidi));
+      const alpha = 0.2; // responsiveness vs smoothness
+      centsEma = centsEma == null ? centsForLocked : (centsEma + alpha * (centsForLocked - centsEma));
+
+      const note = midiToNoteName(lockedMidi);
+      updateStrobeVisualizer(centsEma, true);
+      setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
+      const debugParts: string[] = [];
+      if (tau !== null && cmnd !== null) {
+        debugParts.push(`tau=${tau.toFixed(1)} cmnd=${cmnd.toFixed(3)}`);
+      }
+      if (effSr !== null) {
+        debugParts.push(`effSR=${effSr.toFixed(0)}`);
+      }
+      if (zcHz !== null) {
+        debugParts.push(`zc=${zcHz.toFixed(2)}`);
+      }
+      if (isIOS) {
+        const sp = scriptPitchHz !== null ? scriptPitchHz.toFixed(2) : "null";
+        debugParts.push(`sp=${sp}`);
+        if (scriptWallSr !== null) {
+          debugParts.push(`wallSR=${scriptWallSr.toFixed(0)}`);
+        }
+      }
+      if (useTestTone) {
+        debugParts.push("mode=osc");
+      }
+      const debug = debugParts.length ? ` ${debugParts.join(" ")}` : "";
+      setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
+      return;
     }
-    if (useTestTone) {
-      debugParts.push("mode=osc");
-    }
-    const debug = debugParts.length ? ` ${debugParts.join(" ")}` : "";
-    setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
-    return;
-  }
   };
 
   // Start animation loop for smooth strobe rotation
@@ -736,6 +739,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       await startAudio();
     } catch (err) {
       console.error(err);
+      cleanupAudio();
       
       let errorMsg = "Error starting audio";
       if (err instanceof Error) {
@@ -772,4 +776,5 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   await startWithHandling();
 });
+
 
