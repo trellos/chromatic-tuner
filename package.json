@@ -1,25 +1,27 @@
-{
-  "name": "chromatic-tuner",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "node scripts/dev.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "devDependencies": {
-    "@types/audioworklet": "^0.0.94",
-    "@types/node": "^25.2.0",
-    "chokidar": "^5.0.0",
-    "esbuild": "^0.27.2",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "express": "^5.2.1"
-  }
+﻿{
+    "name":  "chromatic-tuner",
+    "version":  "1.0.0",
+    "description":  "",
+    "main":  "index.js",
+    "scripts":  {
+                    "build":  "node scripts/build.mjs",
+                    "dev":  "node scripts/dev.mjs",
+                    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+                },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "ISC",
+    "type":  "module",
+    "devDependencies":  {
+                            "@types/audioworklet":  "^0.0.94",
+                            "@types/node":  "^25.2.0",
+                            "chokidar":  "^5.0.0",
+                            "esbuild":  "^0.27.2",
+                            "typescript":  "^5.9.3"
+                        },
+    "dependencies":  {
+                         "express":  "^5.2.1"
+                     }
 }
