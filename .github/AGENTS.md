@@ -1,4 +1,4 @@
-# Copilot Instructions for Chromatic Tuner
+﻿# Copilot Instructions for Chromatic Tuner
 
 ## Architecture Overview
 
@@ -19,11 +19,11 @@ It is designed to look like a Peterson Strobe Tuner, providing accurate note and
 ### Data Flow
 
 1. Requests microphone permission via getUserMedia()
-2. Audio input → MediaStreamSource → AudioWorkletNode (tuner)
+2. Audio input â†’ MediaStreamSource â†’ AudioWorkletNode (tuner)
 3. Worklet samples continuously, analyzes every ~50ms (20 Hz hop rate)
 4. Worklet sends pitch messages: `{type: "pitch", freqHz, confidence, rms}`
 5. Main thread receives, applies median filtering, EMA smoothing, and note-locking logic
-6. UI updates with note name (MIDI) and cents offset (±50 cents from locked note)
+6. UI updates with note name (MIDI) and cents offset (Â±50 cents from locked note)
 
 ## Critical Development Patterns
 
@@ -38,13 +38,13 @@ The worklet uses the **YIN algorithm** with these steps:
 4. Parabolic interpolation for sub-sample precision
 5. Gate output on RMS > 0.01 and confidence > 0.75
 
-**Tuning range is hard-coded to 60–1200 Hz** in `yinDetect()` - tune detection frequency sensitivity here.
+**Tuning range is hard-coded to 60â€“1200 Hz** in `yinDetect()` - tune detection frequency sensitivity here.
 
 ### Note Locking & Smoothing
 Main thread uses a **3-layer filtering strategy**:
 1. **Median filter** on rolling history (N=5): kills frequency spikes
 2. **Hysteresis lock**: new note requires 3 consecutive frames (~150ms) to switch
-3. **EMA filter on cents** (α=0.2): smooth offset display without lag
+3. **EMA filter on cents** (Î±=0.2): smooth offset display without lag
 
 This prevents flickering between adjacent notes.
 
@@ -56,7 +56,7 @@ This prevents flickering between adjacent notes.
 ## Build & Development Workflow
 
 ### Commands
-- **`npm run build`**: Clean build to `dist/`. Bundles `main.ts` → `dist/assets/app.js` and `worklet.ts` → `dist/assets/worklet.js`, copies public assets
+- **`npm run build`**: Clean build to `dist/`. Bundles `main.ts` â†’ `dist/assets/app.js` and `worklet.ts` â†’ `dist/assets/worklet.js`, copies public assets
 - **`npm run dev`**: Starts Express server on `http://localhost:3000` with esbuild watch mode for both entry points
 
 ### Watch Mode Details
@@ -65,8 +65,8 @@ Dev script uses **separate esbuild contexts** for app and worklet, allowing inde
 ## Project-Specific Conventions
 
 1. **Note representation**: MIDI numbers (C0=12 through C8=108). `NOTE_NAMES` array uses chromatic order `["C", "C#", "D", ... "B"]`
-2. **Frequency-to-MIDI**: `12 * log₂(freqHz / A4) + 69` where A4 = 440 Hz
-3. **Cents are always relative to the locked MIDI note** (±50 range), not absolute pitch
+2. **Frequency-to-MIDI**: `12 * logâ‚‚(freqHz / A4) + 69` where A4 = 440 Hz
+3. **Cents are always relative to the locked MIDI note** (Â±50 range), not absolute pitch
 4. **RMS gating**: silence detection at < 0.01, confidence must exceed 0.75 for output
 5. **Ring buffer in worklet** (16384 samples): circular buffer for streaming input, maintains write index with wrapping
 
@@ -122,3 +122,4 @@ These changes exist specifically to address iOS Safari audio capture quirks.
 - iOS: mic requires HTTPS. Added guard for missing `getUserMedia`. Audio input now blends stereo channels (uses mono if only channel 0 exists).
 - SVG: strobe arcs are now SVG paths (top semicircle) instead of clipped circles (better iOS rendering).
 - CSS: strobe SVG sized to 100% to avoid offset on mobile.
+
