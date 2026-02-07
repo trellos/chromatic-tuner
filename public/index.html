@@ -40,19 +40,51 @@
             <div class="mode-title">Metronome</div>
           </div>
 
-          <div class="metronome-mock">
-            <div class="tempo-ring">
-              <div class="tempo-value">120</div>
-              <div class="tempo-label">BPM</div>
+          <div class="metronome-panel">
+            <div
+              id="tempo-dial"
+              class="tempo-dial"
+              role="slider"
+              aria-label="Tempo"
+              aria-valuemin="40"
+              aria-valuemax="220"
+              aria-valuenow="120"
+              tabindex="0"
+            >
+              <div class="tempo-wheel"></div>
+              <div class="tempo-ring">
+                <div class="tempo-indicator"></div>
+                <div class="tempo-center">
+                  <div id="tempo-value" class="tempo-value">120</div>
+                  <div class="tempo-label">BPM</div>
+                </div>
+              </div>
             </div>
             <div class="metro-controls">
-              <button class="ghost-btn" type="button">-</button>
-              <button class="primary-btn" type="button">Start</button>
-              <button class="ghost-btn" type="button">+</button>
+              <button class="ghost-btn" type="button" data-action="decrease">-</button>
+              <button class="primary-btn" type="button" data-action="toggle">Start</button>
+              <button class="ghost-btn" type="button" data-action="increase">+</button>
             </div>
             <div class="metro-options">
-              <div class="option-chip">Time: 4/4</div>
-              <div class="option-chip">Accent 1: On</div>
+              <div class="option-chip metro-option">
+                <button id="metro-time-button" class="option-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+                  Time 4/4
+                </button>
+                <div id="metro-time-menu" class="option-menu" role="menu">
+                  <button type="button" role="menuitem" data-value="4/4">4/4</button>
+                  <button type="button" role="menuitem" data-value="3/4">3/4</button>
+                  <button type="button" role="menuitem" data-value="6/8">6/8</button>
+                </div>
+              </div>
+              <button
+                id="metro-accent-toggle"
+                class="accent-toggle is-on"
+                type="button"
+                aria-pressed="true"
+                aria-label="Accent beat"
+              >
+                <span class="accent-icon"></span>
+              </button>
             </div>
           </div>
         </article>
@@ -62,7 +94,7 @@
             <div class="mode-title">Drum Machine</div>
           </div>
 
-          <div class="drum-mock">
+          <div class="drum-mock" data-signature="4/4">
             <div class="drum-controls">
               <div class="control-label">Time Signature</div>
               <div class="signature-toggle" role="radiogroup" aria-label="Time signature">
@@ -73,11 +105,13 @@
                 <input type="radio" name="time-signature" id="ts-6-8" />
                 <label for="ts-6-8">6/8</label>
               </div>
+              <button id="drum-play-toggle" class="primary-btn drum-play" type="button">Play</button>
             </div>
 
-            <div class="drum-grids">
+            <div class="drum-rotator">
+              <div class="drum-grids">
               <div class="drum-grid" data-signature="4/4">
-                <div class="drum-row">
+                <div class="drum-row" data-voice="kick">
                   <div class="drum-label">Kick</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
@@ -98,7 +132,7 @@
                     <button class="step" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="snare">
                   <div class="drum-label">Snare</div>
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
@@ -119,7 +153,7 @@
                     <button class="step is-on" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="hat">
                   <div class="drum-label">Hat</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
@@ -140,7 +174,7 @@
                     <button class="step is-on" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="perc">
                   <div class="drum-label">Perc</div>
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
@@ -164,7 +198,7 @@
               </div>
 
               <div class="drum-grid" data-signature="3/4">
-                <div class="drum-row">
+                <div class="drum-row" data-voice="kick">
                   <div class="drum-label">Kick</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
@@ -181,7 +215,7 @@
                     <button class="step" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="snare">
                   <div class="drum-label">Snare</div>
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
@@ -198,7 +232,7 @@
                     <button class="step" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="hat">
                   <div class="drum-label">Hat</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
@@ -215,7 +249,7 @@
                     <button class="step is-on" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="perc">
                   <div class="drum-label">Perc</div>
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
@@ -235,7 +269,7 @@
               </div>
 
               <div class="drum-grid" data-signature="6/8">
-                <div class="drum-row">
+                <div class="drum-row" data-voice="kick">
                   <div class="drum-label">Kick</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
@@ -252,7 +286,7 @@
                     <button class="step" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="snare">
                   <div class="drum-label">Snare</div>
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
@@ -269,7 +303,7 @@
                     <button class="step" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="hat">
                   <div class="drum-label">Hat</div>
                   <div class="drum-steps">
                     <button class="step is-on" type="button"></button>
@@ -286,7 +320,7 @@
                     <button class="step is-on" type="button"></button>
                   </div>
                 </div>
-                <div class="drum-row">
+                <div class="drum-row" data-voice="perc">
                   <div class="drum-label">Perc</div>
                   <div class="drum-steps">
                     <button class="step" type="button"></button>
@@ -303,6 +337,7 @@
                     <button class="step is-on" type="button"></button>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
             <div class="drum-footer">
