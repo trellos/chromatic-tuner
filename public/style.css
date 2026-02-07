@@ -190,6 +190,16 @@ body.drum-fullscreen .mode-stage {
   gap: 24px;
 }
 
+
+.mode-screen[data-mode="tuner"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mode-screen[data-mode="tuner"] > .tuna-field {
+  z-index: 0;
+}
+
 .mode-header {
   display: flex;
   flex-direction: column;
@@ -310,6 +320,7 @@ h1 {
 }
 
 .strobe-tuner::before {
+  z-index: 2;
   content: "";
   position: absolute;
   left: 0;
@@ -337,7 +348,7 @@ h1 {
   --state-rotation: 0deg;
   position: absolute;
   inset: 0;
-  border-radius: 50%;
+  border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
@@ -434,6 +445,7 @@ h1 {
 }
 
 #status {
+  z-index: 4;
   text-align: center;
   position: absolute;
   top: calc(50% + 8px);
@@ -455,6 +467,7 @@ h1 {
 }
 
 body.status-hidden #status {
+  z-index: 4;
   opacity: 0;
   pointer-events: none;
 }
