@@ -9,8 +9,12 @@ export function createDrumMachineMode(): ModeDefinition {
     drumMockEl?.querySelectorAll<HTMLInputElement>('input[name="time-signature"]') ??
     [];
   const playButton = document.getElementById("drum-play-toggle");
+  const tempoValueEl = document.getElementById("drum-tempo-value");
+  const tempoButtons =
+    drumMockEl?.querySelectorAll<HTMLButtonElement>("[data-tempo]") ?? [];
 
-  const BPM = 120;
+  const BPM_MIN = 60;
+  const BPM_MAX = 180;
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
   const KICK_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2338.wav";
@@ -18,6 +22,7 @@ export function createDrumMachineMode(): ModeDefinition {
   const HAT_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2290.wav";
 
   let signature = "4/4";
+  let bpm = 120;
   let isPlaying = false;
   let audioContext: AudioContext | null = null;
   let buffers: Record<string, AudioBuffer | null> = {
@@ -29,7 +34,9 @@ export function createDrumMachineMode(): ModeDefinition {
   let schedulerId: number | null = null;
   let nextStepTime = 0;
   let currentStep = 0;
+  let lastStepIndex: number | null = null;
   let uiAbort: AbortController | null = null;
+  let playheadTimeouts: number[] = [];
 
   const getStepsPerBar = () => (signature === "4/4" ? 16 : 12);
 
@@ -41,10 +48,19 @@ export function createDrumMachineMode(): ModeDefinition {
     if (drumMockEl) {
       drumMockEl.dataset.signature = value;
     }
+    drumMockEl?.querySelectorAll(".step.is-current").forEach((step) => {
+      step.classList.remove("is-current");
+    });
+    lastStepIndex = null;
     currentStep = 0;
     if (audioContext) {
       nextStepTime = audioContext.currentTime + 0.05;
     }
+  };
+
+  const setBpm = (value: number) => {
+    bpm = Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(value)));
+    if (tempoValueEl) tempoValueEl.textContent = String(bpm);
   };
 
   const ensureAudio = async () => {
@@ -125,11 +141,27 @@ export function createDrumMachineMode(): ModeDefinition {
     const stepsPerBar = getStepsPerBar();
     const beatsPerBar = getBeatsPerBar();
     const stepsPerBeat = stepsPerBar / beatsPerBar;
-    const stepDuration = (60 / BPM) / stepsPerBeat;
+    const stepDuration = (60 / bpm) / stepsPerBeat;
     while (nextStepTime < audioContext.currentTime + SCHEDULE_AHEAD) {
       const activeGrid = drumMockEl?.querySelector<HTMLElement>(
         `.drum-grid[data-signature="${signature}"]`
       );
+      const stepToHighlight = currentStep;
+      if (activeGrid) {
+        const delay = Math.max(
+          0,
+          (nextStepTime - audioContext.currentTime) * 1000
+        );
+        const timeout = window.setTimeout(() => {
+          const steps = activeGrid.querySelectorAll<HTMLButtonElement>(".step");
+          if (lastStepIndex !== null && steps[lastStepIndex]) {
+            steps[lastStepIndex]?.classList.remove("is-current");
+          }
+          steps[stepToHighlight]?.classList.add("is-current");
+          lastStepIndex = stepToHighlight;
+        }, delay);
+        playheadTimeouts.push(timeout);
+      }
       if (activeGrid) {
         const rows = activeGrid.querySelectorAll<HTMLElement>(".drum-row");
         rows.forEach((row) => {
@@ -164,6 +196,16 @@ export function createDrumMachineMode(): ModeDefinition {
       window.clearInterval(schedulerId);
       schedulerId = null;
     }
+    playheadTimeouts.forEach((id) => window.clearTimeout(id));
+    playheadTimeouts = [];
+    if (lastStepIndex !== null) {
+      const activeGrid = drumMockEl?.querySelector<HTMLElement>(
+        `.drum-grid[data-signature="${signature}"]`
+      );
+      const steps = activeGrid?.querySelectorAll<HTMLButtonElement>(".step");
+      steps?.[lastStepIndex]?.classList.remove("is-current");
+      lastStepIndex = null;
+    }
     if (playButton) playButton.textContent = "Play";
   };
 
@@ -182,6 +224,18 @@ export function createDrumMachineMode(): ModeDefinition {
               input.id === "ts-3-4" ? "3/4" : input.id === "ts-6-8" ? "6/8" : "4/4";
             setSignature(value);
           }
+        },
+        { signal }
+      );
+    });
+
+    tempoButtons.forEach((button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          const direction = button.dataset.tempo;
+          if (direction === "down") setBpm(bpm - 1);
+          if (direction === "up") setBpm(bpm + 1);
         },
         { signal }
       );
@@ -207,6 +261,7 @@ export function createDrumMachineMode(): ModeDefinition {
         { signal }
       );
     }
+
   };
 
   const enter = async () => {
@@ -222,6 +277,7 @@ export function createDrumMachineMode(): ModeDefinition {
             : "4/4";
       setSignature(value);
     }
+    setBpm(bpm);
     attachUi();
   };
 

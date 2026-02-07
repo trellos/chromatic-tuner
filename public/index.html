@@ -51,6 +51,7 @@
               aria-valuenow="120"
               tabindex="0"
             >
+              <div class="metro-starburst" aria-hidden="true"></div>
               <div class="tempo-wheel"></div>
               <div class="tempo-ring">
                 <div class="tempo-indicator"></div>
@@ -71,25 +72,20 @@
                   Time 4/4
                 </button>
                 <div id="metro-time-menu" class="option-menu" role="menu">
+                  <button type="button" role="menuitem" data-value="no-accent">No Accent</button>
                   <button type="button" role="menuitem" data-value="4/4">4/4</button>
                   <button type="button" role="menuitem" data-value="3/4">3/4</button>
                   <button type="button" role="menuitem" data-value="6/8">6/8</button>
                 </div>
               </div>
-              <button
-                id="metro-accent-toggle"
-                class="accent-toggle is-on"
-                type="button"
-                aria-pressed="true"
-                aria-label="Accent beat"
-              >
-                <span class="accent-icon"></span>
-              </button>
             </div>
           </div>
         </article>
 
         <article class="mode-screen" data-mode="drum-machine">
+          <button id="drum-exit" class="drum-exit" type="button" aria-label="Exit fullscreen">
+            ✕
+          </button>
           <div class="mode-header">
             <div class="mode-title">Drum Machine</div>
           </div>
@@ -104,6 +100,14 @@
                 <label for="ts-3-4">3/4</label>
                 <input type="radio" name="time-signature" id="ts-6-8" />
                 <label for="ts-6-8">6/8</label>
+              </div>
+              <div class="drum-tempo">
+                <button class="ghost-btn" type="button" data-tempo="down">-</button>
+                <div>
+                  <div id="drum-tempo-value" class="tempo-value">120</div>
+                  <div class="tempo-label">BPM</div>
+                </div>
+                <button class="ghost-btn" type="button" data-tempo="up">+</button>
               </div>
               <button id="drum-play-toggle" class="primary-btn drum-play" type="button">Play</button>
             </div>
@@ -342,8 +346,6 @@
             </div>
             <div class="drum-footer">
               <div class="mode-chip">Kit: Neon Tuna</div>
-              <div class="mode-chip">Pattern: 01</div>
-              <div class="mode-chip">Signature: Adaptive</div>
             </div>
           </div>
         </article>

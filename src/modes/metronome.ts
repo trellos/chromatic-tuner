@@ -6,9 +6,9 @@ export function createMetronomeMode(): ModeDefinition {
   );
   const tempoDialEl = document.getElementById("tempo-dial");
   const tempoValueEl = document.getElementById("tempo-value");
+  const starburstEl = metronomeEl?.querySelector<HTMLElement>(".metro-starburst") ?? null;
   const timeButtonEl = document.getElementById("metro-time-button");
   const timeMenuEl = document.getElementById("metro-time-menu");
-  const accentToggleEl = document.getElementById("metro-accent-toggle");
   const controlsEl =
     metronomeEl?.querySelector<HTMLElement>(".metro-controls") ?? null;
 
@@ -32,6 +32,7 @@ export function createMetronomeMode(): ModeDefinition {
   let nextNoteTime = 0;
   let currentBeat = 0;
   let uiAbort: AbortController | null = null;
+  let pulseTimeouts: number[] = [];
 
   const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -65,10 +66,6 @@ export function createMetronomeMode(): ModeDefinition {
 
   const setAccentEnabled = (enabled: boolean) => {
     accentEnabled = enabled;
-    if (accentToggleEl) {
-      accentToggleEl.classList.toggle("is-on", enabled);
-      accentToggleEl.setAttribute("aria-pressed", String(enabled));
-    }
   };
 
   const ensureAudio = async () => {
@@ -131,12 +128,26 @@ export function createMetronomeMode(): ModeDefinition {
     osc.stop(time + 0.05);
   };
 
+  const schedulePulse = (time: number, accent: boolean) => {
+    if (!starburstEl || !audioContext) return;
+    const delay = Math.max(0, (time - audioContext.currentTime) * 1000);
+    const timeout = window.setTimeout(() => {
+      starburstEl.classList.add("is-pulsing");
+      const release = window.setTimeout(() => {
+        starburstEl.classList.remove("is-pulsing");
+      }, accent ? 180 : 140);
+      pulseTimeouts.push(release);
+    }, delay);
+    pulseTimeouts.push(timeout);
+  };
+
   const schedule = () => {
     if (!audioContext) return;
     const beatsPerBar = getBeatsPerBar();
     while (nextNoteTime < audioContext.currentTime + SCHEDULE_AHEAD) {
       const isAccent = accentEnabled && currentBeat === 0;
       playClick(nextNoteTime, isAccent);
+      schedulePulse(nextNoteTime, isAccent);
       currentBeat = (currentBeat + 1) % beatsPerBar;
       nextNoteTime += 60 / bpm;
     }
@@ -162,6 +173,9 @@ export function createMetronomeMode(): ModeDefinition {
       window.clearInterval(schedulerId);
       schedulerId = null;
     }
+    pulseTimeouts.forEach((id) => window.clearTimeout(id));
+    pulseTimeouts = [];
+    starburstEl?.classList.remove("is-pulsing");
     const toggleButton =
       controlsEl?.querySelector<HTMLButtonElement>('[data-action="toggle"]');
     if (toggleButton) toggleButton.textContent = "Start";
@@ -284,7 +298,12 @@ export function createMetronomeMode(): ModeDefinition {
           const target = event.target as HTMLElement | null;
           const value = target?.getAttribute("data-value");
           if (!value) return;
-          setTimeSignature(value);
+          if (value === "no-accent") {
+            setAccentEnabled(false);
+          } else {
+            setTimeSignature(value);
+            setAccentEnabled(true);
+          }
           toggleMenu(false);
         },
         { signal }
@@ -301,15 +320,6 @@ export function createMetronomeMode(): ModeDefinition {
       );
     }
 
-    if (accentToggleEl) {
-      accentToggleEl.addEventListener(
-        "click",
-        () => {
-          setAccentEnabled(!accentEnabled);
-        },
-        { signal }
-      );
-    }
   };
 
   const enter = async () => {

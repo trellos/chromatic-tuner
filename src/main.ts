@@ -6,6 +6,7 @@ import { createDrumMachineMode } from "./modes/drum-machine.js";
 const carouselEl = document.getElementById("mode-carousel");
 const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
+const drumExitEl = document.getElementById("drum-exit");
 const modeButtons =
   carouselEl?.querySelectorAll<HTMLButtonElement>("[data-mode]") ?? [];
 const modeScreens =
@@ -29,6 +30,10 @@ function setCarouselHidden(hidden: boolean): void {
   if (carouselShowEl) {
     carouselShowEl.setAttribute("aria-hidden", hidden ? "false" : "true");
   }
+  document.body.classList.toggle(
+    "drum-fullscreen",
+    hidden && activeModeId === "drum-machine"
+  );
 }
 
 function updateCarouselState(): void {
@@ -63,6 +68,11 @@ async function switchMode(id: ModeId): Promise<void> {
   activeModeId = id;
   updateCarouselState();
   setActiveScreen(id);
+  document.body.classList.toggle(
+    "drum-fullscreen",
+    document.body.classList.contains("carousel-hidden") &&
+      activeModeId === "drum-machine"
+  );
 
   if (!nextMode?.canFullscreen) {
     setCarouselHidden(false);
@@ -89,6 +99,12 @@ function initializeCarouselUi(): void {
       const activeMode = getModeById(activeModeId);
       if (!activeMode?.canFullscreen) return;
       setCarouselHidden(true);
+    });
+  }
+
+  if (drumExitEl) {
+    drumExitEl.addEventListener("click", () => {
+      setCarouselHidden(false);
     });
   }
 
