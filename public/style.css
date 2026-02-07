@@ -184,6 +184,23 @@ body.carousel-hidden .carousel-show {
   text-transform: uppercase;
 }
 
+.mode-screen[data-mode="tuner"] .mode-header {
+  align-items: center;
+}
+
+.tuner-title {
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 30px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: transparent;
+  background: linear-gradient(90deg, var(--tuna-pink) 0%, var(--tuna-purple) 50%, var(--tuna-aqua) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-rendering: geometricPrecision;
+  text-align: center;
+}
+
 .mode-footer,
 .drum-footer {
   display: flex;
@@ -203,8 +220,8 @@ body.carousel-hidden .carousel-show {
 
 .tuner-stack {
   position: relative;
-  width: 280px;
-  margin: 0 auto 32px;
+  width: min(520px, 90%);
+  margin: 0 auto;
 }
 
 h1 {
@@ -261,8 +278,8 @@ h1 {
 
 /* Strobe Tuner Visualization */
 .strobe-tuner {
-  width: 280px;
-  height: 280px;
+  width: min(520px, 90vw);
+  height: min(520px, 90vw);
   margin: 0;
   border-radius: 50%;
   position: relative;
@@ -598,14 +615,14 @@ body.status-hidden #status {
   }
 
   .strobe-tuner {
-    width: 240px;
-    height: 240px;
+    width: min(320px, 86vw);
+    height: min(320px, 86vw);
     margin-bottom: 0;
   }
 
   .tuner-stack {
-    width: 240px;
-    margin-bottom: 24px;
+    width: min(320px, 86vw);
+    margin-bottom: 0;
   }
 
   #note {
