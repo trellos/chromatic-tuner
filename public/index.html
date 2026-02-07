@@ -9,20 +9,186 @@
   </head>
 
   <body>
-    <main>
-      <h1 class="hero-title" data-text="TUNA">TUNA</h1>
-
-      <div class="tuner-stack">
-        <div id="strobe-visualizer" class="strobe-tuner idle">
-          <div id="reading">
-            <div id="note"></div>
-            <div id="cents"></div>
-          </div>
+    <main class="app">
+      <header class="app-header">
+        <div class="brand">
+          <h1 class="hero-title" data-text="TUNA">TUNA</h1>
+          <p class="tagline">Chromatic tools for pitch, pulse, and pattern.</p>
         </div>
+        <div class="carousel">
+          <div id="mode-carousel" class="mode-carousel" role="tablist" aria-label="Modes">
+            <button class="mode-pill is-active" role="tab" aria-selected="true" data-mode="tuner" type="button">
+              <span class="mode-icon">TU</span>
+              Chromatic Tuner
+            </button>
+            <button class="mode-pill" role="tab" aria-selected="false" data-mode="metronome" type="button">
+              <span class="mode-icon">MT</span>
+              Metronome
+            </button>
+            <button class="mode-pill" role="tab" aria-selected="false" data-mode="drum-machine" type="button">
+              <span class="mode-icon">DR</span>
+              Drum Machine
+            </button>
+          </div>
+          <button id="carousel-toggle" class="carousel-toggle" type="button" disabled>
+            Fullscreen
+          </button>
+        </div>
+      </header>
 
-        <div id="status"></div>
-      </div>
+      <button id="carousel-show" class="carousel-show" type="button" aria-hidden="true">
+        Show modes
+      </button>
 
+      <section class="mode-stage">
+        <article class="mode-screen is-active" data-mode="tuner">
+          <div class="mode-header">
+            <div class="mode-title">Chromatic Tuner</div>
+            <div class="mode-sub">Strobe precision with a neon glow.</div>
+          </div>
+
+          <div class="tuner-stack">
+            <div id="strobe-visualizer" class="strobe-tuner idle">
+              <div id="reading">
+                <div id="note"></div>
+                <div id="cents"></div>
+              </div>
+            </div>
+
+            <div id="status"></div>
+          </div>
+
+          <div class="mode-footer">
+            <div class="mode-chip">A4=440 Hz</div>
+            <div class="mode-chip">Input: Mic</div>
+            <div class="mode-chip">Reset on entry</div>
+          </div>
+        </article>
+
+        <article class="mode-screen" data-mode="metronome">
+          <div class="mode-header">
+            <div class="mode-title">Metronome</div>
+            <div class="mode-sub">Steady pulse with tactile controls.</div>
+          </div>
+
+          <div class="metronome-mock">
+            <div class="tempo-ring">
+              <div class="tempo-value">120</div>
+              <div class="tempo-label">BPM</div>
+            </div>
+            <div class="metro-controls">
+              <button class="ghost-btn" type="button">-</button>
+              <button class="primary-btn" type="button">Start</button>
+              <button class="ghost-btn" type="button">+</button>
+            </div>
+            <div class="metro-options">
+              <div class="option-chip">Time: 4/4</div>
+              <div class="option-chip">Accent 1: On</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="mode-screen" data-mode="drum-machine">
+          <div class="mode-header">
+            <div class="mode-title">Drum Machine</div>
+            <div class="mode-sub">Sketch grooves fast, keep the loop alive.</div>
+          </div>
+
+          <div class="drum-mock">
+            <div class="drum-grid">
+              <div class="drum-row">
+                <div class="drum-label">Kick</div>
+                <div class="drum-steps">
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                </div>
+              </div>
+              <div class="drum-row">
+                <div class="drum-label">Snare</div>
+                <div class="drum-steps">
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                </div>
+              </div>
+              <div class="drum-row">
+                <div class="drum-label">Hat</div>
+                <div class="drum-steps">
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                </div>
+              </div>
+              <div class="drum-row">
+                <div class="drum-label">Perc</div>
+                <div class="drum-steps">
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step" type="button"></button>
+                  <button class="step is-on" type="button"></button>
+                </div>
+              </div>
+            </div>
+            <div class="drum-footer">
+              <div class="mode-chip">Kit: Neon Tuna</div>
+              <div class="mode-chip">Pattern: 01</div>
+              <div class="mode-chip">Preserve state</div>
+            </div>
+          </div>
+        </article>
+      </section>
     </main>
 
     <script type="module" src="./assets/app.js"></script>
