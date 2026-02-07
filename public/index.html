@@ -124,6 +124,24 @@
                     <button type="button" role="menuitem" data-beat="minimal">Minimal</button>
                   </div>
                 </div>
+                <div class="drum-beat-picker">
+                  <button
+                    id="drum-kit-button"
+                    class="ghost-btn drum-random"
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                  >
+                    Kit: <span id="drum-kit-label">Rock</span>
+                  </button>
+                  <div id="drum-kit-menu" class="option-menu" role="menu">
+                    <button type="button" role="menuitem" data-kit="rock">Rock Drums</button>
+                    <button type="button" role="menuitem" data-kit="electro">Electro Drum Machine</button>
+                    <button type="button" role="menuitem" data-kit="house">House Drums</button>
+                    <button type="button" role="menuitem" data-kit="lofi">Lo-Fi Pocket</button>
+                    <button type="button" role="menuitem" data-kit="latin">Latin Percussion</button>
+                  </div>
+                </div>
                 <button id="drum-play-toggle" class="primary-btn drum-play" type="button">Play</button>
               </div>
 
@@ -394,4 +412,3 @@
     <script type="module" src="./assets/app.js"></script>
   </body>
 </html>
-
