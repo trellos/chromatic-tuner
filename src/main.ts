@@ -3,6 +3,43 @@ const noteEl = document.getElementById("note");
 const centsEl = document.getElementById("cents");
 const strobeVisualizerEl = document.getElementById("strobe-visualizer");
 
+type ModeId = "tuner" | "metronome" | "drum-machine";
+
+type ModeDefinition = {
+  id: ModeId;
+  title: string;
+  icon: string;
+  preserveState?: boolean;
+  canFullscreen?: boolean;
+  onEnter?: () => void | Promise<void>;
+  onExit?: () => void | Promise<void>;
+};
+
+const MODE_REGISTRY: ModeDefinition[] = [
+  {
+    id: "tuner",
+    title: "Chromatic Tuner",
+    icon: "TU",
+    preserveState: false,
+    canFullscreen: false,
+  },
+  {
+    id: "metronome",
+    title: "Metronome",
+    icon: "MT",
+    preserveState: false,
+    canFullscreen: false,
+  },
+  {
+    id: "drum-machine",
+    title: "Drum Machine",
+    icon: "DR",
+    preserveState: true,
+    canFullscreen: true,
+  },
+];
+
+
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 const A4 = 440;
