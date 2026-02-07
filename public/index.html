@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -84,36 +84,48 @@
 
         <article class="mode-screen" data-mode="drum-machine">
           <button id="drum-exit" class="drum-exit" type="button" aria-label="Exit fullscreen">
-            ✕
+            X
           </button>
           <div class="mode-header">
             <div class="mode-title">Drum Machine</div>
           </div>
 
           <div class="drum-mock" data-signature="4/4">
-            <div class="drum-controls">
-              <div class="control-label">Time Signature</div>
-              <div class="signature-toggle" role="radiogroup" aria-label="Time signature">
-                <input type="radio" name="time-signature" id="ts-4-4" checked />
-                <label for="ts-4-4">4/4</label>
-                <input type="radio" name="time-signature" id="ts-3-4" />
-                <label for="ts-3-4">3/4</label>
-                <input type="radio" name="time-signature" id="ts-6-8" />
-                <label for="ts-6-8">6/8</label>
-              </div>
-              <div class="drum-tempo">
-                <button class="ghost-btn" type="button" data-tempo="down">-</button>
-                <div>
-                  <div id="drum-tempo-value" class="tempo-value">120</div>
-                  <div class="tempo-label">BPM</div>
-                </div>
-                <button class="ghost-btn" type="button" data-tempo="up">+</button>
-              </div>
-              <button id="drum-play-toggle" class="primary-btn drum-play" type="button">Play</button>
-            </div>
-
             <div class="drum-rotator">
+              <div class="drum-ui">
+                <div class="drum-tempo">
+                  <button class="ghost-btn" type="button" data-tempo="down">-</button>
+                  <div>
+                    <div id="drum-tempo-value" class="tempo-value">120</div>
+                    <div class="tempo-label">BPM</div>
+                  </div>
+                  <button class="ghost-btn" type="button" data-tempo="up">+</button>
+                </div>
+                <div class="drum-beat-picker">
+                  <button
+                    id="drum-beat-button"
+                    class="ghost-btn drum-random"
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                  >
+                    Beat
+                  </button>
+                  <div id="drum-beat-menu" class="option-menu" role="menu">
+                    <button type="button" role="menuitem" data-beat="rock">Rock</button>
+                    <button type="button" role="menuitem" data-beat="shuffle">Shuffle</button>
+                    <button type="button" role="menuitem" data-beat="disco">Disco</button>
+                    <button type="button" role="menuitem" data-beat="half-time">Half-Time</button>
+                    <button type="button" role="menuitem" data-beat="breakbeat">Breakbeat</button>
+                    <button type="button" role="menuitem" data-beat="afrobeat">Afrobeat</button>
+                    <button type="button" role="menuitem" data-beat="minimal">Minimal</button>
+                  </div>
+                </div>
+                <button id="drum-play-toggle" class="primary-btn drum-play" type="button">Play</button>
+              </div>
+
               <div class="drum-grids">
+                <div class="drum-playhead" aria-hidden="true"></div>
               <div class="drum-grid" data-signature="4/4">
                 <div class="drum-row" data-voice="kick">
                   <div class="drum-label">Kick</div>
@@ -366,8 +378,8 @@
             Drum Machine
           </button>
         </div>
-        <button id="carousel-toggle" class="carousel-toggle" type="button" disabled>
-          Fullscreen
+        <button id="carousel-toggle" class="carousel-toggle" type="button" aria-label="Fullscreen" disabled>
+          <span class="fullscreen-icon" aria-hidden="true"></span>
         </button>
       </div>
 
@@ -379,3 +391,4 @@
     <script type="module" src="./assets/app.js"></script>
   </body>
 </html>
+

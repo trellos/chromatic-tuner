@@ -5,10 +5,11 @@ export function createDrumMachineMode(): ModeDefinition {
     '.mode-screen[data-mode="drum-machine"]'
   );
   const drumMockEl = drumModeEl?.querySelector<HTMLElement>(".drum-mock") ?? null;
-  const signatureInputs =
-    drumMockEl?.querySelectorAll<HTMLInputElement>('input[name="time-signature"]') ??
-    [];
+  const drumGridsEl = drumMockEl?.querySelector<HTMLElement>(".drum-grids") ?? null;
+  const playheadEl = drumMockEl?.querySelector<HTMLElement>(".drum-playhead") ?? null;
   const playButton = document.getElementById("drum-play-toggle");
+  const beatButton = document.getElementById("drum-beat-button");
+  const beatMenu = document.getElementById("drum-beat-menu");
   const tempoValueEl = document.getElementById("drum-tempo-value");
   const tempoButtons =
     drumMockEl?.querySelectorAll<HTMLButtonElement>("[data-tempo]") ?? [];
@@ -48,13 +49,186 @@ export function createDrumMachineMode(): ModeDefinition {
     if (drumMockEl) {
       drumMockEl.dataset.signature = value;
     }
+    if (drumGridsEl) {
+      const count = value === "4/4" ? 16 : 12;
+      drumGridsEl.style.setProperty("--playhead-count", String(count));
+      drumGridsEl.style.setProperty("--playhead-index", "0");
+    }
     drumMockEl?.querySelectorAll(".step.is-current").forEach((step) => {
       step.classList.remove("is-current");
     });
+    playheadEl?.classList.remove("is-active");
     lastStepIndex = null;
     currentStep = 0;
     if (audioContext) {
       nextStepTime = audioContext.currentTime + 0.05;
+    }
+  };
+
+  const clearRow = (row: HTMLElement) => {
+    row.querySelectorAll<HTMLButtonElement>(".step").forEach((step) => {
+      step.classList.remove("is-on");
+    });
+  };
+
+  const setStep = (row: HTMLElement, index: number, on: boolean) => {
+    const steps = row.querySelectorAll<HTMLButtonElement>(".step");
+    const step = steps[index];
+    if (!step) return;
+    step.classList.toggle("is-on", on);
+  };
+
+  const applyBeat = (beat: string) => {
+    setSignature("4/4");
+    const grid = drumMockEl?.querySelector<HTMLElement>(
+      '.drum-grid[data-signature="4/4"]'
+    );
+    if (!grid) return;
+
+    const rows = grid.querySelectorAll<HTMLElement>(".drum-row");
+    rows.forEach(clearRow);
+
+    const kick = rows[0];
+    const snare = rows[1];
+    const hat = rows[2];
+    const perc = rows[3];
+
+    const setHatEights = () => {
+      if (!hat) return;
+      for (let i = 0; i < 16; i += 2) setStep(hat, i, true);
+    };
+
+    const setHatSixteenths = (swing = false) => {
+      if (!hat) return;
+      for (let i = 0; i < 16; i++) {
+        const on = swing ? i % 2 === 0 || (i % 4 === 3 && Math.random() < 0.6) : true;
+        if (on) setStep(hat, i, true);
+      }
+    };
+
+    const setBackbeat = () => {
+      if (!snare) return;
+      setStep(snare, 4, true);
+      setStep(snare, 12, true);
+    };
+
+    const setFourOnFloor = () => {
+      if (!kick) return;
+      [0, 4, 8, 12].forEach((i) => setStep(kick, i, true));
+    };
+
+    const setRockKick = () => {
+      if (!kick) return;
+      setStep(kick, 0, true);
+      setStep(kick, 8, true);
+      setStep(kick, 6, Math.random() < 0.4);
+      setStep(kick, 10, Math.random() < 0.4);
+    };
+
+    const setShuffleKick = () => {
+      if (!kick) return;
+      setStep(kick, 0, true);
+      setStep(kick, 6, true);
+      setStep(kick, 12, true);
+      setStep(kick, 14, Math.random() < 0.5);
+    };
+
+    const setBreakKick = () => {
+      if (!kick) return;
+      [0, 6, 7, 10, 12].forEach((i) => setStep(kick, i, true));
+    };
+
+    const setPercOffbeats = (prob: number) => {
+      if (!perc) return;
+      for (let i = 0; i < 16; i++) {
+        if (i % 4 === 2 && Math.random() < prob) setStep(perc, i, true);
+      }
+    };
+
+    switch (beat) {
+      case "rock":
+        setRockKick();
+        setBackbeat();
+        setHatEights();
+        setPercOffbeats(0.3);
+        break;
+      case "shuffle":
+        setShuffleKick();
+        setBackbeat();
+        setHatSixteenths(true);
+        setPercOffbeats(0.2);
+        break;
+      case "disco":
+        setFourOnFloor();
+        setBackbeat();
+        setHatSixteenths();
+        break;
+      case "half-time":
+        if (kick) {
+          setStep(kick, 0, true);
+          setStep(kick, 8, Math.random() < 0.6);
+          setStep(kick, 12, Math.random() < 0.4);
+        }
+        if (snare) {
+          setStep(snare, 8, true);
+        }
+        if (hat) {
+          for (let i = 0; i < 16; i++) {
+            const on = i % 4 === 0 || (i % 8 === 6 && Math.random() < 0.6);
+            if (on) setStep(hat, i, true);
+          }
+        }
+        break;
+      case "breakbeat":
+        setBreakKick();
+        if (snare) {
+          setStep(snare, 4, true);
+          setStep(snare, 12, true);
+          setStep(snare, 14, true);
+        }
+        if (hat) {
+          for (let i = 0; i < 16; i++) {
+            const on = i % 2 === 0 || (i % 4 === 3 && Math.random() < 0.5);
+            if (on) setStep(hat, i, true);
+          }
+        }
+        setPercOffbeats(0.35);
+        break;
+      case "afrobeat":
+        if (kick) {
+          [0, 5, 8, 11, 15].forEach((i) => setStep(kick, i, true));
+        }
+        if (snare) {
+          [4, 12].forEach((i) => setStep(snare, i, true));
+          setStep(snare, 10, true);
+        }
+        if (hat) {
+          for (let i = 0; i < 16; i++) {
+            const on = i % 4 === 0 || i % 4 === 2;
+            if (on || Math.random() < 0.2) setStep(hat, i, true);
+          }
+        }
+        setPercOffbeats(0.4);
+        break;
+      case "minimal":
+        if (kick) {
+          setStep(kick, 0, true);
+          setStep(kick, 8, true);
+        }
+        if (snare) {
+          setStep(snare, 12, true);
+        }
+        if (hat) {
+          for (let i = 0; i < 16; i++) {
+            if (i % 4 === 2) setStep(hat, i, true);
+          }
+        }
+        break;
+      default:
+        setRockKick();
+        setBackbeat();
+        setHatEights();
+        break;
     }
   };
 
@@ -153,11 +327,24 @@ export function createDrumMachineMode(): ModeDefinition {
           (nextStepTime - audioContext.currentTime) * 1000
         );
         const timeout = window.setTimeout(() => {
-          const steps = activeGrid.querySelectorAll<HTMLButtonElement>(".step");
-          if (lastStepIndex !== null && steps[lastStepIndex]) {
-            steps[lastStepIndex]?.classList.remove("is-current");
+          const rows = activeGrid.querySelectorAll<HTMLElement>(".drum-row");
+          if (lastStepIndex !== null) {
+            rows.forEach((row) => {
+              const steps = row.querySelectorAll<HTMLButtonElement>(".step");
+              steps[lastStepIndex]?.classList.remove("is-current");
+            });
           }
-          steps[stepToHighlight]?.classList.add("is-current");
+          rows.forEach((row) => {
+            const steps = row.querySelectorAll<HTMLButtonElement>(".step");
+            steps[stepToHighlight]?.classList.add("is-current");
+          });
+          if (drumGridsEl) {
+            drumGridsEl.style.setProperty(
+              "--playhead-index",
+              String(stepToHighlight)
+            );
+          }
+          playheadEl?.classList.add("is-active");
           lastStepIndex = stepToHighlight;
         }, delay);
         playheadTimeouts.push(timeout);
@@ -202,10 +389,14 @@ export function createDrumMachineMode(): ModeDefinition {
       const activeGrid = drumMockEl?.querySelector<HTMLElement>(
         `.drum-grid[data-signature="${signature}"]`
       );
-      const steps = activeGrid?.querySelectorAll<HTMLButtonElement>(".step");
-      steps?.[lastStepIndex]?.classList.remove("is-current");
+      const rows = activeGrid?.querySelectorAll<HTMLElement>(".drum-row");
+      rows?.forEach((row) => {
+        const steps = row.querySelectorAll<HTMLButtonElement>(".step");
+        steps[lastStepIndex]?.classList.remove("is-current");
+      });
       lastStepIndex = null;
     }
+    playheadEl?.classList.remove("is-active");
     if (playButton) playButton.textContent = "Play";
   };
 
@@ -214,20 +405,6 @@ export function createDrumMachineMode(): ModeDefinition {
     uiAbort?.abort();
     uiAbort = new AbortController();
     const { signal } = uiAbort;
-
-    signatureInputs.forEach((input) => {
-      input.addEventListener(
-        "change",
-        () => {
-          if (input.checked) {
-            const value =
-              input.id === "ts-3-4" ? "3/4" : input.id === "ts-6-8" ? "6/8" : "4/4";
-            setSignature(value);
-          }
-        },
-        { signal }
-      );
-    });
 
     tempoButtons.forEach((button) => {
       button.addEventListener(
@@ -262,21 +439,49 @@ export function createDrumMachineMode(): ModeDefinition {
       );
     }
 
+    if (beatButton && beatMenu) {
+      const toggleBeatMenu = (open: boolean) => {
+        beatMenu.classList.toggle("is-open", open);
+        beatButton.setAttribute("aria-expanded", String(open));
+      };
+
+      beatButton.addEventListener(
+        "click",
+        (event) => {
+          event.stopPropagation();
+          const isOpen = beatMenu.classList.contains("is-open");
+          toggleBeatMenu(!isOpen);
+        },
+        { signal }
+      );
+
+      beatMenu.addEventListener(
+        "click",
+        (event) => {
+          const target = event.target as HTMLElement | null;
+          const beat = target?.getAttribute("data-beat");
+          if (!beat) return;
+          applyBeat(beat);
+          toggleBeatMenu(false);
+        },
+        { signal }
+      );
+
+      document.addEventListener(
+        "click",
+        (event) => {
+          if (beatMenu.contains(event.target as Node)) return;
+          if (beatButton.contains(event.target as Node)) return;
+          toggleBeatMenu(false);
+        },
+        { signal }
+      );
+    }
+
   };
 
   const enter = async () => {
-    const activeInput =
-      Array.from(signatureInputs).find((input) => input.checked) ??
-      signatureInputs[0];
-    if (activeInput) {
-      const value =
-        activeInput.id === "ts-3-4"
-          ? "3/4"
-          : activeInput.id === "ts-6-8"
-            ? "6/8"
-            : "4/4";
-      setSignature(value);
-    }
+    setSignature(signature);
     setBpm(bpm);
     attachUi();
   };
