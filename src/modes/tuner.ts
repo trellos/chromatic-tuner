@@ -4,6 +4,7 @@ const statusEl = document.getElementById("status");
 const noteEl = document.getElementById("note");
 const centsEl = document.getElementById("cents");
 const strobeVisualizerEl = document.getElementById("strobe-visualizer");
+const tunaFieldEl = document.getElementById("tuna-field");
 
 
 
@@ -98,6 +99,10 @@ let candidateCount = 0;
 let centsEma: number | null = null;
 let overlayRing: SVGPathElement | null = null;
 let strobeDots: SVGPathElement | null = null;
+const TUNA_TILE_COUNT = 42;
+const TUNA_FIELD_SIZE = 280;
+let tunaTiles: HTMLSpanElement[] = [];
+let tunaFieldReady = false;
 
 function freqToMidi(freqHz: number): number {
   return Math.round(12 * Math.log2(freqHz / A4) + 69);
@@ -258,6 +263,86 @@ function wrapCents(c: number): number {
   return c;
 }
 
+function createTunaField(): void {
+  if (!tunaFieldEl || tunaFieldReady) return;
+
+  const fragment = document.createDocumentFragment();
+  tunaTiles = [];
+
+  for (let i = 0; i < TUNA_TILE_COUNT; i++) {
+    const tile = document.createElement("span");
+    tile.className = "tuna-tile";
+    fragment.appendChild(tile);
+    tunaTiles.push(tile);
+  }
+
+  tunaFieldEl.appendChild(fragment);
+  tunaFieldReady = true;
+}
+
+function updateTunaField(centsValue: number | null, isDetecting: boolean): void {
+  if (!tunaFieldEl) return;
+  if (!tunaFieldReady) createTunaField();
+  if (tunaTiles.length === 0) return;
+
+  const boundedCents = centsValue == null ? 0 : Math.max(-50, Math.min(50, centsValue));
+  const detune = Math.abs(boundedCents) / 50;
+  const direction = boundedCents === 0 ? 0 : Math.sign(boundedCents);
+  const sharpness = Math.max(0, boundedCents) / 50;
+  const flatness = Math.max(0, -boundedCents) / 50;
+
+  tunaFieldEl.style.setProperty("--detune", detune.toFixed(3));
+  tunaFieldEl.style.setProperty("--sharpness", sharpness.toFixed(3));
+  tunaFieldEl.style.setProperty("--flatness", flatness.toFixed(3));
+  tunaFieldEl.style.setProperty("--state-rotation", `${(direction * detune * 8).toFixed(2)}deg`);
+
+  if (!isDetecting || centsValue === null) {
+    tunaFieldEl.classList.remove("is-detecting", "is-sharp", "is-flat");
+    return;
+  }
+
+  tunaFieldEl.classList.add("is-detecting");
+  tunaFieldEl.classList.toggle("is-sharp", direction > 0);
+  tunaFieldEl.classList.toggle("is-flat", direction < 0);
+
+  const center = TUNA_FIELD_SIZE / 2;
+  const turns = 4.1;
+  const spiralStart = -Math.PI / 2;
+  const sharpNudge = 16 * sharpness;
+  const flatNudge = 16 * flatness;
+
+  tunaTiles.forEach((tile, index) => {
+    const t = (index + 1) / TUNA_TILE_COUNT;
+    const angle = spiralStart + t * Math.PI * 2 * turns;
+    const radius = t * (TUNA_FIELD_SIZE * 0.33);
+
+    const spiralX = center + Math.cos(angle) * radius;
+    const spiralY = center + Math.sin(angle) * radius;
+
+    const col = index % 7;
+    const row = Math.floor(index / 7);
+    const gridBaseX = 36 + col * 34;
+    const gridBaseY = 34 + row * 36;
+
+    const sharpWarp = ((row % 2 === 0 ? 1 : -1) * sharpNudge) + Math.sin(col * 1.4 + row * 0.6) * (6 + sharpNudge * 0.25);
+    const flatWarp = ((col % 2 === 0 ? -1 : 1) * flatNudge) + Math.cos(col * 0.55 + row * 1.15) * (6 + flatNudge * 0.25);
+    const driftX = sharpness > 0 ? sharpWarp : -flatWarp;
+    const driftY = sharpness > 0 ? Math.cos(row * 0.95 + col * 0.35) * (8 + sharpNudge * 0.2) : Math.sin(col * 1.12 + row * 0.42) * (8 + flatNudge * 0.2);
+
+    const gridX = gridBaseX + driftX;
+    const gridY = gridBaseY + driftY;
+
+    const x = spiralX + (gridX - spiralX) * detune;
+    const y = spiralY + (gridY - spiralY) * detune;
+    const localRotation = direction * detune * 14 + Math.sin(index * 1.618) * 6 * detune;
+
+    tile.style.left = `${x.toFixed(2)}px`;
+    tile.style.top = `${y.toFixed(2)}px`;
+    tile.style.transform = `translate(-50%, -50%) rotate(${localRotation.toFixed(2)}deg)`;
+    tile.style.opacity = `${(0.2 + (isDetecting ? 0.58 : 0) + detune * 0.18).toFixed(3)}`;
+  });
+}
+
 function setStatus(msg: string) {
   if (statusEl) statusEl.textContent = msg;
 }
@@ -331,12 +416,14 @@ function updateStrobeVisualizer(centsValue: number | null, isDetecting: boolean)
     });
   }
 
+  updateTunaField(centsValue, isDetecting);
   updateStrobeVisualizerRotation(centsValue, isDetecting);
 }
 
 setStatus("Idle");
 setReading(null, null);
 initializeStrobeVisualizer();
+createTunaField();
 
 let audioContext: AudioContext | null = null;
 let micStream: MediaStream | null = null;

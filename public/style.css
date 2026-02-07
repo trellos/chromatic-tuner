@@ -329,6 +329,52 @@ h1 {
   pointer-events: none;
 }
 
+
+.tuna-field {
+  --detune: 0;
+  --sharpness: 0;
+  --flatness: 0;
+  --state-rotation: 0deg;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  transform: rotate(var(--state-rotation));
+  transition: transform 140ms ease-out;
+}
+
+.tuna-tile {
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  background-image: url("./favicon.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.2;
+  filter: saturate(calc(0.85 + var(--detune) * 0.8));
+  transition:
+    left 140ms linear,
+    top 140ms linear,
+    transform 140ms linear,
+    opacity 120ms linear,
+    filter 120ms linear;
+}
+
+.tuna-field.is-detecting .tuna-tile {
+  opacity: 0.52;
+}
+
+.tuna-field.is-sharp .tuna-tile {
+  filter: hue-rotate(calc(var(--sharpness) * 12deg)) saturate(1.2);
+}
+
+.tuna-field.is-flat .tuna-tile {
+  filter: hue-rotate(calc(-1 * var(--flatness) * 10deg)) saturate(0.95);
+}
+
 /* SVG Strobe Pattern */
 .strobe-tuner svg {
   width: 100%;
@@ -337,6 +383,7 @@ h1 {
   top: 0;
   left: 0;
   transform-origin: center;
+  z-index: 1;
 }
 
 .strobe-tuner.idle svg {
@@ -348,6 +395,8 @@ h1 {
 }
 
 #reading {
+  z-index: 2;
+
   text-align: center;
   position: absolute;
   left: 50%;
