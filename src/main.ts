@@ -63,7 +63,7 @@ function initializeStrobeVisualizer(): void {
   const outerArc = createArcPath(130);
   outerArc.style.stroke = "#808080";
   outerArc.style.strokeWidth = "12";
-  outerArc.style.strokeDasharray = "8 24";
+  outerArc.style.strokeDasharray = "48 48";
   outerArc.style.strokeDashoffset = "0";
 
   strobeDots = outerArc as any; // Reuse to track the animated element
@@ -73,7 +73,7 @@ function initializeStrobeVisualizer(): void {
   const innerArc = createArcPath(116);
   innerArc.style.stroke = "#808080";
   innerArc.style.strokeWidth = "12";
-  innerArc.style.strokeDasharray = "12 12";
+  innerArc.style.strokeDasharray = "24 24";
   innerArc.style.strokeDashoffset = "0";
 
   overlayRing = innerArc as any;
