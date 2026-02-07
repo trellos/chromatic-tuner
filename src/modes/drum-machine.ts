@@ -10,6 +10,9 @@ export function createDrumMachineMode(): ModeDefinition {
   const playButton = document.getElementById("drum-play-toggle");
   const beatButton = document.getElementById("drum-beat-button");
   const beatMenu = document.getElementById("drum-beat-menu");
+  const kitButton = document.getElementById("drum-kit-button");
+  const kitMenu = document.getElementById("drum-kit-menu");
+  const kitLabel = document.getElementById("drum-kit-label");
   const tempoValueEl = document.getElementById("drum-tempo-value");
   const tempoButtons =
     drumMockEl?.querySelectorAll<HTMLButtonElement>("[data-tempo]") ?? [];
@@ -18,15 +21,70 @@ export function createDrumMachineMode(): ModeDefinition {
   const BPM_MAX = 180;
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
-  const KICK_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2338.wav";
-  const SNARE_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2304.wav";
-  const HAT_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2290.wav";
+  type KitId = "rock" | "electro" | "house" | "lofi" | "latin";
+  type VoiceId = "kick" | "snare" | "hat" | "perc";
+
+  type DrumKit = {
+    name: string;
+    urls: Record<VoiceId, string>;
+  };
+
+  // Public-domain / freely-usable internet samples. If network/CDN blocks them,
+  // synth fallback in playVoice() still allows all kits to be auditioned.
+  const DRUM_KITS: Record<KitId, DrumKit> = {
+    rock: {
+      name: "Rock Drums",
+      urls: {
+        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/kick.wav",
+        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/snare.wav",
+        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/hihat.wav",
+        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/tom1.wav",
+      },
+    },
+    electro: {
+      name: "Electro Drum Machine",
+      urls: {
+        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/kick.wav",
+        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/snare.wav",
+        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/hihat.wav",
+        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/cowbell.wav",
+      },
+    },
+    house: {
+      name: "House Drums",
+      urls: {
+        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/kick.wav",
+        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/snare.wav",
+        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/hihat.wav",
+        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/clap.wav",
+      },
+    },
+    lofi: {
+      name: "Lo-Fi Pocket",
+      urls: {
+        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/kick.wav",
+        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/snare.wav",
+        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/hihat.wav",
+        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/tamb.wav",
+      },
+    },
+    latin: {
+      name: "Latin Percussion",
+      urls: {
+        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/kick.wav",
+        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/snare.wav",
+        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/hihat.wav",
+        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/conga.wav",
+      },
+    },
+  };
 
   let signature = "4/4";
   let bpm = 120;
   let isPlaying = false;
+  let currentKit: KitId = "rock";
   let audioContext: AudioContext | null = null;
-  let buffers: Record<string, AudioBuffer | null> = {
+  let buffers: Record<VoiceId, AudioBuffer | null> = {
     kick: null,
     snare: null,
     hat: null,
@@ -38,6 +96,45 @@ export function createDrumMachineMode(): ModeDefinition {
   let lastStepIndex: number | null = null;
   let uiAbort: AbortController | null = null;
   let playheadTimeouts: number[] = [];
+
+  const setKitLabel = () => {
+    if (kitLabel) {
+      kitLabel.textContent = DRUM_KITS[currentKit].name;
+    }
+  };
+
+  const loadKit = async (kitId: KitId) => {
+    if (!audioContext) return;
+    const kit = DRUM_KITS[kitId];
+
+    const loadSample = async (url: string) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.arrayBuffer();
+        return await audioContext!.decodeAudioData(data);
+      } catch {
+        return null;
+      }
+    };
+
+    const [kick, snare, hat, perc] = await Promise.all([
+      loadSample(kit.urls.kick),
+      loadSample(kit.urls.snare),
+      loadSample(kit.urls.hat),
+      loadSample(kit.urls.perc),
+    ]);
+
+    buffers = { kick, snare, hat, perc: perc ?? snare ?? hat };
+  };
+
+  const setKit = async (kitId: KitId) => {
+    currentKit = kitId;
+    setKitLabel();
+    if (audioContext) {
+      await loadKit(kitId);
+    }
+  };
 
   const getStepsPerBar = () => (signature === "4/4" ? 16 : 12);
 
@@ -248,28 +345,7 @@ export function createDrumMachineMode(): ModeDefinition {
     audioContext = new AudioCtx({ latencyHint: "interactive" });
     await audioContext.resume();
 
-    const loadSample = async (url: string) => {
-      try {
-        const response = await fetch(url);
-        const data = await response.arrayBuffer();
-        return await audioContext!.decodeAudioData(data);
-      } catch {
-        return null;
-      }
-    };
-
-    const [kick, snare, hat] = await Promise.all([
-      loadSample(KICK_URL),
-      loadSample(SNARE_URL),
-      loadSample(HAT_URL),
-    ]);
-
-    buffers = {
-      kick,
-      snare,
-      hat,
-      perc: snare ?? hat,
-    };
+    await loadKit(currentKit);
   };
 
   const playBuffer = (
@@ -287,7 +363,7 @@ export function createDrumMachineMode(): ModeDefinition {
     source.start(time);
   };
 
-  const playVoice = (voice: string, time: number) => {
+  const playVoice = (voice: VoiceId, time: number) => {
     if (buffers[voice]) {
       const gainValue =
         voice === "kick" ? 1.0 : voice === "snare" ? 0.85 : 0.5;
@@ -298,11 +374,11 @@ export function createDrumMachineMode(): ModeDefinition {
     if (!audioContext) return;
     const osc = audioContext.createOscillator();
     const gain = audioContext.createGain();
-    osc.type = "triangle";
-    if (voice === "kick") osc.frequency.value = 120;
-    if (voice === "snare") osc.frequency.value = 240;
-    if (voice === "hat") osc.frequency.value = 520;
-    if (voice === "perc") osc.frequency.value = 320;
+    osc.type = currentKit === "electro" || currentKit === "house" ? "square" : "triangle";
+    if (voice === "kick") osc.frequency.value = currentKit === "electro" ? 90 : 120;
+    if (voice === "snare") osc.frequency.value = currentKit === "lofi" ? 190 : 240;
+    if (voice === "hat") osc.frequency.value = currentKit === "house" ? 780 : 520;
+    if (voice === "perc") osc.frequency.value = currentKit === "latin" ? 400 : 320;
     gain.gain.value = 0.18;
     osc.connect(gain);
     gain.connect(audioContext.destination);
@@ -329,9 +405,10 @@ export function createDrumMachineMode(): ModeDefinition {
         const timeout = window.setTimeout(() => {
           const rows = activeGrid.querySelectorAll<HTMLElement>(".drum-row");
           if (lastStepIndex !== null) {
+            const previousStep = lastStepIndex;
             rows.forEach((row) => {
               const steps = row.querySelectorAll<HTMLButtonElement>(".step");
-              steps[lastStepIndex]?.classList.remove("is-current");
+              steps[previousStep]?.classList.remove("is-current");
             });
           }
           rows.forEach((row) => {
@@ -352,7 +429,7 @@ export function createDrumMachineMode(): ModeDefinition {
       if (activeGrid) {
         const rows = activeGrid.querySelectorAll<HTMLElement>(".drum-row");
         rows.forEach((row) => {
-          const voice = row.dataset.voice ?? "perc";
+          const voice = (row.dataset.voice as VoiceId | undefined) ?? "perc";
           const steps = row.querySelectorAll<HTMLButtonElement>(".step");
           const stepEl = steps[currentStep];
           if (stepEl?.classList.contains("is-on")) {
@@ -390,9 +467,10 @@ export function createDrumMachineMode(): ModeDefinition {
         `.drum-grid[data-signature="${signature}"]`
       );
       const rows = activeGrid?.querySelectorAll<HTMLElement>(".drum-row");
+      const previousStep = lastStepIndex;
       rows?.forEach((row) => {
         const steps = row.querySelectorAll<HTMLButtonElement>(".step");
-        steps[lastStepIndex]?.classList.remove("is-current");
+        steps[previousStep]?.classList.remove("is-current");
       });
       lastStepIndex = null;
     }
@@ -478,11 +556,51 @@ export function createDrumMachineMode(): ModeDefinition {
       );
     }
 
+    if (kitButton && kitMenu) {
+      const toggleKitMenu = (open: boolean) => {
+        kitMenu.classList.toggle("is-open", open);
+        kitButton.setAttribute("aria-expanded", String(open));
+      };
+
+      kitButton.addEventListener(
+        "click",
+        (event) => {
+          event.stopPropagation();
+          const isOpen = kitMenu.classList.contains("is-open");
+          toggleKitMenu(!isOpen);
+        },
+        { signal }
+      );
+
+      kitMenu.addEventListener(
+        "click",
+        (event) => {
+          const target = event.target as HTMLElement | null;
+          const kit = target?.getAttribute("data-kit");
+          if (!kit || !(kit in DRUM_KITS)) return;
+          void setKit(kit as KitId);
+          toggleKitMenu(false);
+        },
+        { signal }
+      );
+
+      document.addEventListener(
+        "click",
+        (event) => {
+          if (kitMenu.contains(event.target as Node)) return;
+          if (kitButton.contains(event.target as Node)) return;
+          toggleKitMenu(false);
+        },
+        { signal }
+      );
+    }
+
   };
 
   const enter = async () => {
     setSignature(signature);
     setBpm(bpm);
+    setKitLabel();
     attachUi();
   };
 
