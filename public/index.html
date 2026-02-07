@@ -408,23 +408,41 @@
 
     <script>
       (() => {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const unlock = () => {
-          const ctx = new AudioCtx();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          gain.gain.value = 0;
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start();
-          osc.stop(ctx.currentTime + 0.01);
-          ctx.resume().finally(() => ctx.close());
-          window.removeEventListener("touchstart", unlock);
-          window.removeEventListener("pointerdown", unlock);
+        const contexts = new Set();
+        const wrapContext = (Original) => {
+          if (!Original) return Original;
+          const Wrapped = function (...args) {
+            const ctx = new Original(...args);
+            contexts.add(ctx);
+            return ctx;
+          };
+          Wrapped.prototype = Original.prototype;
+          return Wrapped;
         };
-        window.addEventListener("touchstart", unlock, { once: true, passive: true });
-        window.addEventListener("pointerdown", unlock, { once: true, passive: true });
+        if (window.AudioContext) {
+          window.AudioContext = wrapContext(window.AudioContext);
+        }
+        if (window.webkitAudioContext) {
+          window.webkitAudioContext = wrapContext(window.webkitAudioContext);
+        }
+        const resumeAll = () => {
+          contexts.forEach((ctx) => {
+            if (ctx.state === "suspended") {
+              ctx.resume().catch(() => {});
+            }
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.01);
+          });
+          window.removeEventListener("touchstart", resumeAll);
+          window.removeEventListener("pointerdown", resumeAll);
+        };
+        window.addEventListener("touchstart", resumeAll, { passive: true });
+        window.addEventListener("pointerdown", resumeAll, { passive: true });
       })();
     </script>
     <script type="module" src="./assets/app.js"></script>
