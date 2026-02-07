@@ -96,6 +96,7 @@ export function createDrumMachineMode(): ModeDefinition {
   let lastStepIndex: number | null = null;
   let uiAbort: AbortController | null = null;
   let playheadTimeouts: number[] = [];
+  let resizeObserver: ResizeObserver | null = null;
 
   const setKitLabel = () => {
     if (kitLabel) {
@@ -141,6 +142,30 @@ export function createDrumMachineMode(): ModeDefinition {
   const getBeatsPerBar = () =>
     Number.parseInt(signature.split("/")[0] ?? "4", 10);
 
+  const syncLayout = () => {
+    if (!drumMockEl || !drumGridsEl) return;
+    const activeGrid = drumMockEl.querySelector<HTMLElement>(
+      `.drum-grid[data-signature="${signature}"]`
+    );
+    const stepsEl = activeGrid?.querySelector<HTMLElement>(".drum-steps");
+    if (!stepsEl) return;
+    const gridsRect = drumGridsEl.getBoundingClientRect();
+    const stepsRect = stepsEl.getBoundingClientRect();
+    const stepsPerBar = getStepsPerBar();
+    const stepWidth = stepsRect.width / stepsPerBar;
+    const leftOffset = Math.max(0, stepsRect.left - gridsRect.left);
+    drumMockEl.style.setProperty(
+      "--drum-grid-width",
+      `${drumGridsEl.offsetWidth}px`
+    );
+    drumGridsEl.style.setProperty("--playhead-left", `${leftOffset}px`);
+    drumGridsEl.style.setProperty("--playhead-width", `${stepWidth}px`);
+  };
+
+  const scheduleLayoutSync = () => {
+    window.requestAnimationFrame(syncLayout);
+  };
+
   const setSignature = (value: string) => {
     signature = value;
     if (drumMockEl) {
@@ -160,6 +185,7 @@ export function createDrumMachineMode(): ModeDefinition {
     if (audioContext) {
       nextStepTime = audioContext.currentTime + 0.05;
     }
+    scheduleLayoutSync();
   };
 
   const clearRow = (row: HTMLElement) => {
@@ -484,6 +510,16 @@ export function createDrumMachineMode(): ModeDefinition {
     uiAbort = new AbortController();
     const { signal } = uiAbort;
 
+    scheduleLayoutSync();
+
+    if (drumGridsEl && "ResizeObserver" in window) {
+      resizeObserver?.disconnect();
+      resizeObserver = new ResizeObserver(() => scheduleLayoutSync());
+      resizeObserver.observe(drumGridsEl);
+    } else {
+      window.addEventListener("resize", scheduleLayoutSync, { signal });
+    }
+
     tempoButtons.forEach((button) => {
       button.addEventListener(
         "click",
@@ -602,12 +638,15 @@ export function createDrumMachineMode(): ModeDefinition {
     setBpm(bpm);
     setKitLabel();
     attachUi();
+    scheduleLayoutSync();
   };
 
   const exit = () => {
     stop();
     uiAbort?.abort();
     uiAbort = null;
+    resizeObserver?.disconnect();
+    resizeObserver = null;
   };
 
   return {
