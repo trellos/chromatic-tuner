@@ -687,16 +687,18 @@ body.status-hidden #status {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  align-items: center;
+  width: 100%;
 }
 
 .drum-ui {
   display: flex;
   align-items: center;
-  gap: 16px;
-  justify-content: center;
-  margin-bottom: 12px;
-  padding: 10px 16px;
-  border-radius: 999px;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 10px 14px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(12, 16, 32, 0.12);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
@@ -751,15 +753,13 @@ body.status-hidden #status {
 }
 
 .drum-rotator {
-  width: min(640px, 92vw);
-  height: min(420px, 70vh);
+  width: min(700px, 100%);
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  transform: rotate(-90deg);
-  transform-origin: center;
   filter: drop-shadow(0 18px 30px rgba(15, 23, 42, 0.25));
 }
 
@@ -774,7 +774,8 @@ body.status-hidden #status {
     linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.6));
   border: 1px solid rgba(12, 16, 32, 0.12);
   overflow: hidden;
-  width: fit-content;
+  width: 100%;
+  max-width: 100%;
 }
 
 .drum-playhead {
@@ -792,7 +793,9 @@ body.status-hidden #status {
   background: linear-gradient(180deg, rgba(0, 245, 212, 0.32), rgba(0, 245, 212, 0.08));
   border-radius: 6px;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform var(--playhead-ms, 120ms) linear;
   pointer-events: none;
   z-index: 0;
 }
@@ -851,7 +854,7 @@ body.status-hidden #status {
 
 .drum-grid[data-signature="3/4"] .drum-steps,
 .drum-grid[data-signature="6/8"] .drum-steps {
-  grid-template-columns: repeat(12, minmax(18px, 1fr));
+  grid-template-columns: repeat(16, minmax(18px, 1fr));
 }
 
 .drum-grid[data-signature="6/8"] .step:nth-child(6n) {
@@ -957,34 +960,7 @@ body.drum-fullscreen .drum-rotator {
 }
 
 body.drum-fullscreen .drum-ui {
-  transform: scale(1.1);
-  transform-origin: center;
-}
-
-@supports (-webkit-touch-callout: none) {
-  body {
-    min-height: 100svh;
-  }
-
-  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
-    height: 100svh;
-  }
-
-  .drum-rotator {
-    width: min(560px, 72svh);
-    height: min(320px, 60svw);
-    transform: rotate(-90deg) scale(0.82);
-    transform-origin: center;
-  }
-
-  .drum-mock {
-    gap: 12px;
-  }
-
-  .drum-ui {
-    transform: scale(0.9);
-    transform-origin: center;
-  }
+  max-width: min(720px, 100%);
 }
 
 /* Responsive Design */
@@ -1040,10 +1016,7 @@ body.drum-fullscreen .drum-ui {
   }
 
   .drum-rotator {
-    width: min(560px, 92vw);
-    height: min(320px, 62vh);
-    transform: rotate(-90deg) scale(0.92);
-    transform-origin: center;
+    width: min(620px, 100%);
   }
 
   .drum-ui {
@@ -1060,26 +1033,35 @@ body.drum-fullscreen .drum-ui {
 
   .drum-grid[data-signature="3/4"] .drum-steps,
   .drum-grid[data-signature="6/8"] .drum-steps {
-    grid-template-columns: repeat(6, minmax(18px, 1fr));
+    grid-template-columns: repeat(8, minmax(18px, 1fr));
   }
 }
 
-@media (max-width: 480px) {
-  .drum-rotator {
-    width: min(520px, 94vw);
-    height: min(300px, 58vh);
-    transform: rotate(-90deg) scale(0.86);
-  }
-
-  .drum-ui {
-    transform: scale(0.94);
-  }
+.mode-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
 }
 
-@media (max-height: 700px) {
-  .drum-rotator {
-    height: min(300px, 56vh);
-    transform: rotate(-90deg) scale(0.84);
+.mode-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  background: transparent;
+  cursor: pointer;
+}
+
+.mode-dot.is-active {
+  background: linear-gradient(135deg, var(--tuna-pink), var(--tuna-aqua));
+  border-color: rgba(0, 245, 212, 0.8);
+  box-shadow: 0 0 10px rgba(0, 245, 212, 0.35);
+}
+
+@media (max-width: 700px) {
+  .mode-carousel {
+    display: none;
   }
 }
 .fullscreen-icon {
@@ -1110,4 +1092,18 @@ body.drum-fullscreen .drum-ui {
   right: -1px;
   border-left: none;
   border-top: none;
+}
+
+.mode-carousel {
+  display: none;
+}
+
+.mode-screen[data-mode="drum-machine"] .mode-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drum-fullscreen-toggle {
+  align-self: center;
 }

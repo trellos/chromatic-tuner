@@ -138,10 +138,9 @@ export function createDrumMachineMode(): ModeDefinition {
     }
   };
 
-  const getStepsPerBar = () => (signature === "4/4" ? 16 : 12);
+  const getStepsPerBar = () => 16;
 
-  const getBeatsPerBar = () =>
-    Number.parseInt(signature.split("/")[0] ?? "4", 10);
+  const getBeatsPerBar = () => 4;
 
   const syncLayout = () => {
     if (!drumMockEl || !drumGridsEl) return;
@@ -173,8 +172,7 @@ export function createDrumMachineMode(): ModeDefinition {
       drumMockEl.dataset.signature = value;
     }
     if (drumGridsEl) {
-      const count = value === "4/4" ? 16 : 12;
-      drumGridsEl.style.setProperty("--playhead-count", String(count));
+      drumGridsEl.style.setProperty("--playhead-count", "16");
       drumGridsEl.style.setProperty("--playhead-index", "0");
     }
     drumMockEl?.querySelectorAll(".step.is-current").forEach((step) => {
@@ -445,6 +443,12 @@ export function createDrumMachineMode(): ModeDefinition {
     const beatsPerBar = getBeatsPerBar();
     const stepsPerBeat = stepsPerBar / beatsPerBar;
     const stepDuration = (60 / bpm) / stepsPerBeat;
+    if (drumGridsEl) {
+      drumGridsEl.style.setProperty(
+        "--playhead-ms",
+        `${Math.max(40, stepDuration * 1000)}ms`
+      );
+    }
     while (nextStepTime < audioContext.currentTime + SCHEDULE_AHEAD) {
       const activeGrid = drumMockEl?.querySelector<HTMLElement>(
         `.drum-grid[data-signature="${signature}"]`
