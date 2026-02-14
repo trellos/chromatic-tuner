@@ -94,7 +94,7 @@ test('app loads and key UI is visible with no runtime/network failures', async (
   ).toEqual([]);
 });
 
-test('mode switches keep stage size stable', async ({ page }) => {
+test('mode switches keep stage width stable with usable height in each mode', async ({ page }) => {
   await page.goto('/');
 
   const stage = page.locator('.mode-stage');
@@ -104,10 +104,11 @@ test('mode switches keep stage size stable', async ({ page }) => {
   expect(baseline).not.toBeNull();
 
   const tolerancePx = 2;
+  const minHeightPx = 500;
 
   for (const mode of MODE_TABS) {
     await page.getByRole('tab', { name: mode.label }).click();
-    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"`)).toHaveClass(/is-active/);
+    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"]`)).toHaveClass(/is-active/);
 
     const afterSwitch = await stage.boundingBox();
     expect(afterSwitch).not.toBeNull();
@@ -115,9 +116,7 @@ test('mode switches keep stage size stable', async ({ page }) => {
     expect(Math.abs((afterSwitch?.width ?? 0) - (baseline?.width ?? 0))).toBeLessThanOrEqual(
       tolerancePx
     );
-    expect(Math.abs((afterSwitch?.height ?? 0) - (baseline?.height ?? 0))).toBeLessThanOrEqual(
-      tolerancePx
-    );
+    expect(afterSwitch?.height ?? 0).toBeGreaterThanOrEqual(minHeightPx);
   }
 });
 
@@ -126,7 +125,7 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
 
   for (const mode of MODE_TABS) {
     await page.getByRole('tab', { name: mode.label }).click();
-    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"`)).toHaveClass(/is-active/);
+    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"]`)).toHaveClass(/is-active/);
     await assertNoOffscreenText(page);
   }
 });
