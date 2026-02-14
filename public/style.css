@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --ink: #0b1020;
   --ink-soft: #1f2a44;
   --tuna-pink: #ff6bd6;
@@ -173,7 +173,7 @@ body.drum-fullscreen .mode-stage {
 .mode-screen {
   display: none;
   width: min(720px, 100%);
-  min-height: 520px;
+  min-height: 604px;
   padding: 24px;
   border-radius: 28px;
   background: var(--panel);
@@ -1107,3 +1107,4 @@ body.drum-fullscreen .drum-ui {
 .drum-fullscreen-toggle {
   align-self: center;
 }
+
