@@ -1,4 +1,4 @@
-{
+﻿{
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     // File Layout
@@ -9,7 +9,7 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "esnext",
-    "types": ["audioworklet"],
+    "types": ["audioworklet", "node"],
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
@@ -45,3 +45,4 @@
     "skipLibCheck": true,
   }
 }
+
