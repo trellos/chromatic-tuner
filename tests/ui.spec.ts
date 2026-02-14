@@ -107,7 +107,7 @@ test('mode switches keep stage size stable', async ({ page }) => {
 
   for (const mode of MODE_TABS) {
     await page.getByRole('tab', { name: mode.label }).click();
-    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"`)).toHaveClass(/is-active/);
+    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"]`)).toHaveClass(/is-active/);
 
     const afterSwitch = await stage.boundingBox();
     expect(afterSwitch).not.toBeNull();
@@ -126,7 +126,9 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
 
   for (const mode of MODE_TABS) {
     await page.getByRole('tab', { name: mode.label }).click();
-    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"`)).toHaveClass(/is-active/);
+    await expect(page.locator(`.mode-screen[data-mode="${mode.id}"]`)).toHaveClass(/is-active/);
     await assertNoOffscreenText(page);
   }
 });
+
+
