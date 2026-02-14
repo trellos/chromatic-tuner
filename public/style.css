@@ -165,15 +165,18 @@ body.drum-fullscreen .mode-stage {
 }
 
 .mode-stage {
+  --mode-panel-height: 604px;
   width: 100%;
   display: flex;
   justify-content: center;
+  min-height: var(--mode-panel-height);
 }
 
 .mode-screen {
   display: none;
   width: min(720px, 100%);
-  min-height: 604px;
+  height: var(--mode-panel-height);
+  min-height: var(--mode-panel-height);
   padding: 24px;
   border-radius: 28px;
   background: var(--panel);
@@ -182,6 +185,7 @@ body.drum-fullscreen .mode-stage {
   border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(12px);
   position: relative;
+  overflow: auto;
 }
 
 .mode-screen.is-active {
@@ -816,22 +820,6 @@ body.status-hidden #status {
   display: flex;
 }
 
-.drum-mock[data-signature="3/4"] .drum-grid {
-  display: none;
-}
-
-.drum-mock[data-signature="3/4"] .drum-grid[data-signature="3/4"] {
-  display: flex;
-}
-
-.drum-mock[data-signature="6/8"] .drum-grid {
-  display: none;
-}
-
-.drum-mock[data-signature="6/8"] .drum-grid[data-signature="6/8"] {
-  display: flex;
-}
-
 .drum-row {
   display: grid;
   grid-template-columns: 70px 1fr;
@@ -850,15 +838,6 @@ body.status-hidden #status {
   display: grid;
   grid-template-columns: repeat(16, minmax(18px, 1fr));
   gap: 6px;
-}
-
-.drum-grid[data-signature="3/4"] .drum-steps,
-.drum-grid[data-signature="6/8"] .drum-steps {
-  grid-template-columns: repeat(16, minmax(18px, 1fr));
-}
-
-.drum-grid[data-signature="6/8"] .step:nth-child(6n) {
-  margin-right: 10px;
 }
 
 .step {
@@ -1008,7 +987,11 @@ body.drum-fullscreen .drum-ui {
 
   .mode-screen {
     padding: 18px;
-    min-height: 70vh;
+    overflow: auto;
+  }
+
+  .mode-stage {
+    --mode-panel-height: min(74svh, 604px);
   }
 
   .tempo-dial {
@@ -1027,14 +1010,6 @@ body.drum-fullscreen .drum-ui {
     grid-template-columns: 52px 1fr;
   }
 
-  .drum-grid[data-signature="4/4"] .drum-steps {
-    grid-template-columns: repeat(8, minmax(18px, 1fr));
-  }
-
-  .drum-grid[data-signature="3/4"] .drum-steps,
-  .drum-grid[data-signature="6/8"] .drum-steps {
-    grid-template-columns: repeat(8, minmax(18px, 1fr));
-  }
 }
 
 .mode-dots {
@@ -1106,5 +1081,13 @@ body.drum-fullscreen .drum-ui {
 
 .drum-fullscreen-toggle {
   align-self: center;
+}
+
+@supports not (height: 1svh) {
+  @media (max-width: 600px) {
+    .mode-stage {
+      --mode-panel-height: min(74vh, 604px);
+    }
+  }
 }
 

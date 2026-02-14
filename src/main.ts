@@ -7,8 +7,9 @@ const carouselEl = document.getElementById("mode-carousel");
 const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
 const drumExitEl = document.getElementById("drum-exit");
-const modeButtons =
-  carouselEl?.querySelectorAll<HTMLButtonElement>("[data-mode]") ?? [];
+const modeDots =
+  document.querySelectorAll<HTMLButtonElement>(".mode-dot[data-mode]") ?? [];
+const modeStageEl = document.querySelector<HTMLElement>(".mode-stage");
 const modeScreens =
   document.querySelectorAll<HTMLElement>(".mode-screen[data-mode]") ?? [];
 
@@ -38,10 +39,10 @@ function setCarouselHidden(hidden: boolean): void {
 
 function updateCarouselState(): void {
   const activeMode = getModeById(activeModeId);
-  modeButtons.forEach((btn) => {
-    const isActive = btn.dataset.mode === activeModeId;
-    btn.classList.toggle("is-active", isActive);
-    btn.setAttribute("aria-selected", String(isActive));
+  modeDots.forEach((dot) => {
+    const isActive = dot.dataset.mode === activeModeId;
+    dot.classList.toggle("is-active", isActive);
+    dot.setAttribute("aria-selected", String(isActive));
   });
   if (carouselToggleEl) {
     (carouselToggleEl as HTMLButtonElement).disabled = !activeMode?.canFullscreen;
@@ -52,7 +53,53 @@ function setActiveScreen(id: ModeId): void {
   modeScreens.forEach((screen) => {
     const isActive = screen.dataset.mode === id;
     screen.classList.toggle("is-active", isActive);
+    screen.setAttribute("aria-hidden", String(!isActive));
   });
+}
+
+function getModeOrder(): ModeId[] {
+  return MODE_REGISTRY.map((mode) => mode.id);
+}
+
+function switchByOffset(offset: number): void {
+  const order = getModeOrder();
+  const currentIndex = order.indexOf(activeModeId);
+  if (currentIndex === -1) return;
+  const nextIndex = (currentIndex + offset + order.length) % order.length;
+  const nextMode = order[nextIndex];
+  if (!nextMode) return;
+  void switchMode(nextMode);
+  setCarouselHidden(false);
+}
+
+function bindModeSwipe(): void {
+  if (!modeStageEl) return;
+  let startX = 0;
+  let startY = 0;
+
+  modeStageEl.addEventListener(
+    "touchstart",
+    (event) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      startX = touch.clientX;
+      startY = touch.clientY;
+    },
+    { passive: true }
+  );
+
+  modeStageEl.addEventListener(
+    "touchend",
+    (event) => {
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+      switchByOffset(dx < 0 ? 1 : -1);
+    },
+    { passive: true }
+  );
 }
 
 async function switchMode(id: ModeId): Promise<void> {
@@ -85,9 +132,9 @@ async function switchMode(id: ModeId): Promise<void> {
 }
 
 function initializeCarouselUi(): void {
-  modeButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const modeId = btn.dataset.mode as ModeId | undefined;
+  modeDots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      const modeId = dot.dataset.mode as ModeId | undefined;
       if (!modeId) return;
       void switchMode(modeId);
       setCarouselHidden(false);
@@ -116,6 +163,7 @@ function initializeCarouselUi(): void {
 
   updateCarouselState();
   setActiveScreen(activeModeId);
+  bindModeSwipe();
 }
 
 // Auto-start tuner mode on page load until the carousel is wired up.

@@ -17,7 +17,13 @@
       </header>
 
       <section class="mode-stage">
-        <article class="mode-screen is-active" data-mode="tuner">
+        <article
+          id="mode-screen-tuner"
+          class="mode-screen is-active"
+          data-mode="tuner"
+          role="tabpanel"
+          aria-hidden="false"
+        >
           <div class="mode-header">
             <div class="mode-title tuner-title">Chromatic Tuner</div>
           </div>
@@ -38,7 +44,13 @@
 
         </article>
 
-        <article class="mode-screen" data-mode="metronome">
+        <article
+          id="mode-screen-metronome"
+          class="mode-screen"
+          data-mode="metronome"
+          role="tabpanel"
+          aria-hidden="true"
+        >
           <div class="mode-header">
             <div class="mode-title">Metronome</div>
           </div>
@@ -85,7 +97,13 @@
           </div>
         </article>
 
-        <article class="mode-screen" data-mode="drum-machine">
+        <article
+          id="mode-screen-drum-machine"
+          class="mode-screen"
+          data-mode="drum-machine"
+          role="tabpanel"
+          aria-hidden="true"
+        >
           <button id="drum-exit" class="drum-exit" type="button" aria-label="Exit fullscreen">
             X
           </button>
@@ -156,234 +174,92 @@
 
               <div class="drum-grids">
                 <div class="drum-playhead" aria-hidden="true"></div>
-              <div class="drum-grid" data-signature="4/4">
-                <div class="drum-row" data-voice="kick">
-                  <div class="drum-label">Kick</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
+                <div class="drum-grid" data-signature="4/4">
+                  <div class="drum-row" data-voice="kick">
+                    <div class="drum-label">Kick</div>
+                    <div class="drum-steps">
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                    </div>
+                  </div>
+                  <div class="drum-row" data-voice="snare">
+                    <div class="drum-label">Snare</div>
+                    <div class="drum-steps">
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                    </div>
+                  </div>
+                  <div class="drum-row" data-voice="hat">
+                    <div class="drum-label">Hat</div>
+                    <div class="drum-steps">
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step is-on" type="button"></button>
+                      <button class="step" type="button"></button>
+                    </div>
+                  </div>
+                  <div class="drum-row" data-voice="perc">
+                    <div class="drum-label">Perc</div>
+                    <div class="drum-steps">
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                      <button class="step" type="button"></button>
+                    </div>
                   </div>
                 </div>
-                <div class="drum-row" data-voice="snare">
-                  <div class="drum-label">Snare</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="hat">
-                  <div class="drum-label">Hat</div>
-                  <div class="drum-steps">
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="perc">
-                  <div class="drum-label">Perc</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="drum-grid" data-signature="3/4">
-                <div class="drum-row" data-voice="kick">
-                  <div class="drum-label">Kick</div>
-                  <div class="drum-steps">
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="snare">
-                  <div class="drum-label">Snare</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="hat">
-                  <div class="drum-label">Hat</div>
-                  <div class="drum-steps">
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="perc">
-                  <div class="drum-label">Perc</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="drum-grid" data-signature="6/8">
-                <div class="drum-row" data-voice="kick">
-                  <div class="drum-label">Kick</div>
-                  <div class="drum-steps">
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="snare">
-                  <div class="drum-label">Snare</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="hat">
-                  <div class="drum-label">Hat</div>
-                  <div class="drum-steps">
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                  </div>
-                </div>
-                <div class="drum-row" data-voice="perc">
-                  <div class="drum-label">Perc</div>
-                  <div class="drum-steps">
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step" type="button"></button>
-                    <button class="step is-on" type="button"></button>
-                  </div>
-                </div>
-              </div>
               </div>
             </div>
           </div>
@@ -391,24 +267,11 @@
       </section>
 
       <div class="carousel">
-        <div id="mode-carousel" class="mode-carousel" role="tablist" aria-label="Modes">
-          <button class="mode-pill is-active" role="tab" aria-selected="true" data-mode="tuner" type="button">
-            <span class="mode-icon">TU</span>
-            Chromatic Tuner
-          </button>
-          <button class="mode-pill" role="tab" aria-selected="false" data-mode="metronome" type="button">
-            <span class="mode-icon">MT</span>
-            Metronome
-          </button>
-          <button class="mode-pill" role="tab" aria-selected="false" data-mode="drum-machine" type="button">
-            <span class="mode-icon">DR</span>
-            Drum Machine
-          </button>
-        </div>
+        <div id="mode-carousel" class="mode-carousel" role="tablist" aria-label="Modes"></div>
         <div class="mode-dots" role="tablist" aria-label="Mode dots">
-          <button class="mode-dot is-active" role="tab" aria-selected="true" data-mode="tuner" aria-label="Chromatic Tuner" type="button"></button>
-          <button class="mode-dot" role="tab" aria-selected="false" data-mode="metronome" aria-label="Metronome" type="button"></button>
-          <button class="mode-dot" role="tab" aria-selected="false" data-mode="drum-machine" aria-label="Drum Machine" type="button"></button>
+          <button class="mode-dot is-active" role="tab" aria-selected="true" aria-controls="mode-screen-tuner" data-mode="tuner" aria-label="Chromatic Tuner" type="button"></button>
+          <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-metronome" data-mode="metronome" aria-label="Metronome" type="button"></button>
+          <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-drum-machine" data-mode="drum-machine" aria-label="Drum Machine" type="button"></button>
         </div>
       </div>
 
@@ -457,72 +320,5 @@
       })();
     </script>
     <script type="module" src="./assets/app.js"></script>
-    <script>
-      (() => {
-        const pills = Array.from(document.querySelectorAll(".mode-pill"));
-        const dots = Array.from(document.querySelectorAll(".mode-dot"));
-        const stage = document.querySelector(".mode-stage");
-        if (!pills.length || !dots.length || !stage) return;
-
-        const syncDots = () => {
-          dots.forEach((dot) => {
-            const mode = dot.getAttribute("data-mode");
-            const isActive = !!document.querySelector(
-              `.mode-pill.is-active[data-mode="${mode}"]`
-            );
-            dot.classList.toggle("is-active", isActive);
-            dot.setAttribute("aria-selected", String(isActive));
-          });
-        };
-
-        dots.forEach((dot) => {
-          dot.addEventListener("click", () => {
-            const mode = dot.getAttribute("data-mode");
-            const pill = pills.find((item) => item.dataset.mode === mode);
-            pill?.click();
-          });
-        });
-
-        pills.forEach((pill) => {
-          pill.addEventListener("click", () => {
-            window.requestAnimationFrame(syncDots);
-          });
-        });
-
-        let startX = 0;
-        let startY = 0;
-        stage.addEventListener(
-          "touchstart",
-          (event) => {
-            const touch = event.touches[0];
-            if (!touch) return;
-            startX = touch.clientX;
-            startY = touch.clientY;
-          },
-          { passive: true }
-        );
-
-        stage.addEventListener(
-          "touchend",
-          (event) => {
-            const touch = event.changedTouches[0];
-            if (!touch) return;
-            const dx = touch.clientX - startX;
-            const dy = touch.clientY - startY;
-            if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-            const index = pills.findIndex((pill) =>
-              pill.classList.contains("is-active")
-            );
-            if (index === -1) return;
-            const direction = dx < 0 ? 1 : -1;
-            const nextIndex = (index + direction + pills.length) % pills.length;
-            pills[nextIndex]?.click();
-          },
-          { passive: true }
-        );
-
-        syncDots();
-      })();
-    </script>
   </body>
 </html>
