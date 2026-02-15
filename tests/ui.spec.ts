@@ -228,17 +228,36 @@ test('drum machine toolbar stays in a single row on mobile portrait', async ({ p
   }
 });
 
-test('mode switching recovers after a mode hook failure', async ({ page }) => {
-  await page.addInitScript(() => {
-    (window as typeof window & {
-      __tunaTest?: { throwOnce?: { modeId: 'metronome'; phase: 'enter' } };
-    }).__tunaTest = {
-      throwOnce: { modeId: 'metronome', phase: 'enter' },
-    };
+test('mode switching remains responsive after a runtime hook error', async ({ page }) => {
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    const original = window.AbortController;
+    Object.defineProperty(window, '__testOriginalAbortController', {
+      value: original,
+      configurable: true,
+    });
+    window.AbortController = class {
+      constructor() {
+        throw new Error('forced metronome enter failure');
+      }
+    } as typeof AbortController;
   });
 
-  await page.goto('/');
   await page.getByRole('tab', { name: 'Metronome' }).click();
+  await expect(page.locator('.mode-screen[data-mode="metronome"]')).toHaveClass(/is-active/);
+
+  await page.evaluate(() => {
+    const original = (window as typeof window & {
+      __testOriginalAbortController?: typeof AbortController;
+    }).__testOriginalAbortController;
+    if (original) {
+      window.AbortController = original;
+      delete (window as typeof window & { __testOriginalAbortController?: unknown })
+        .__testOriginalAbortController;
+    }
+  });
+
   await page.getByRole('tab', { name: 'Drum Machine' }).click();
 
   await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);

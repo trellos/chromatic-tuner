@@ -1,8 +1,8 @@
-﻿import type { ModeDefinition, ModeId } from "./modes/types.js";
+import type { ModeDefinition, ModeId } from "./modes/types.js";
 import { createTunerMode } from "./modes/tuner.js";
 import { createMetronomeMode } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
-
+import { runModeTransition } from "./mode-transition.js";
 const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
 const drumExitEl = document.getElementById("drum-exit");
@@ -28,23 +28,6 @@ let swipeActiveScreen: HTMLElement | null = null;
 let swipeTargetScreen: HTMLElement | null = null;
 let swipeTargetMode: ModeId | null = null;
 let isSwipeDragging = false;
-
-type TestModeHookPhase = "enter" | "exit";
-
-// Enables one-shot, test-only failures of mode lifecycle hooks so
-// integration tests can verify switch-state recovery behavior.
-function shouldThrowModeHookForTest(modeId: ModeId, phase: TestModeHookPhase): boolean {
-  const config = (window as typeof window & {
-    __tunaTest?: {
-      throwOnce?: { modeId: ModeId; phase: TestModeHookPhase };
-    };
-  }).__tunaTest;
-  const throwOnce = config?.throwOnce;
-  if (!throwOnce) return false;
-  if (throwOnce.modeId !== modeId || throwOnce.phase !== phase) return false;
-  config!.throwOnce = undefined;
-  return true;
-}
 
 function getModeById(id: ModeId): ModeDefinition | undefined {
   return MODE_REGISTRY.find((mode) => mode.id === id);
@@ -285,38 +268,29 @@ function bindModeSwipe(): void {
 async function switchMode(id: ModeId): Promise<void> {
   if (isSwitching || id === activeModeId) return;
   isSwitching = true;
+  const previousMode = getModeById(activeModeId);
+  const nextMode = getModeById(id);
   try {
-    const previousMode = getModeById(activeModeId);
-    const nextMode = getModeById(id);
-
-    if (shouldThrowModeHookForTest(activeModeId, "exit")) {
-      throw new Error("Test hook forced onExit failure");
-    }
-    if (previousMode?.onExit) {
-      await previousMode.onExit();
-    }
-
-    activeModeId = id;
-    updateCarouselState();
-    setActiveScreen(id);
-    document.body.classList.toggle(
-      "drum-fullscreen",
-      document.body.classList.contains("carousel-hidden") &&
-        activeModeId === "drum-machine"
-    );
-
-    if (!nextMode?.canFullscreen) {
-      setCarouselHidden(false);
-    }
-
-    if (shouldThrowModeHookForTest(id, "enter")) {
-      throw new Error("Test hook forced onEnter failure");
-    }
-    if (nextMode?.onEnter) {
-      await nextMode.onEnter();
-    }
-  } catch (error) {
-    console.error("Mode switch failed", error);
+    await runModeTransition({
+      exitCurrent: previousMode?.onExit,
+      applyUiState: () => {
+        activeModeId = id;
+        updateCarouselState();
+        setActiveScreen(id);
+        document.body.classList.toggle(
+          "drum-fullscreen",
+          document.body.classList.contains("carousel-hidden") &&
+            activeModeId === "drum-machine"
+        );
+        if (!nextMode?.canFullscreen) {
+          setCarouselHidden(false);
+        }
+      },
+      enterNext: nextMode?.onEnter,
+      onError: (error) => {
+        console.error("Mode switch failed", error);
+      },
+    });
   } finally {
     isSwitching = false;
   }
@@ -366,3 +340,4 @@ window.addEventListener("DOMContentLoaded", async () => {
     await tunerMode.onEnter();
   }
 });
+
