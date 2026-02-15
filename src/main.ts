@@ -64,24 +64,13 @@ function setActiveScreen(id: ModeId): void {
   });
 }
 
-function getModeOrder(): ModeId[] {
-  return MODE_REGISTRY.map((mode) => mode.id);
-}
-
 function getModeByOffset(offset: number): ModeId | null {
-  const order = getModeOrder();
+  const order = MODE_REGISTRY.map((mode) => mode.id);
   const currentIndex = order.indexOf(activeModeId);
   if (currentIndex === -1) return null;
   const nextIndex = (currentIndex + offset + order.length) % order.length;
   const nextMode = order[nextIndex];
   return nextMode ?? null;
-}
-
-function switchByOffset(offset: number): void {
-  const nextMode = getModeByOffset(offset);
-  if (!nextMode) return;
-  void switchMode(nextMode);
-  setCarouselHidden(false);
 }
 
 function getScreenByMode(modeId: ModeId): HTMLElement | null {
@@ -241,7 +230,10 @@ function bindModeSwipe(): void {
       if (!isSwipeDragging || !swipeTargetMode || !swipeDirection) {
         clearSwipeState();
         if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-        switchByOffset(dx < 0 ? 1 : -1);
+        const nextMode = getModeByOffset(dx < 0 ? 1 : -1);
+        if (!nextMode) return;
+        await switchMode(nextMode);
+        setCarouselHidden(false);
         return;
       }
 
@@ -340,4 +332,3 @@ window.addEventListener("DOMContentLoaded", async () => {
     await tunerMode.onEnter();
   }
 });
-
