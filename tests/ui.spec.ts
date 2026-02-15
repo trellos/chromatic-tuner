@@ -227,3 +227,30 @@ test('drum machine toolbar stays in a single row on mobile portrait', async ({ p
     expect(overlapsSingleRow).toBeTruthy();
   }
 });
+
+test('mode switching recovers after a mode hook failure', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as typeof window & {
+      __tunaTest?: { throwOnce?: { modeId: 'metronome'; phase: 'enter' } };
+    }).__tunaTest = {
+      throwOnce: { modeId: 'metronome', phase: 'enter' },
+    };
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+
+  await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);
+});
+
+test('tuner status toggle is not duplicated after mode re-entry', async ({ page }) => {
+  await page.goto('/?debug=1');
+
+  await expect(page.locator('body')).not.toHaveClass(/status-hidden/);
+  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await page.getByRole('tab', { name: 'Chromatic Tuner' }).click();
+
+  await page.locator('#strobe-visualizer').click();
+  await expect(page.locator('body')).toHaveClass(/status-hidden/);
+});

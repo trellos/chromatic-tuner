@@ -67,47 +67,6 @@ main {
   gap: 12px;
 }
 
-.mode-carousel {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-}
-
-.mode-pill {
-  border: 1px solid var(--stroke);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--ink);
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  padding: 8px 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  box-shadow: 0 8px 20px rgba(12, 16, 32, 0.2);
-}
-
-.mode-pill.is-active {
-  border-color: rgba(0, 245, 212, 0.6);
-  box-shadow: 0 12px 24px rgba(0, 245, 212, 0.25);
-}
-
-.mode-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--tuna-pink), var(--tuna-aqua));
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
 .carousel-toggle {
   border: 1px solid rgba(0, 245, 212, 0.6);
   background: rgba(17, 24, 39, 0.4);
@@ -1117,11 +1076,6 @@ body.drum-fullscreen .drum-ui {
   box-shadow: 0 0 10px rgba(0, 245, 212, 0.35);
 }
 
-@media (max-width: 700px) {
-  .mode-carousel {
-    display: none;
-  }
-}
 .fullscreen-icon {
   width: 16px;
   height: 16px;
@@ -1150,10 +1104,6 @@ body.drum-fullscreen .drum-ui {
   right: -1px;
   border-left: none;
   border-top: none;
-}
-
-.mode-carousel {
-  display: none;
 }
 
 .mode-screen[data-mode="drum-machine"] .mode-header {

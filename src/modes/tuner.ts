@@ -437,6 +437,7 @@ let useTestTone = false;
 let testOsc: OscillatorNode | null = null;
 let micGainNode: GainNode | null = null;
 let oscGainNode: GainNode | null = null;
+let tunerUiAbort: AbortController | null = null;
 
 function stopAnimationLoop(): void {
   if (animationFrameId !== null) {
@@ -782,6 +783,9 @@ async function startAudio() {
 }
 
 async function enterTunerMode(): Promise<void> {
+  tunerUiAbort?.abort();
+  tunerUiAbort = new AbortController();
+  const { signal } = tunerUiAbort;
   setReading(null, null);
   if (SHOW_STATUS) {
     setStatus("Initializing audio...");
@@ -797,11 +801,15 @@ async function enterTunerMode(): Promise<void> {
         document.body.classList.toggle("status-hidden");
       };
       let touchToggledAt = 0;
-      strobeVisualizerEl.addEventListener("click", () => {
-        // iOS fires click after touchend; suppress double-toggle.
-        if (Date.now() - touchToggledAt < 500) return;
-        toggleStatus();
-      });
+      strobeVisualizerEl.addEventListener(
+        "click",
+        () => {
+          // iOS fires click after touchend; suppress double-toggle.
+          if (Date.now() - touchToggledAt < 500) return;
+          toggleStatus();
+        },
+        { signal }
+      );
       strobeVisualizerEl.addEventListener(
         "touchend",
         () => {
@@ -812,7 +820,7 @@ async function enterTunerMode(): Promise<void> {
             testToneTimer = null;
           }
         },
-        { passive: true }
+        { passive: true, signal }
       );
     }
     if (isIOS) {
@@ -827,7 +835,7 @@ async function enterTunerMode(): Promise<void> {
             setStatus(useTestTone ? "Test tone ON (440 Hz)" : "Test tone OFF");
           }, 600);
         },
-        { passive: true }
+        { passive: true, signal }
       );
     }
   }
@@ -876,6 +884,8 @@ async function enterTunerMode(): Promise<void> {
 }
 
 function exitTunerMode(): void {
+  tunerUiAbort?.abort();
+  tunerUiAbort = null;
   cleanupAudio();
   setReading(null, null);
   updateStrobeVisualizer(null, false);
