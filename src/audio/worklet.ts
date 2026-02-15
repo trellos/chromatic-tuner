@@ -17,6 +17,8 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+// AudioWorklet processor that performs frame-by-frame pitch detection and
+// posts smoothed pitch/confidence diagnostics back to the UI thread.
 class TunerProcessor extends AudioWorkletProcessor {
   private ring: Float32Array;
   private writeIndex = 0;

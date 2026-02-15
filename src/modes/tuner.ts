@@ -14,6 +14,8 @@ const A4 = 440;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 const SHOW_STATUS = new URLSearchParams(window.location.search).has("debug");
 
+// Creates an AudioContext with an iOS-specific warmup path to reduce
+// first-start failures observed on Safari.
 async function createAudioContext(
   AudioCtx: typeof AudioContext
 ): Promise<AudioContext> {
@@ -145,6 +147,7 @@ function createHannWindow(n: number): Float32Array {
   return w;
 }
 
+// Core YIN-based pitch detection used by the iOS fallback path.
 function yinDetectMain(
   x: Float32Array,
   sr: number,
@@ -462,6 +465,8 @@ function cleanupAudio(): void {
   scriptNode = null;
 }
 
+// Builds the tuner audio graph and starts pitch updates from the worklet
+// (plus iOS script-processor fallback when needed).
 async function startAudio() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error("Microphone access not available. On iOS Safari this requires HTTPS (secure context).");
@@ -782,6 +787,7 @@ async function startAudio() {
   animationFrameId = requestAnimationFrame(animate);
 }
 
+// Enters tuner mode by wiring tuner interactions and starting audio detection.
 async function enterTunerMode(): Promise<void> {
   tunerUiAbort?.abort();
   tunerUiAbort = new AbortController();
@@ -883,6 +889,7 @@ async function enterTunerMode(): Promise<void> {
   await startWithHandling();
 }
 
+// Leaves tuner mode and tears down runtime/audio resources.
 function exitTunerMode(): void {
   tunerUiAbort?.abort();
   tunerUiAbort = null;
@@ -891,6 +898,7 @@ function exitTunerMode(): void {
   updateStrobeVisualizer(null, false);
 }
 
+// Mode factory for the Chromatic Tuner screen and lifecycle hooks.
 export function createTunerMode(): ModeDefinition {
   return {
     id: "tuner",

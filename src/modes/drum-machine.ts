@@ -1,5 +1,7 @@
 import type { ModeDefinition } from "./types.js";
 
+// Mode factory for the drum machine screen: pattern editing, kit loading,
+// step scheduling/playhead animation, and lifecycle-managed UI wiring.
 export function createDrumMachineMode(): ModeDefinition {
   const drumModeEl = document.querySelector<HTMLElement>(
     '.mode-screen[data-mode="drum-machine"]'

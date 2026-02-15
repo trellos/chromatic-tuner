@@ -31,6 +31,8 @@ let isSwipeDragging = false;
 
 type TestModeHookPhase = "enter" | "exit";
 
+// Enables one-shot, test-only failures of mode lifecycle hooks so
+// integration tests can verify switch-state recovery behavior.
 function shouldThrowModeHookForTest(modeId: ModeId, phase: TestModeHookPhase): boolean {
   const config = (window as typeof window & {
     __tunaTest?: {
@@ -125,6 +127,8 @@ function clearSwipeState(): void {
   swipeTargetScreen = null;
 }
 
+// Prepares the active and incoming panels so horizontal drag can
+// render both screens together during a mode swipe.
 function setupSwipeScreens(direction: 1 | -1): void {
   if (!modeStageEl) return;
   const nextMode = getModeByOffset(direction);
@@ -182,6 +186,8 @@ async function animateSwipe(commit: boolean): Promise<void> {
   });
 }
 
+// Drives touch swipe gesture handling for mode changes, including
+// drag-follow visuals and commit/cancel behavior.
 function bindModeSwipe(): void {
   if (!modeStageEl) return;
 
@@ -270,6 +276,12 @@ function bindModeSwipe(): void {
   );
 }
 
+// Mode flow architecture:
+// 1) UI intent (dot click or swipe) picks a target mode and calls switchMode(target).
+// 2) switchMode runs lifecycle hooks in order: current.onExit -> UI state swap -> next.onEnter.
+// 3) UI state swap updates active screen classes, ARIA state, and fullscreen/body flags.
+// 4) Errors are caught so the app can recover, and isSwitching is always reset in finally.
+// Keep this comment updated as this flow changes so implementation and docs stay aligned.
 async function switchMode(id: ModeId): Promise<void> {
   if (isSwitching || id === activeModeId) return;
   isSwitching = true;
@@ -310,6 +322,7 @@ async function switchMode(id: ModeId): Promise<void> {
   }
 }
 
+// Wires mode dot/fullscreen controls and applies initial active mode UI state.
 function initializeCarouselUi(): void {
   modeDots.forEach((dot) => {
     dot.addEventListener("click", () => {

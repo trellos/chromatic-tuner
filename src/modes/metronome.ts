@@ -1,5 +1,7 @@
 import type { ModeDefinition } from "./types.js";
 
+// Mode factory for the metronome screen: tempo/time-signature controls,
+// click scheduling, and lifecycle-managed event wiring.
 export function createMetronomeMode(): ModeDefinition {
   const metronomeEl = document.querySelector<HTMLElement>(
     '.mode-screen[data-mode="metronome"]'
