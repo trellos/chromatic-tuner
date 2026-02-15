@@ -99,6 +99,8 @@ export function createDrumMachineMode(): ModeDefinition {
   let uiAbort: AbortController | null = null;
   let playheadTimeouts: number[] = [];
   let resizeObserver: ResizeObserver | null = null;
+  let bodyClassObserver: MutationObserver | null = null;
+  let detachVisualViewportListeners: (() => void) | null = null;
   let hasSeedPattern = false;
 
   const setKitLabel = () => {
@@ -166,6 +168,27 @@ export function createDrumMachineMode(): ModeDefinition {
 
   const scheduleLayoutSync = () => {
     window.requestAnimationFrame(syncLayout);
+  };
+
+  const getViewportBounds = () => {
+    const viewport = window.visualViewport;
+    const width = viewport?.width ?? window.innerWidth;
+    const height = viewport?.height ?? window.innerHeight;
+    return { width, height };
+  };
+
+  const shouldUseRotatedFullscreenLayout = () => {
+    const { width, height } = getViewportBounds();
+    if (width > 600) return false;
+    return height > width;
+  };
+
+  const syncFullscreenLayoutMode = () => {
+    if (!drumModeEl) return;
+    const isFullscreen = document.body.classList.contains("drum-fullscreen");
+    const shouldRotate = isFullscreen && shouldUseRotatedFullscreenLayout();
+    drumModeEl.classList.toggle("use-rotated-fullscreen-layout", shouldRotate);
+    scheduleLayoutSync();
   };
 
   const setSignature = (value: string) => {
@@ -544,6 +567,7 @@ export function createDrumMachineMode(): ModeDefinition {
     const { signal } = uiAbort;
 
     scheduleLayoutSync();
+    syncFullscreenLayoutMode();
 
     if (drumGridsEl && "ResizeObserver" in window) {
       resizeObserver?.disconnect();
@@ -551,6 +575,29 @@ export function createDrumMachineMode(): ModeDefinition {
       resizeObserver.observe(drumGridsEl);
     } else {
       window.addEventListener("resize", scheduleLayoutSync, { signal });
+    }
+    window.addEventListener("resize", syncFullscreenLayoutMode, { signal });
+    detachVisualViewportListeners?.();
+    detachVisualViewportListeners = null;
+    if (window.visualViewport) {
+      const onViewportChange = () => syncFullscreenLayoutMode();
+      window.visualViewport.addEventListener("resize", onViewportChange);
+      window.visualViewport.addEventListener("scroll", onViewportChange);
+      detachVisualViewportListeners = () => {
+        window.visualViewport?.removeEventListener("resize", onViewportChange);
+        window.visualViewport?.removeEventListener("scroll", onViewportChange);
+      };
+    }
+
+    if ("MutationObserver" in window) {
+      bodyClassObserver?.disconnect();
+      bodyClassObserver = new MutationObserver(() => {
+        syncFullscreenLayoutMode();
+      });
+      bodyClassObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
     }
 
     tempoButtons.forEach((button) => {
@@ -671,6 +718,7 @@ export function createDrumMachineMode(): ModeDefinition {
     setBpm(bpm);
     setKitLabel();
     attachUi();
+    syncFullscreenLayoutMode();
     scheduleLayoutSync();
     if (!hasSeedPattern) {
       applyStandardRock();
@@ -684,6 +732,11 @@ export function createDrumMachineMode(): ModeDefinition {
     uiAbort = null;
     resizeObserver?.disconnect();
     resizeObserver = null;
+    detachVisualViewportListeners?.();
+    detachVisualViewportListeners = null;
+    bodyClassObserver?.disconnect();
+    bodyClassObserver = null;
+    drumModeEl?.classList.remove("use-rotated-fullscreen-layout");
   };
 
   return {

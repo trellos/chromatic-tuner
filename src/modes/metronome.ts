@@ -30,6 +30,7 @@ export function createMetronomeMode(): ModeDefinition {
   let audioContext: AudioContext | null = null;
   let regularBuffer: AudioBuffer | null = null;
   let accentBuffer: AudioBuffer | null = null;
+  let samplesLoadingPromise: Promise<void> | null = null;
   let schedulerId: number | null = null;
   let nextNoteTime = 0;
   let currentBeat = 0;
@@ -70,7 +71,7 @@ export function createMetronomeMode(): ModeDefinition {
     accentEnabled = enabled;
   };
 
-  const ensureAudio = async () => {
+  const ensureAudioContext = async () => {
     if (audioContext) {
       await audioContext.resume();
       return;
@@ -80,10 +81,21 @@ export function createMetronomeMode(): ModeDefinition {
     if (!AudioCtx) return;
     audioContext = new AudioCtx({ latencyHint: "interactive" });
     await audioContext.resume();
+  };
 
+  const ensureSamples = async () => {
+    if (!audioContext) return;
+    if (regularBuffer && accentBuffer) return;
+    if (samplesLoadingPromise) {
+      await samplesLoadingPromise;
+      return;
+    }
+
+    samplesLoadingPromise = (async () => {
     const loadSample = async (url: string) => {
       try {
         const response = await fetch(url);
+          if (!response.ok) return null;
         const data = await response.arrayBuffer();
         return await audioContext!.decodeAudioData(data);
       } catch {
@@ -95,6 +107,13 @@ export function createMetronomeMode(): ModeDefinition {
       loadSample(REGULAR_URL),
       loadSample(ACCENT_URL),
     ]);
+    })();
+
+    try {
+      await samplesLoadingPromise;
+    } finally {
+      samplesLoadingPromise = null;
+    }
   };
 
   const playBuffer = (
@@ -113,8 +132,11 @@ export function createMetronomeMode(): ModeDefinition {
   };
 
   const playClick = (time: number, accent: boolean) => {
-    if (regularBuffer || accentBuffer) {
-      playBuffer(accent ? accentBuffer : regularBuffer, time, accent ? 1 : 0.75);
+    const sample = accent
+      ? accentBuffer ?? regularBuffer
+      : regularBuffer ?? accentBuffer;
+    if (sample) {
+      playBuffer(sample, time, accent ? 1 : 0.75);
       return;
     }
 
@@ -157,7 +179,8 @@ export function createMetronomeMode(): ModeDefinition {
 
   const start = async () => {
     if (isPlaying) return;
-    await ensureAudio();
+    await ensureAudioContext();
+    void ensureSamples();
     if (!audioContext) return;
     isPlaying = true;
     currentBeat = 0;
@@ -205,6 +228,15 @@ export function createMetronomeMode(): ModeDefinition {
     const { signal } = uiAbort;
 
     if (controlsEl) {
+      controlsEl.addEventListener(
+        "pointerdown",
+        () => {
+          void ensureAudioContext();
+          void ensureSamples();
+        },
+        { signal }
+      );
+
       controlsEl.addEventListener(
         "click",
         (event) => {

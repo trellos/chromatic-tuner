@@ -133,7 +133,7 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
 
 
 
-test('drum machine rotates to landscape presentation in fullscreen on mobile', async ({
+test('drum machine fullscreen layout is aspect-ratio aware on mobile', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -161,7 +161,10 @@ test('drum machine rotates to landscape presentation in fullscreen on mobile', a
   const fullscreenTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
   expect(fullscreenStepRect).not.toBeNull();
   expect(fullscreenTransform).not.toBe('none');
-  expect((fullscreenStepRect?.width ?? 0) > (normalStepRect?.width ?? 0)).toBeTruthy();
+
+  await page.setViewportSize({ width: 320, height: 900 });
+  const tallPortraitTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(tallPortraitTransform).not.toBe('none');
 });
 
 test('drum machine fullscreen toggle keeps mobile orientation rules consistent', async ({
@@ -221,11 +224,73 @@ test('drum machine toolbar stays in a single row on mobile portrait', async ({ p
       if (rects.length < 2) return false;
 
       const first = rects[0];
+      if (!first) return false;
       return rects.every((rect) => rect.top < first.bottom && rect.bottom > first.top);
     });
 
     expect(overlapsSingleRow).toBeTruthy();
   }
+});
+
+test('drum machine fullscreen keeps toolbar buttons visible and parallel to grid', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await page.locator('#carousel-toggle').click();
+  await expect(page.locator('body')).toHaveClass(/drum-fullscreen/);
+
+  const drumUi = page.locator('.mode-screen[data-mode="drum-machine"] .drum-ui');
+  const drumGrid = page.locator('.mode-screen[data-mode="drum-machine"] .drum-grids');
+  const drumRotator = page.locator('.mode-screen[data-mode="drum-machine"] .drum-rotator');
+  const beatButton = page.locator('#drum-beat-button');
+  const kitButton = page.locator('#drum-kit-button');
+  const playButton = page.locator('#drum-play-toggle');
+  const tempoDown = page.locator('.drum-tempo [data-tempo="down"]');
+  const tempoUp = page.locator('.drum-tempo [data-tempo="up"]');
+
+  await expect(beatButton).toBeVisible();
+  await expect(kitButton).toBeVisible();
+  await expect(playButton).toBeVisible();
+  await expect(tempoDown).toBeVisible();
+  await expect(tempoUp).toBeVisible();
+
+  const controlsInViewport = await page.evaluate(() => {
+    const ids = [
+      '#drum-beat-button',
+      '#drum-kit-button',
+      '#drum-play-toggle',
+      '.drum-tempo [data-tempo="down"]',
+      '.drum-tempo [data-tempo="up"]',
+    ];
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    return ids.every((selector) => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.top >= -1 &&
+        rect.left >= -1 &&
+        rect.bottom <= vh + 1 &&
+        rect.right <= vw + 1
+      );
+    });
+  });
+  expect(controlsInViewport).toBeTruthy();
+
+  const [rotatorTransform, uiTransform, gridTransform] = await Promise.all([
+    drumRotator.evaluate((el) => getComputedStyle(el).transform),
+    drumUi.evaluate((el) => getComputedStyle(el).transform),
+    drumGrid.evaluate((el) => getComputedStyle(el).transform),
+  ]);
+  expect(rotatorTransform).not.toBe('none');
+  expect(uiTransform).toBe('none');
+  expect(gridTransform).toBe('none');
 });
 
 test('mode switching remains responsive after a runtime hook error', async ({ page }) => {

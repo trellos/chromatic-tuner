@@ -464,8 +464,8 @@ body.status-hidden #status {
 }
 
 .tempo-dial {
-  --dial-rotation: -90deg;
-  --dial-rotation-inverse: 90deg;
+  --dial-rotation: -15deg;
+  --dial-rotation-inverse: 15deg;
   width: min(320px, 78vw);
   aspect-ratio: 1 / 1;
   position: relative;
@@ -897,7 +897,7 @@ body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
   border-radius: 0;
   padding: 24px;
   box-shadow: none;
-  overflow: hidden;
+  overflow: auto;
 }
 
 body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .mode-header {
@@ -909,13 +909,15 @@ body.drum-fullscreen .drum-footer {
 }
 
 body.drum-fullscreen .drum-mock {
-  height: 100%;
-  justify-content: center;
+  min-height: 100%;
+  justify-content: flex-start;
+  padding-top: 56px;
+  box-sizing: border-box;
 }
 
 body.drum-fullscreen .drum-rotator {
   width: min(1200px, 100%);
-  max-height: 100%;
+  max-height: none;
   aspect-ratio: 16 / 9;
   height: auto;
 }
@@ -993,21 +995,22 @@ body.drum-fullscreen .drum-ui {
   }
 
   body.drum-fullscreen .drum-mock {
-    overflow: visible;
+    overflow: auto;
+    padding-top: 52px;
   }
 
   body.drum-fullscreen .drum-rotator {
-    width: min(96svh, 900px);
-    max-width: 96svh;
-    max-height: 96vw;
-    aspect-ratio: 16 / 9;
-    transform: rotate(90deg);
-    transform-origin: center;
+    width: min(720px, 100%);
+    max-width: 100%;
+    max-height: none;
+    aspect-ratio: auto;
+    transform: none;
   }
 
   body.drum-fullscreen .drum-grids {
-    min-width: 640px;
+    min-width: 0;
   }
+
 }
 
 @media (max-width: 600px) and (orientation: portrait) {
@@ -1029,9 +1032,33 @@ body.drum-fullscreen .drum-ui {
   }
 
   .drum-tempo {
+    order: 1;
     min-width: 144px;
     gap: 8px;
     padding: 6px 8px;
+  }
+
+  .drum-play {
+    order: 2;
+  }
+
+  #drum-beat-button {
+    white-space: nowrap;
+  }
+
+  #drum-kit-button {
+    max-width: 124px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #drum-kit-label {
+    display: inline-block;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
   }
 
   .drum-tempo .ghost-btn {
@@ -1051,6 +1078,74 @@ body.drum-fullscreen .drum-ui {
     min-width: 74px;
     min-height: 34px;
     padding: 8px 14px;
+  }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-mock {
+    position: relative;
+    min-height: 100svh;
+    padding-top: 0;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-rotator {
+    width: min(94svh, 860px);
+    max-width: min(94svh, 860px);
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-ui {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    gap: 8px;
+    padding: 8px 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    overflow-x: visible;
+    overflow-y: visible;
+    overflow: visible;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-ui > * {
+    flex: 0 1 auto;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-row {
+    grid-template-columns: 42px 1fr;
+    gap: 8px;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-grids {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 210px;
+    padding: 10px;
+    gap: 8px;
+    transform: none;
+    margin: 0;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-steps {
+    grid-template-columns: repeat(16, minmax(14px, 1fr));
+    gap: 4px;
   }
 }
 
