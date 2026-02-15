@@ -132,3 +132,98 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
 });
 
 
+
+test('drum machine rotates to landscape presentation in fullscreen on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  const drumScreen = page.locator('.mode-screen[data-mode="drum-machine"]');
+  const drumRotator = page.locator('.mode-screen[data-mode="drum-machine"] .drum-rotator');
+  const drumGrid = page.locator('.mode-screen[data-mode="drum-machine"] .drum-grids');
+  const firstStep = page.locator('.mode-screen[data-mode="drum-machine"] .step').first();
+  await expect(drumScreen).toHaveClass(/is-active/);
+  await expect(page.locator('body')).not.toHaveClass(/drum-fullscreen/);
+
+  const normalGridRect = await drumGrid.boundingBox();
+  const normalStepRect = await firstStep.boundingBox();
+  const normalTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(normalGridRect).not.toBeNull();
+  expect(normalStepRect).not.toBeNull();
+  expect(normalTransform).toBe('none');
+
+  await page.locator('#carousel-toggle').click();
+  await expect(page.locator('body')).toHaveClass(/drum-fullscreen/);
+
+  const fullscreenStepRect = await firstStep.boundingBox();
+  const fullscreenTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(fullscreenStepRect).not.toBeNull();
+  expect(fullscreenTransform).not.toBe('none');
+  expect((fullscreenStepRect?.width ?? 0) > (normalStepRect?.width ?? 0)).toBeTruthy();
+});
+
+test('drum machine fullscreen toggle keeps mobile orientation rules consistent', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  const drumScreen = page.locator('.mode-screen[data-mode="drum-machine"]');
+  const drumRotator = page.locator('.mode-screen[data-mode="drum-machine"] .drum-rotator');
+  await expect(drumScreen).toHaveClass(/is-active/);
+
+  const initialTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(initialTransform).toBe('none');
+
+  await page.locator('#carousel-toggle').click();
+  await expect(page.locator('body')).toHaveClass(/drum-fullscreen/);
+  const fullscreenTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(fullscreenTransform).not.toBe('none');
+
+  await page.locator('#drum-exit').click();
+  await expect(page.locator('body')).not.toHaveClass(/drum-fullscreen/);
+  const exitedTransform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(exitedTransform).toBe('none');
+});
+
+test('drum machine fullscreen rotation is mobile-only', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await page.locator('#carousel-toggle').click();
+  await expect(page.locator('body')).toHaveClass(/drum-fullscreen/);
+
+  const drumRotator = page.locator('.mode-screen[data-mode="drum-machine"] .drum-rotator');
+  const transform = await drumRotator.evaluate((el) => getComputedStyle(el).transform);
+  expect(transform).toBe('none');
+});
+
+test('drum machine toolbar stays in a single row on mobile portrait', async ({ page }) => {
+  const portraitViewports = [
+    { width: 320, height: 640 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const viewport of portraitViewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    await page.getByRole('tab', { name: 'Drum Machine' }).click();
+    const drumUi = page.locator('.mode-screen[data-mode="drum-machine"] .drum-ui');
+    await expect(drumUi).toBeVisible();
+
+    const overlapsSingleRow = await drumUi.locator(':scope > *').evaluateAll((nodes) => {
+      const rects = nodes.map((node) => node.getBoundingClientRect());
+      if (rects.length < 2) return false;
+
+      const first = rects[0];
+      return rects.every((rect) => rect.top < first.bottom && rect.bottom > first.top);
+    });
+
+    expect(overlapsSingleRow).toBeTruthy();
+  }
+});

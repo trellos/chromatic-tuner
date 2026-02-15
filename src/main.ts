@@ -21,6 +21,14 @@ const MODE_REGISTRY: ModeDefinition[] = [
 
 let activeModeId: ModeId = "tuner";
 let isSwitching = false;
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeDx = 0;
+let swipeDirection: 1 | -1 | null = null;
+let swipeActiveScreen: HTMLElement | null = null;
+let swipeTargetScreen: HTMLElement | null = null;
+let swipeTargetMode: ModeId | null = null;
+let isSwipeDragging = false;
 
 function getModeById(id: ModeId): ModeDefinition | undefined {
   return MODE_REGISTRY.find((mode) => mode.id === id);
@@ -61,42 +69,188 @@ function getModeOrder(): ModeId[] {
   return MODE_REGISTRY.map((mode) => mode.id);
 }
 
-function switchByOffset(offset: number): void {
+function getModeByOffset(offset: number): ModeId | null {
   const order = getModeOrder();
   const currentIndex = order.indexOf(activeModeId);
-  if (currentIndex === -1) return;
+  if (currentIndex === -1) return null;
   const nextIndex = (currentIndex + offset + order.length) % order.length;
   const nextMode = order[nextIndex];
+  return nextMode ?? null;
+}
+
+function switchByOffset(offset: number): void {
+  const nextMode = getModeByOffset(offset);
   if (!nextMode) return;
   void switchMode(nextMode);
   setCarouselHidden(false);
 }
 
+function getScreenByMode(modeId: ModeId): HTMLElement | null {
+  return (
+    Array.from(modeScreens).find((screen) => screen.dataset.mode === modeId) ?? null
+  );
+}
+
+function clearSwipeState(): void {
+  swipeStartX = 0;
+  swipeStartY = 0;
+  swipeDx = 0;
+  swipeDirection = null;
+  swipeTargetMode = null;
+  isSwipeDragging = false;
+  if (modeStageEl) {
+    modeStageEl.classList.remove("is-swiping");
+  }
+  [swipeActiveScreen, swipeTargetScreen].forEach((screen) => {
+    if (!screen) return;
+    screen.classList.remove("is-swipe-active");
+    screen.style.transition = "";
+    screen.style.transform = "";
+  });
+  swipeActiveScreen = null;
+  swipeTargetScreen = null;
+}
+
+function setupSwipeScreens(direction: 1 | -1): void {
+  if (!modeStageEl) return;
+  const nextMode = getModeByOffset(direction);
+  const activeScreen = getScreenByMode(activeModeId);
+  if (!nextMode || !activeScreen) {
+    clearSwipeState();
+    return;
+  }
+  const nextScreen = getScreenByMode(nextMode);
+  if (!nextScreen) {
+    clearSwipeState();
+    return;
+  }
+  swipeDirection = direction;
+  swipeTargetMode = nextMode;
+  swipeActiveScreen = activeScreen;
+  swipeTargetScreen = nextScreen;
+  modeStageEl.classList.add("is-swiping");
+  swipeActiveScreen.classList.add("is-swipe-active");
+  swipeTargetScreen.classList.add("is-swipe-active");
+  swipeActiveScreen.style.transition = "none";
+  swipeTargetScreen.style.transition = "none";
+}
+
+function renderSwipe(dx: number): void {
+  if (!modeStageEl || !swipeDirection || !swipeActiveScreen || !swipeTargetScreen) return;
+  const width = modeStageEl.getBoundingClientRect().width;
+  const clampedDx = Math.max(-width, Math.min(width, dx));
+  swipeDx = clampedDx;
+  const targetOffset = swipeDirection === 1 ? width : -width;
+  swipeActiveScreen.style.transform = `translate3d(${clampedDx}px, 0, 0)`;
+  swipeTargetScreen.style.transform = `translate3d(${clampedDx + targetOffset}px, 0, 0)`;
+}
+
+async function animateSwipe(commit: boolean): Promise<void> {
+  if (!modeStageEl || !swipeDirection || !swipeActiveScreen || !swipeTargetScreen) return;
+  const width = modeStageEl.getBoundingClientRect().width;
+  const targetOffset = swipeDirection === 1 ? width : -width;
+  const activeTargetX = commit ? (swipeDirection === 1 ? -width : width) : 0;
+  const targetTargetX = commit ? 0 : targetOffset;
+  swipeActiveScreen.style.transition = "transform 220ms ease";
+  swipeTargetScreen.style.transition = "transform 220ms ease";
+  swipeActiveScreen.style.transform = `translate3d(${activeTargetX}px, 0, 0)`;
+  swipeTargetScreen.style.transform = `translate3d(${targetTargetX}px, 0, 0)`;
+  await new Promise<void>((resolve) => {
+    const timeout = window.setTimeout(resolve, 260);
+    swipeTargetScreen?.addEventListener(
+      "transitionend",
+      () => {
+        window.clearTimeout(timeout);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
 function bindModeSwipe(): void {
   if (!modeStageEl) return;
-  let startX = 0;
-  let startY = 0;
 
   modeStageEl.addEventListener(
     "touchstart",
     (event) => {
+      if (document.body.classList.contains("drum-fullscreen") || isSwitching) {
+        clearSwipeState();
+        return;
+      }
       const touch = event.touches[0];
       if (!touch) return;
-      startX = touch.clientX;
-      startY = touch.clientY;
+      swipeStartX = touch.clientX;
+      swipeStartY = touch.clientY;
+      swipeDx = 0;
+      swipeDirection = null;
+      swipeTargetMode = null;
+      isSwipeDragging = false;
+    },
+    { passive: true }
+  );
+
+  modeStageEl.addEventListener(
+    "touchmove",
+    (event) => {
+      if (document.body.classList.contains("drum-fullscreen")) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      const dx = touch.clientX - swipeStartX;
+      const dy = touch.clientY - swipeStartY;
+      if (!isSwipeDragging) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dx) <= Math.abs(dy)) return;
+        isSwipeDragging = true;
+      }
+      event.preventDefault();
+      const direction: 1 | -1 = dx < 0 ? 1 : -1;
+      if (!swipeDirection || swipeDirection !== direction) {
+        setupSwipeScreens(direction);
+      }
+      renderSwipe(dx);
+    },
+    { passive: false }
+  );
+
+  modeStageEl.addEventListener(
+    "touchcancel",
+    () => {
+      clearSwipeState();
     },
     { passive: true }
   );
 
   modeStageEl.addEventListener(
     "touchend",
-    (event) => {
+    async (event) => {
+      if (document.body.classList.contains("drum-fullscreen")) {
+        clearSwipeState();
+        return;
+      }
       const touch = event.changedTouches[0];
-      if (!touch) return;
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-      switchByOffset(dx < 0 ? 1 : -1);
+      if (!touch) {
+        clearSwipeState();
+        return;
+      }
+      const dx = touch.clientX - swipeStartX;
+      const dy = touch.clientY - swipeStartY;
+      if (!isSwipeDragging || !swipeTargetMode || !swipeDirection) {
+        clearSwipeState();
+        if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+        switchByOffset(dx < 0 ? 1 : -1);
+        return;
+      }
+
+      const width = modeStageEl.getBoundingClientRect().width;
+      const shouldCommit = Math.abs(swipeDx) > width * 0.22;
+      await animateSwipe(shouldCommit);
+      const nextMode = shouldCommit ? swipeTargetMode : null;
+      clearSwipeState();
+      if (nextMode) {
+        await switchMode(nextMode);
+        setCarouselHidden(false);
+      }
     },
     { passive: true }
   );
