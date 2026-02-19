@@ -180,6 +180,15 @@ body.drum-fullscreen .mode-stage {
   z-index: 1;
 }
 
+.mode-screen[data-mode="tuner"] {
+  --tuner-dial-size: min(520px, calc(var(--mode-panel-height) - 140px), 90vw);
+  overflow: hidden;
+}
+
+.mode-screen[data-mode="tuner"].is-active {
+  gap: 16px;
+}
+
 .mode-screen[data-mode="tuner"] > .tuna-field {
   z-index: 0;
 }
@@ -233,7 +242,7 @@ body.drum-fullscreen .mode-stage {
 
 .tuner-stack {
   position: relative;
-  width: min(520px, 90%);
+  width: min(var(--tuner-dial-size), 100%);
   margin: 0 auto;
 }
 
@@ -291,8 +300,8 @@ h1 {
 
 /* Strobe Tuner Visualization */
 .strobe-tuner {
-  width: min(520px, 90vw);
-  height: min(520px, 90vw);
+  width: var(--tuner-dial-size);
+  height: var(--tuner-dial-size);
   margin: 0;
   border-radius: 50%;
   position: relative;
@@ -1218,4 +1227,3 @@ body.drum-fullscreen .drum-ui {
     }
   }
 }
-
