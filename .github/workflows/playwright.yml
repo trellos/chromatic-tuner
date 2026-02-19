@@ -1,11 +1,11 @@
-name: Playwright Mobile UI
+name: Playwright UI
 on:
   push:
     branches-ignore: [ main, master ]
   pull_request:
     branches: [ main, master ]
 jobs:
-  e2e-mobile:
+  e2e-ui:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
@@ -18,11 +18,11 @@ jobs:
       run: npm ci
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
-    - name: Run mobile UI Playwright tests
-      run: npm run test:e2e:mobile
+    - name: Run desktop + mobile UI Playwright tests
+      run: npx playwright test tests/ui.spec.ts --project=chromium --project="Mobile Safari"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
-        name: playwright-report-mobile
+        name: playwright-report-ui
         path: playwright-report/
         retention-days: 30
