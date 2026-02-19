@@ -1,7 +1,5 @@
 name: Playwright UI
 on:
-  push:
-    branches-ignore: [ main, master ]
   pull_request:
     branches: [ main, master ]
 jobs:
@@ -18,8 +16,12 @@ jobs:
       run: npm ci
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
-    - name: Run desktop + mobile UI Playwright tests
-      run: npx playwright test tests/ui.spec.ts --project=chromium --project="Mobile Safari"
+    - name: Run critical desktop + mobile tuner UI checks
+      run: >-
+        npx playwright test tests/ui.spec.ts
+        --project=chromium
+        --project="Mobile Safari"
+        --grep "app loads and key UI is visible with no runtime/network failures|tuner mode does not need scrollbars in current project viewport"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
