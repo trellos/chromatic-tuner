@@ -94,6 +94,29 @@ test('app loads and key UI is visible with no runtime/network failures', async (
   ).toEqual([]);
 });
 
+
+
+test('tuner exposes audio diagnostics for CI smoke checks', async ({ page }) => {
+  await page.goto('/');
+
+  await page.waitForFunction(() => Boolean((window as any).__tunerAudioDiagnostics));
+  const diagnostics = await page.evaluate(() => (window as any).__tunerAudioDiagnostics);
+
+  expect(diagnostics).toEqual(
+    expect.objectContaining({
+      isIOS: expect.any(Boolean),
+      awaitingAudioUnlock: expect.any(Boolean),
+      contextState: expect.any(String),
+      hasWorkletNode: expect.any(Boolean),
+    })
+  );
+
+  const audioLikelyAvailable =
+    diagnostics.hasWorkletNode ||
+    diagnostics.contextState === 'running' ||
+    diagnostics.awaitingAudioUnlock;
+  expect(audioLikelyAvailable).toBeTruthy();
+});
 test('mode switches keep stage size stable', async ({ page }) => {
   await page.goto('/');
 
