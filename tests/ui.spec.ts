@@ -131,41 +131,34 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
   }
 });
 
-test('tuner mode does not need scrollbars on desktop or mobile', async ({ page }) => {
-  const viewports = [
-    { width: 1280, height: 800 },
-    { width: 390, height: 844 },
-  ];
+test('tuner mode does not need scrollbars in current project viewport', async ({ page }, testInfo) => {
+  await page.goto('/');
 
-  for (const viewport of viewports) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
+  await page.getByRole('tab', { name: 'Chromatic Tuner' }).click();
+  const tunerScreen = page.locator('.mode-screen[data-mode="tuner"]');
+  await expect(tunerScreen).toHaveClass(/is-active/);
 
-    await page.getByRole('tab', { name: 'Chromatic Tuner' }).click();
-    const tunerScreen = page.locator('.mode-screen[data-mode="tuner"]');
-    await expect(tunerScreen).toHaveClass(/is-active/);
+  const overflow = await tunerScreen.evaluate((element) => {
+    const needsVerticalScroll = element.scrollHeight > element.clientHeight + 1;
+    const needsHorizontalScroll = element.scrollWidth > element.clientWidth + 1;
 
-    const overflow = await tunerScreen.evaluate((element) => {
-      const style = window.getComputedStyle(element);
-      const needsVerticalScroll = element.scrollHeight > element.clientHeight + 1;
-      const needsHorizontalScroll = element.scrollWidth > element.clientWidth + 1;
+    return {
+      needsVerticalScroll,
+      needsHorizontalScroll,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    };
+  });
 
-      return {
-        overflowX: style.overflowX,
-        overflowY: style.overflowY,
-        needsVerticalScroll,
-        needsHorizontalScroll,
-      };
-    });
-
-    expect(
-      overflow,
-      `Viewport ${viewport.width}x${viewport.height} should not require tuner scrolling`
-    ).toMatchObject({
-      needsVerticalScroll: false,
-      needsHorizontalScroll: false,
-    });
-  }
+  expect(
+    overflow,
+    `${testInfo.project.name} should not require tuner scrolling`
+  ).toMatchObject({
+    needsVerticalScroll: false,
+    needsHorizontalScroll: false,
+  });
 });
 
 
