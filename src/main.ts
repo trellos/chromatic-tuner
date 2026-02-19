@@ -73,6 +73,13 @@ function getModeByOffset(offset: number): ModeId | null {
   return nextMode ?? null;
 }
 
+function requestModeSwitchFromSwipe(nextMode: ModeId): void {
+  // Intentionally non-blocking: touchend should finish immediately,
+  // while switchMode handles async lifecycle and error reporting.
+  void switchMode(nextMode);
+  setCarouselHidden(false);
+}
+
 function getScreenByMode(modeId: ModeId): HTMLElement | null {
   return (
     Array.from(modeScreens).find((screen) => screen.dataset.mode === modeId) ?? null
@@ -232,8 +239,7 @@ function bindModeSwipe(): void {
         if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
         const nextMode = getModeByOffset(dx < 0 ? 1 : -1);
         if (!nextMode) return;
-        void switchMode(nextMode);
-        setCarouselHidden(false);
+        requestModeSwitchFromSwipe(nextMode);
         return;
       }
 
@@ -243,8 +249,7 @@ function bindModeSwipe(): void {
       const nextMode = shouldCommit ? swipeTargetMode : null;
       clearSwipeState();
       if (nextMode) {
-        void switchMode(nextMode);
-        setCarouselHidden(false);
+        requestModeSwitchFromSwipe(nextMode);
       }
     },
     { passive: true }
