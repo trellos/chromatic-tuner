@@ -64,12 +64,8 @@ function setActiveScreen(id: ModeId): void {
   });
 }
 
-function getModeOrder(): ModeId[] {
-  return MODE_REGISTRY.map((mode) => mode.id);
-}
-
 function getModeByOffset(offset: number): ModeId | null {
-  const order = getModeOrder();
+  const order = MODE_REGISTRY.map((mode) => mode.id);
   const currentIndex = order.indexOf(activeModeId);
   if (currentIndex === -1) return null;
   const nextIndex = (currentIndex + offset + order.length) % order.length;
@@ -77,9 +73,9 @@ function getModeByOffset(offset: number): ModeId | null {
   return nextMode ?? null;
 }
 
-function switchByOffset(offset: number): void {
-  const nextMode = getModeByOffset(offset);
-  if (!nextMode) return;
+function requestModeSwitchFromSwipe(nextMode: ModeId): void {
+  // Intentionally non-blocking: touchend should finish immediately,
+  // while switchMode handles async lifecycle and error reporting.
   void switchMode(nextMode);
   setCarouselHidden(false);
 }
@@ -241,7 +237,9 @@ function bindModeSwipe(): void {
       if (!isSwipeDragging || !swipeTargetMode || !swipeDirection) {
         clearSwipeState();
         if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-        switchByOffset(dx < 0 ? 1 : -1);
+        const nextMode = getModeByOffset(dx < 0 ? 1 : -1);
+        if (!nextMode) return;
+        requestModeSwitchFromSwipe(nextMode);
         return;
       }
 
@@ -251,8 +249,7 @@ function bindModeSwipe(): void {
       const nextMode = shouldCommit ? swipeTargetMode : null;
       clearSwipeState();
       if (nextMode) {
-        await switchMode(nextMode);
-        setCarouselHidden(false);
+        requestModeSwitchFromSwipe(nextMode);
       }
     },
     { passive: true }
@@ -340,4 +337,3 @@ window.addEventListener("DOMContentLoaded", async () => {
     await tunerMode.onEnter();
   }
 });
-
