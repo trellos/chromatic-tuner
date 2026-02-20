@@ -7,28 +7,31 @@ type SeigaihaTileSpec = {
   tileSize: number;
 };
 
-type TileGeometry = {
-  radius: number;
-  tileSize: number;
-  dx: number;
-  dy: number;
-};
-
 type WaveState = {
-  waveLPos: string;
-  waveMPos: string;
-  waveSPos: string;
-  cardWaveLPos: string;
-  cardWaveMPos: string;
+  waveLX: string;
+  waveLY: string;
+  waveMX: string;
+  waveMY: string;
+  waveSX: string;
+  waveSY: string;
+  cardWaveLX: string;
+  cardWaveLY: string;
+  cardWaveMX: string;
+  cardWaveMY: string;
 };
 
-const DEBUG_WAVES = true;
+const DEBUG_WAVES = false;
 const DEBUG_DURATION_MS = 5000;
 const TILE_PADDING_CELLS = 2;
 
-const SMALL_TILE: SeigaihaTileSpec = { radius: 32, tileSize: 384 };
-const MEDIUM_TILE: SeigaihaTileSpec = { radius: 48, tileSize: 384 };
-const LARGE_TILE: SeigaihaTileSpec = { radius: 64, tileSize: 384 };
+const R_SMALL = 32;
+const R_MED = 48;
+const R_LARGE = 64;
+const TILE_SIZE = 384;
+
+const SMALL_TILE: SeigaihaTileSpec = { radius: R_SMALL, tileSize: TILE_SIZE };
+const MEDIUM_TILE: SeigaihaTileSpec = { radius: R_MED, tileSize: TILE_SIZE };
+const LARGE_TILE: SeigaihaTileSpec = { radius: R_LARGE, tileSize: TILE_SIZE };
 
 let activeMode: BackgroundMode = "tuner";
 let beatIntervalMs = 500;
@@ -44,49 +47,41 @@ let rootEl: HTMLElement | null = null;
 const tileUrlCache = new Map<string, string>();
 
 let lastWaveState: WaveState = {
-  waveLPos: "",
-  waveMPos: "",
-  waveSPos: "",
-  cardWaveLPos: "",
-  cardWaveMPos: "",
+  waveLX: "",
+  waveLY: "",
+  waveMX: "",
+  waveMY: "",
+  waveSX: "",
+  waveSY: "",
+  cardWaveLX: "",
+  cardWaveLY: "",
+  cardWaveMX: "",
+  cardWaveMY: "",
 };
 
 function clamp(value: number, min = 0, max = 1): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function quantizeHalfPixel(value: number): number {
+function q(value: number): number {
   return Math.round(value * 2) / 2;
 }
 
-function pos(x: number, y: number): string {
-  return `${x}px ${y}px`;
-}
-
-function beatEnvelope(now: number): number {
-  if (beatIntervalMs <= 0) return 0;
-  const elapsed = (now - lastBeatAt) % beatIntervalMs;
-  const progress = clamp(elapsed / beatIntervalMs);
-  return Math.pow(Math.sin(progress * Math.PI), 0.85);
-}
-
-function normalizeTileGeometry(spec: SeigaihaTileSpec): TileGeometry {
-  const radius = Math.max(8, Math.round(spec.radius));
-  const dx = 2 * radius;
-  const dy = radius;
-  const period = Math.max(dx, 2 * dy);
-  const tileSize = Math.max(period, Math.round(spec.tileSize / period) * period);
-  return { radius, tileSize, dx, dy };
+function formatVar(value: number): string {
+  return q(value).toFixed(1);
 }
 
 function arcPath(cx: number, cy: number, radius: number): string {
   return `M ${(cx - radius).toFixed(2)} ${cy.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 1 ${(cx + radius).toFixed(2)} ${cy.toFixed(2)}`;
 }
 
-function buildSeigaihaArcs(geometry: TileGeometry): string {
-  const { radius, tileSize, dx, dy } = geometry;
+function buildSeigaihaArcs(spec: SeigaihaTileSpec): string {
+  const { radius, tileSize } = spec;
+  const dx = 2 * radius;
+  const dy = radius;
+
   const radii = [radius, radius * (2 / 3), radius * (1 / 3)];
-  const strokeWidths = [radius * 0.046, radius * 0.036, radius * 0.027];
+  const strokeWidths = [radius * 0.048, radius * 0.038, radius * 0.028];
 
   const minY = -TILE_PADDING_CELLS * dy;
   const maxY = tileSize + TILE_PADDING_CELLS * dy;
@@ -109,7 +104,7 @@ function buildSeigaihaArcs(geometry: TileGeometry): string {
       const cx = col * dx + xOffset;
       for (let i = 0; i < radii.length; i += 1) {
         const r = radii[i] ?? radius;
-        const width = strokeWidths[i] ?? 1.2;
+        const width = strokeWidths[i] ?? 1;
         arcs.push(
           `<path d="${arcPath(cx, cy, r)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="0.115" stroke-width="${width.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
         );
@@ -121,8 +116,7 @@ function buildSeigaihaArcs(geometry: TileGeometry): string {
 }
 
 function makeSeigaihaTileSvg(spec: SeigaihaTileSpec): string {
-  const geometry = normalizeTileGeometry(spec);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.tileSize}" height="${geometry.tileSize}" viewBox="0 0 ${geometry.tileSize} ${geometry.tileSize}">${buildSeigaihaArcs(geometry)}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${spec.tileSize}" height="${spec.tileSize}" viewBox="0 0 ${spec.tileSize} ${spec.tileSize}">${buildSeigaihaArcs(spec)}</svg>`;
 }
 
 function svgToDataUrl(svg: string): string {
@@ -133,7 +127,9 @@ function svgToDataUrl(svg: string): string {
 function getTileUrl(spec: SeigaihaTileSpec): string {
   const key = `${spec.radius}-${spec.tileSize}`;
   const cached = tileUrlCache.get(key);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
 
   const url = `url("${svgToDataUrl(makeSeigaihaTileSvg(spec))}")`;
   tileUrlCache.set(key, url);
@@ -145,80 +141,99 @@ function applyStaticBackgroundVars(root: HTMLElement): void {
   root.style.setProperty("--seigaiha-medium-image", getTileUrl(MEDIUM_TILE));
   root.style.setProperty("--seigaiha-large-image", getTileUrl(LARGE_TILE));
 
-  root.style.setProperty("--seigaiha-small-size", "384px 384px");
-  root.style.setProperty("--seigaiha-medium-size", "384px 384px");
-  root.style.setProperty("--seigaiha-large-size", "384px 384px");
-
-  root.style.setProperty("--seigaiha-opacity", "0.22");
-  root.style.setProperty("--card-seigaiha-opacity", "0.062");
-}
-
-function motionBoost(now: number): number {
-  if (activeMode === "tuner") {
-    return 1 + tunerStability * 0.08;
-  }
-  if (activeMode === "metronome" || activeMode === "drum-machine") {
-    return 1 + beatEnvelope(now) * 0.1;
-  }
-  return 1;
+  root.style.setProperty("--seigaiha-small-size", `${TILE_SIZE}px ${TILE_SIZE}px`);
+  root.style.setProperty("--seigaiha-medium-size", `${TILE_SIZE}px ${TILE_SIZE}px`);
+  root.style.setProperty("--seigaiha-large-size", `${TILE_SIZE}px ${TILE_SIZE}px`);
 }
 
 function computeWaveState(now: number): WaveState {
   const t = now * 0.001;
-  const boost = motionBoost(now);
 
-  const waveLx = quantizeHalfPixel(Math.sin(t * 0.012) * 22 * boost);
-  const waveLy = quantizeHalfPixel(Math.cos(t * 0.01) * 16 * boost);
-  const waveMx = quantizeHalfPixel(Math.sin(t * 0.018) * 34 * boost);
-  const waveMy = quantizeHalfPixel(Math.cos(t * 0.015) * 26 * boost);
-  const waveSx = quantizeHalfPixel(Math.sin(t * 0.025) * 46 * boost);
-  const waveSy = quantizeHalfPixel(Math.cos(t * 0.021) * 34 * boost);
+  const waveLx = 18 * Math.sin(t * 0.08 + 0.2);
+  const waveLy = 18 * Math.cos(t * 0.07 + 1.3);
+
+  const waveMx = 28 * Math.sin(t * 0.13 + 0.9);
+  const waveMy = 28 * Math.cos(t * 0.11 + 2.1);
+
+  const waveSx = 40 * Math.sin(t * 0.19 + 1.7);
+  const waveSy = 40 * Math.cos(t * 0.16 + 0.4);
+
+  const cardScale = 0.6;
 
   return {
-    waveLPos: pos(waveLx, waveLy),
-    waveMPos: pos(waveMx, waveMy),
-    waveSPos: pos(waveSx, waveSy),
-    cardWaveLPos: pos(quantizeHalfPixel(waveLx * 0.6), quantizeHalfPixel(waveLy * 0.6)),
-    cardWaveMPos: pos(quantizeHalfPixel(waveMx * 0.6), quantizeHalfPixel(waveMy * 0.6)),
+    waveLX: formatVar(waveLx),
+    waveLY: formatVar(waveLy),
+    waveMX: formatVar(waveMx),
+    waveMY: formatVar(waveMy),
+    waveSX: formatVar(waveSx),
+    waveSY: formatVar(waveSy),
+    cardWaveLX: formatVar(waveLx * cardScale),
+    cardWaveLY: formatVar(waveLy * cardScale),
+    cardWaveMX: formatVar(waveMx * cardScale),
+    cardWaveMY: formatVar(waveMy * cardScale),
   };
 }
 
 function applyWaveVars(root: HTMLElement, state: WaveState): void {
-  if (state.waveLPos !== lastWaveState.waveLPos) {
-    root.style.setProperty("--waveL-pos", state.waveLPos);
-    lastWaveState.waveLPos = state.waveLPos;
+  if (state.waveLX !== lastWaveState.waveLX) {
+    root.style.setProperty("--waveL-x", state.waveLX);
+    lastWaveState.waveLX = state.waveLX;
   }
-  if (state.waveMPos !== lastWaveState.waveMPos) {
-    root.style.setProperty("--waveM-pos", state.waveMPos);
-    lastWaveState.waveMPos = state.waveMPos;
+  if (state.waveLY !== lastWaveState.waveLY) {
+    root.style.setProperty("--waveL-y", state.waveLY);
+    lastWaveState.waveLY = state.waveLY;
   }
-  if (state.waveSPos !== lastWaveState.waveSPos) {
-    root.style.setProperty("--waveS-pos", state.waveSPos);
-    lastWaveState.waveSPos = state.waveSPos;
+  if (state.waveMX !== lastWaveState.waveMX) {
+    root.style.setProperty("--waveM-x", state.waveMX);
+    lastWaveState.waveMX = state.waveMX;
   }
-  if (state.cardWaveLPos !== lastWaveState.cardWaveLPos) {
-    root.style.setProperty("--cardWaveL-pos", state.cardWaveLPos);
-    lastWaveState.cardWaveLPos = state.cardWaveLPos;
+  if (state.waveMY !== lastWaveState.waveMY) {
+    root.style.setProperty("--waveM-y", state.waveMY);
+    lastWaveState.waveMY = state.waveMY;
   }
-  if (state.cardWaveMPos !== lastWaveState.cardWaveMPos) {
-    root.style.setProperty("--cardWaveM-pos", state.cardWaveMPos);
-    lastWaveState.cardWaveMPos = state.cardWaveMPos;
+  if (state.waveSX !== lastWaveState.waveSX) {
+    root.style.setProperty("--waveS-x", state.waveSX);
+    lastWaveState.waveSX = state.waveSX;
+  }
+  if (state.waveSY !== lastWaveState.waveSY) {
+    root.style.setProperty("--waveS-y", state.waveSY);
+    lastWaveState.waveSY = state.waveSY;
+  }
+  if (state.cardWaveLX !== lastWaveState.cardWaveLX) {
+    root.style.setProperty("--cardWaveL-x", state.cardWaveLX);
+    lastWaveState.cardWaveLX = state.cardWaveLX;
+  }
+  if (state.cardWaveLY !== lastWaveState.cardWaveLY) {
+    root.style.setProperty("--cardWaveL-y", state.cardWaveLY);
+    lastWaveState.cardWaveLY = state.cardWaveLY;
+  }
+  if (state.cardWaveMX !== lastWaveState.cardWaveMX) {
+    root.style.setProperty("--cardWaveM-x", state.cardWaveMX);
+    lastWaveState.cardWaveMX = state.cardWaveMX;
+  }
+  if (state.cardWaveMY !== lastWaveState.cardWaveMY) {
+    root.style.setProperty("--cardWaveM-y", state.cardWaveMY);
+    lastWaveState.cardWaveMY = state.cardWaveMY;
   }
 }
 
 function render(now: number): void {
-  if (!rootEl) return;
+  if (!rootEl) {
+    return;
+  }
 
   const state = computeWaveState(now);
   applyWaveVars(rootEl, state);
 
-  if (
-    DEBUG_WAVES &&
-    now - debugStartAt <= DEBUG_DURATION_MS &&
-    now - lastDebugLogAt >= 1000
-  ) {
+  if (DEBUG_WAVES && now - debugStartAt <= DEBUG_DURATION_MS && now - lastDebugLogAt >= 1000) {
     lastDebugLogAt = now;
-    console.debug("[seigaiha-vars]", state);
+    console.debug("[seigaiha-vars]", {
+      waveL: [state.waveLX, state.waveLY],
+      waveM: [state.waveMX, state.waveMY],
+      waveS: [state.waveSX, state.waveSY],
+      cardL: [state.cardWaveLX, state.cardWaveLY],
+      cardM: [state.cardWaveMX, state.cardWaveMY],
+    });
   }
 
   rafId = window.requestAnimationFrame(render);
@@ -234,11 +249,16 @@ export function initializeSeigaihaBackground(_el: HTMLElement): void {
   }
 
   lastWaveState = {
-    waveLPos: "",
-    waveMPos: "",
-    waveSPos: "",
-    cardWaveLPos: "",
-    cardWaveMPos: "",
+    waveLX: "",
+    waveLY: "",
+    waveMX: "",
+    waveMY: "",
+    waveSX: "",
+    waveSY: "",
+    cardWaveLX: "",
+    cardWaveLY: "",
+    cardWaveMX: "",
+    cardWaveMY: "",
   };
 
   applyStaticBackgroundVars(rootEl);

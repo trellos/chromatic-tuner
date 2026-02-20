@@ -16,13 +16,16 @@
   --seigaiha-small-size: 384px 384px;
   --seigaiha-medium-size: 384px 384px;
   --seigaiha-large-size: 384px 384px;
-  --seigaiha-opacity: 0.22;
-  --card-seigaiha-opacity: 0.062;
-  --waveL-pos: 0px 0px;
-  --waveM-pos: 0px 0px;
-  --waveS-pos: 0px 0px;
-  --cardWaveL-pos: 0px 0px;
-  --cardWaveM-pos: 0px 0px;
+  --waveL-x: 0;
+  --waveL-y: 0;
+  --waveM-x: 0;
+  --waveM-y: 0;
+  --waveS-x: 0;
+  --waveS-y: 0;
+  --cardWaveL-x: 0;
+  --cardWaveL-y: 0;
+  --cardWaveM-x: 0;
+  --cardWaveM-y: 0;
 }
 
 
@@ -52,8 +55,7 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-body::before,
-body::after {
+body::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -70,16 +72,13 @@ body::before {
     var(--seigaiha-large-size),
     var(--seigaiha-medium-size),
     var(--seigaiha-small-size);
-  background-position: var(--waveL-pos), var(--waveM-pos), var(--waveS-pos);
+  background-position:
+    calc(var(--waveL-x) * 1px) calc(var(--waveL-y) * 1px),
+    calc(var(--waveM-x) * 1px) calc(var(--waveM-y) * 1px),
+    calc(var(--waveS-x) * 1px) calc(var(--waveS-y) * 1px);
   background-repeat: repeat, repeat, repeat;
-  opacity: var(--seigaiha-opacity);
+  opacity: 0.22;
   filter: none;
-}
-
-body::after {
-  z-index: 0;
-  background: none;
-  opacity: 0;
 }
 
 body > * {
@@ -216,8 +215,10 @@ body.drum-fullscreen .mode-stage {
   background-image: var(--seigaiha-large-image), var(--seigaiha-medium-image);
   background-size: var(--seigaiha-large-size), var(--seigaiha-medium-size);
   background-repeat: repeat, repeat;
-  background-position: var(--cardWaveL-pos), var(--cardWaveM-pos);
-  opacity: var(--card-seigaiha-opacity);
+  background-position:
+    calc(var(--cardWaveL-x) * 1px) calc(var(--cardWaveL-y) * 1px),
+    calc(var(--cardWaveM-x) * 1px) calc(var(--cardWaveM-y) * 1px);
+  opacity: 0.08;
   filter: none;
   mix-blend-mode: multiply;
   z-index: 0;
