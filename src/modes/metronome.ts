@@ -1,3 +1,4 @@
+import { METRONOME_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import type { ModeDefinition } from "./types.js";
 
 let sessionBpm = 120;
@@ -43,28 +44,22 @@ export function createMetronomeMode(): ModeDefinition {
   const SOUND_PROFILES: Record<MetronomeSoundId, SoundProfile> = {
     electro: {
       label: "Electro",
-      regularUrl:
-        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/hihat.wav",
-      accentUrl:
-        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/snare.wav",
+      regularUrl: METRONOME_SAMPLE_URLS.electroRegular,
+      accentUrl: METRONOME_SAMPLE_URLS.electroAccent,
       regularTone: { type: "square", frequency: 920, gain: 0.18, duration: 0.04 },
       accentTone: { type: "square", frequency: 1220, gain: 0.26, duration: 0.055 },
     },
     drum: {
       label: "Drum",
-      regularUrl:
-        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/hihat.wav",
-      accentUrl:
-        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/snare.wav",
+      regularUrl: METRONOME_SAMPLE_URLS.drumRegular,
+      accentUrl: METRONOME_SAMPLE_URLS.drumAccent,
       regularTone: { type: "triangle", frequency: 690, gain: 0.2, duration: 0.05 },
       accentTone: { type: "triangle", frequency: 960, gain: 0.28, duration: 0.07 },
     },
     conga: {
       label: "Conga",
-      regularUrl:
-        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/conga.wav",
-      accentUrl:
-        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/snare.wav",
+      regularUrl: METRONOME_SAMPLE_URLS.congaRegular,
+      accentUrl: METRONOME_SAMPLE_URLS.congaAccent,
       regularTone: { type: "sine", frequency: 510, gain: 0.23, duration: 0.06 },
       accentTone: { type: "sawtooth", frequency: 770, gain: 0.3, duration: 0.08 },
     },
