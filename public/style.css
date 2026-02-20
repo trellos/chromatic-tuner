@@ -64,7 +64,7 @@ body::before {
   background-position: 0 0;
   background-repeat: repeat;
   opacity: var(--seigaiha-opacity);
-  filter: blur(var(--seigaiha-blur));
+  filter: none;
 }
 
 body::after {
