@@ -14,19 +14,13 @@
   --seigaiha-medium-image: none;
   --seigaiha-large-image: none;
   --card-seigaiha-image: none;
-  --seigaiha-small-size: 288px 288px;
-  --seigaiha-medium-size: 288px 288px;
-  --seigaiha-large-size: 360px 360px;
-  --seigaiha-opacity: 0.22;
-  --seigaiha-grain-opacity: 0.00;
+  --seigaiha-size: 288px 288px;
+  --seigaiha-opacity: 0.20;
+  --seigaiha-grain-opacity: 0.05;
   --seigaiha-blur: 0px;
-  --card-seigaiha-opacity: 0.065;
-  --waveL-x: 0;
-  --waveL-y: 0;
-  --waveM-x: 0;
-  --waveM-y: 0;
-  --waveS-x: 0;
-  --waveS-y: 0;
+  --card-seigaiha-opacity: 0.08;
+  --grain-offset-x: 0px;
+  --grain-offset-y: 0px;
 }
 
 
@@ -85,8 +79,13 @@ body::before {
 
 body::after {
   z-index: 0;
-  background: none;
-  opacity: 0;
+  background-image: var(--grain-image);
+  background-size: 256px 256px;
+  background-position: var(--grain-offset-x) var(--grain-offset-y);
+  background-repeat: repeat;
+  opacity: var(--seigaiha-grain-opacity);
+  mix-blend-mode: soft-light;
+  filter: blur(0.35px);
 }
 
 body > * {

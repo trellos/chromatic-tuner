@@ -3,8 +3,9 @@ import type { ModeId } from "../modes/types.js";
 type BackgroundMode = ModeId;
 
 type SeigaihaOpts = {
-  tileSize: number;
-  radius: number;
+  tileSize?: number;
+  radius?: number;
+  noiseLevel?: number;
 };
 
 type TileGeometry = {
@@ -14,22 +15,14 @@ type TileGeometry = {
   dy: number;
 };
 
-type WaveOffsets = {
-  lx: number;
-  ly: number;
-  mx: number;
-  my: number;
-  sx: number;
-  sy: number;
-};
-
-const DEBUG_WAVES = true;
-const DEBUG_DURATION_MS = 5000;
+// Tile must be a multiple of both dx=(2R) and the stagger period (2dy=2R)
+// so the pattern repeats without seams.
+const DEFAULT_RADIUS = 48;
+const DEFAULT_TILE_SIZE = 288;
 const TILE_PADDING_CELLS = 2;
-
-const SMALL_TILE = { radius: 36, tileSize: 288 };
-const MEDIUM_TILE = { radius: 48, tileSize: 288 };
-const LARGE_TILE = { radius: 60, tileSize: 360 };
+const NOISE_QUANTUM = 0.02;
+const DRIFT_CYCLE_MS = 16000;
+const DEBUG = false;
 
 let targetEl: HTMLElement | null = null;
 let activeMode: BackgroundMode = "tuner";
@@ -37,24 +30,26 @@ let beatIntervalMs = 500;
 let lastBeatAt = performance.now();
 let tunerStability = 0;
 
+let targetNoiseLevel = 0.25;
+let currentNoiseLevel = 0.25;
 let rafId: number | null = null;
-let debugStartedAt = 0;
 let lastDebugLogAt = 0;
 
 let seigaihaSmallImageUrl = "";
 let seigaihaMediumImageUrl = "";
 let seigaihaLargeImageUrl = "";
 
+let grainImageUrl = "";
+
 let lastApplied = {
-  lx: Number.NaN,
-  ly: Number.NaN,
-  mx: Number.NaN,
-  my: Number.NaN,
-  sx: Number.NaN,
-  sy: Number.NaN,
-  smallImage: "",
-  mediumImage: "",
-  largeImage: "",
+  noiseLevel: -1,
+  blurPx: -1,
+  cardOpacity: -1,
+  grainOffsetX: Number.NaN,
+  grainOffsetY: Number.NaN,
+  patternImage: "",
+  cardImage: "",
+  grainImage: "",
 };
 
 function clamp(value: number, min = 0, max = 1): number {
@@ -87,10 +82,10 @@ function buildArcPath(cx: number, cy: number, radius: number): string {
   return `M ${(cx - radius).toFixed(2)} ${cy.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 1 ${(cx + radius).toFixed(2)} ${cy.toFixed(2)}`;
 }
 
-function makeSeigaihaArcs(geometry: TileGeometry): string {
+function makeSeigaihaArcs(geometry: TileGeometry, noiseLevel: number): string {
   const { tileSize, radius, dx, dy } = geometry;
   const radii = [radius, (radius * 2) / 3, radius / 3];
-  const strokeWidths = [radius * 0.041, radius * 0.033, radius * 0.025];
+  const strokeWidths = [2.0, 1.6, 1.2];
 
   const minY = -TILE_PADDING_CELLS * dy;
   const maxY = tileSize + TILE_PADDING_CELLS * dy;
@@ -98,6 +93,7 @@ function makeSeigaihaArcs(geometry: TileGeometry): string {
   const maxRow = Math.ceil(maxY / dy);
 
   const arcs: string[] = [];
+  const strokeOpacity = lerp(0.08, 0.13, 1 - noiseLevel);
 
   for (let row = minRow; row <= maxRow; row += 1) {
     const cy = row * dy;
@@ -115,7 +111,7 @@ function makeSeigaihaArcs(geometry: TileGeometry): string {
         const arcRadius = radii[i] ?? radius;
         const strokeWidth = strokeWidths[i] ?? 1.2;
         arcs.push(
-          `<path d="${buildArcPath(cx, cy, arcRadius)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="0.115" stroke-width="${strokeWidth.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
+          `<path d="${buildArcPath(cx, cy, arcRadius)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="${strokeOpacity.toFixed(3)}" stroke-width="${strokeWidth.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
         );
       }
     }
@@ -124,9 +120,30 @@ function makeSeigaihaArcs(geometry: TileGeometry): string {
   return arcs.join("");
 }
 
-export function makeSeigaihaTileSvg(opts: SeigaihaOpts): string {
-  const geometry = normalizeTileGeometry(opts.tileSize, opts.radius);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.tileSize}" height="${geometry.tileSize}" viewBox="0 0 ${geometry.tileSize} ${geometry.tileSize}">${makeSeigaihaArcs(geometry)}</svg>`;
+export function makeSeigaihaTileSvg(opts: SeigaihaOpts = {}): string {
+  const geometry = normalizeTileGeometry(
+    opts.tileSize ?? DEFAULT_TILE_SIZE,
+    opts.radius ?? DEFAULT_RADIUS
+  );
+  const noiseLevel = clamp(opts.noiseLevel ?? 0);
+  const inkVarOpacity = lerp(0.0, 0.10, noiseLevel);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.tileSize}" height="${geometry.tileSize}" viewBox="0 0 ${geometry.tileSize} ${geometry.tileSize}">
+    ${makeSeigaihaArcs(geometry, noiseLevel)}
+    <rect width="100%" height="100%" fill="rgb(232,241,255)" opacity="${inkVarOpacity.toFixed(3)}"/>
+  </svg>`;
+}
+
+function makeGrainTileSvg(tileSize = 256): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${tileSize}" height="${tileSize}" viewBox="0 0 ${tileSize} ${tileSize}">
+    <defs>
+      <filter id="grain" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="7" stitchTiles="stitch" result="grainNoise"/>
+        <feColorMatrix in="grainNoise" type="saturate" values="0" result="monoNoise"/>
+      </filter>
+    </defs>
+    <rect width="100%" height="100%" filter="url(#grain)" opacity="0.75"/>
+  </svg>`;
 }
 
 export function svgToDataUrl(svg: string): string {
@@ -134,50 +151,81 @@ export function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml,${encodeURIComponent(compact)}`;
 }
 
-function initializeSeigaihaImages(): void {
-  if (!seigaihaSmallImageUrl) {
-    seigaihaSmallImageUrl = `url("${svgToDataUrl(makeSeigaihaTileSvg(SMALL_TILE))}")`;
+function quantizeNoiseLevel(noiseLevel: number): number {
+  return Math.round(clamp(noiseLevel) / NOISE_QUANTUM) * NOISE_QUANTUM;
+}
+
+function cacheSeigaihaTiles(): void {
+  if (seigaihaUrlCache.size > 0 && cardUrlCache.size > 0) {
+    return;
   }
-  if (!seigaihaMediumImageUrl) {
-    seigaihaMediumImageUrl = `url("${svgToDataUrl(makeSeigaihaTileSvg(MEDIUM_TILE))}")`;
-  }
-  if (!seigaihaLargeImageUrl) {
-    seigaihaLargeImageUrl = `url("${svgToDataUrl(makeSeigaihaTileSvg(LARGE_TILE))}")`;
+
+  for (let i = 0; i <= Math.round(1 / NOISE_QUANTUM); i += 1) {
+    const key = (i * NOISE_QUANTUM).toFixed(2);
+    const noiseLevel = Number(key);
+    const svg = makeSeigaihaTileSvg({
+      tileSize: DEFAULT_TILE_SIZE,
+      radius: DEFAULT_RADIUS,
+      noiseLevel,
+    });
+    const url = `url("${svgToDataUrl(svg)}")`;
+    seigaihaUrlCache.set(key, url);
+    cardUrlCache.set(key, url);
   }
 }
 
-function motionBoost(now: number): number {
-  if (activeMode === "tuner") return 1 + tunerStability * 0.08;
-  if (activeMode === "metronome" || activeMode === "drum-machine") {
-    return 1 + beatEnvelope(now) * 0.1;
+function getSeigaihaUrlForNoiseLevel(noiseLevel: number): string {
+  const key = quantizeNoiseLevel(noiseLevel).toFixed(2);
+  return seigaihaUrlCache.get(key) ?? seigaihaUrlCache.get("0.00") ?? "none";
+}
+
+function getCardSeigaihaUrlForNoiseLevel(noiseLevel: number): string {
+  const key = quantizeNoiseLevel(noiseLevel).toFixed(2);
+  return cardUrlCache.get(key) ?? cardUrlCache.get("0.00") ?? "none";
+}
+
+function getGrainImageUrl(): string {
+  if (!grainImageUrl) {
+    grainImageUrl = `url("${svgToDataUrl(makeGrainTileSvg())}")`;
   }
-  return 1;
+  return grainImageUrl;
 }
 
-function quantizeHalfPx(value: number): number {
-  return Math.round(value * 2) / 2;
-}
+function applyVars(el: HTMLElement, noiseLevel: number, now: number): void {
+  const quantized = quantizeNoiseLevel(noiseLevel);
 
-function computeWaveOffsets(now: number): WaveOffsets {
-  const t = now * 0.001;
-  const boost = motionBoost(now);
+  const blurPx = lerp(0.0, 0.8, quantized);
+  const cardOpacity = lerp(0.10, 0.05, quantized);
+  const seigaihaOpacity = lerp(0.24, 0.14, quantized);
+  const grainOpacity = lerp(0.0, 0.14, quantized);
 
-  return {
-    lx: quantizeHalfPx(Math.sin(t * 0.015) * 24 * boost),
-    ly: quantizeHalfPx(Math.cos(t * 0.012) * 18 * boost),
-    mx: quantizeHalfPx(Math.sin(t * 0.022) * 36 * boost),
-    my: quantizeHalfPx(Math.cos(t * 0.017) * 28 * boost),
-    sx: quantizeHalfPx(Math.sin(t * 0.03) * 48 * boost),
-    sy: quantizeHalfPx(Math.cos(t * 0.024) * 34 * boost),
-  };
-}
+  const patternImage = getSeigaihaUrlForNoiseLevel(quantized);
+  const cardImage = getCardSeigaihaUrlForNoiseLevel(quantized);
+  const grainImage = getGrainImageUrl();
+
+  const driftPhase = now / DRIFT_CYCLE_MS;
+  const driftScale = lerp(0.1, 1, quantized);
+  const grainOffsetX = Number((Math.sin(driftPhase * Math.PI * 2) * 18 * driftScale).toFixed(2));
+  const grainOffsetY = Number((Math.cos(driftPhase * Math.PI * 1.6) * 14 * driftScale).toFixed(2));
+
+  if (patternImage !== lastApplied.patternImage) {
+    el.style.setProperty("--seigaiha-image", patternImage);
+    lastApplied.patternImage = patternImage;
+  }
 
 function applyStaticVars(el: HTMLElement): void {
   initializeSeigaihaImages();
 
-  if (seigaihaSmallImageUrl !== lastApplied.smallImage) {
-    el.style.setProperty("--seigaiha-small-image", seigaihaSmallImageUrl);
-    lastApplied.smallImage = seigaihaSmallImageUrl;
+  if (grainImage !== lastApplied.grainImage) {
+    el.style.setProperty("--grain-image", grainImage);
+    lastApplied.grainImage = grainImage;
+  }
+
+  if (Math.abs(quantized - lastApplied.noiseLevel) > 0.001) {
+    el.style.setProperty("--bg-noise", quantized.toFixed(3));
+    el.style.setProperty("--seigaiha-opacity", seigaihaOpacity.toFixed(3));
+    el.style.setProperty("--seigaiha-grain-opacity", grainOpacity.toFixed(3));
+    lastApplied.noiseLevel = quantized;
   }
   if (seigaihaMediumImageUrl !== lastApplied.mediumImage) {
     el.style.setProperty("--seigaiha-medium-image", seigaihaMediumImageUrl);
@@ -188,41 +236,40 @@ function applyStaticVars(el: HTMLElement): void {
     lastApplied.largeImage = seigaihaLargeImageUrl;
   }
 
-  el.style.setProperty("--card-seigaiha-image", seigaihaMediumImageUrl);
-  el.style.setProperty("--seigaiha-small-size", "288px 288px");
-  el.style.setProperty("--seigaiha-medium-size", "288px 288px");
-  el.style.setProperty("--seigaiha-large-size", "360px 360px");
-  el.style.setProperty("--seigaiha-opacity", "0.22");
-  el.style.setProperty("--card-seigaiha-opacity", "0.065");
-  el.style.setProperty("--seigaiha-grain-opacity", "0");
-  el.style.setProperty("--seigaiha-blur", "0px");
+  if (grainOffsetX !== lastApplied.grainOffsetX || grainOffsetY !== lastApplied.grainOffsetY) {
+    el.style.setProperty("--grain-offset-x", `${grainOffsetX}px`);
+    el.style.setProperty("--grain-offset-y", `${grainOffsetY}px`);
+    lastApplied.grainOffsetX = grainOffsetX;
+    lastApplied.grainOffsetY = grainOffsetY;
+  }
+
+  el.style.setProperty("--seigaiha-size", `${DEFAULT_TILE_SIZE}px ${DEFAULT_TILE_SIZE}px`);
+
+  if (DEBUG && now - lastDebugLogAt >= 1000) {
+    lastDebugLogAt = now;
+    console.debug("[seigaiha] noiseLevel", quantized.toFixed(3));
+  }
 }
 
-function applyWaveVars(el: HTMLElement, offsets: WaveOffsets): void {
-  if (offsets.lx !== lastApplied.lx) {
-    el.style.setProperty("--waveL-x", String(offsets.lx));
-    lastApplied.lx = offsets.lx;
+function computeDriftNoise(now: number): number {
+  const t = now / DRIFT_CYCLE_MS;
+  const slow = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+  const slower = 0.5 + 0.5 * Math.sin(t * Math.PI * 0.9 + 1.1);
+  return (slow * 0.65 + slower * 0.35) * 0.16;
+}
+
+function computeTargetNoiseLevel(now: number): number {
+  const drift = computeDriftNoise(now);
+
+  if (activeMode === "tuner") {
+    return clamp(0.04 + tunerStability * 0.58 + drift);
   }
-  if (offsets.ly !== lastApplied.ly) {
-    el.style.setProperty("--waveL-y", String(offsets.ly));
-    lastApplied.ly = offsets.ly;
+
+  if (activeMode === "metronome" || activeMode === "drum-machine") {
+    return clamp(0.08 + beatEnvelope(now) * 0.58 + drift);
   }
-  if (offsets.mx !== lastApplied.mx) {
-    el.style.setProperty("--waveM-x", String(offsets.mx));
-    lastApplied.mx = offsets.mx;
-  }
-  if (offsets.my !== lastApplied.my) {
-    el.style.setProperty("--waveM-y", String(offsets.my));
-    lastApplied.my = offsets.my;
-  }
-  if (offsets.sx !== lastApplied.sx) {
-    el.style.setProperty("--waveS-x", String(offsets.sx));
-    lastApplied.sx = offsets.sx;
-  }
-  if (offsets.sy !== lastApplied.sy) {
-    el.style.setProperty("--waveS-y", String(offsets.sy));
-    lastApplied.sy = offsets.sy;
-  }
+
+  return clamp(0.12 + drift);
 }
 
 function render(now: number): void {
@@ -230,42 +277,48 @@ function render(now: number): void {
   const offsets = computeWaveOffsets(now);
   applyWaveVars(targetEl, offsets);
 
-  if (DEBUG_WAVES && now - debugStartedAt <= DEBUG_DURATION_MS && now - lastDebugLogAt >= 1000) {
-    lastDebugLogAt = now;
-    console.debug("[seigaiha-waves]", offsets);
-  }
+  targetNoiseLevel = computeTargetNoiseLevel(now);
+  currentNoiseLevel = lerp(currentNoiseLevel, targetNoiseLevel, 0.12);
+
+  applyVars(targetEl, currentNoiseLevel, now);
 
   rafId = window.requestAnimationFrame(render);
 }
 
-export function applySeigaihaBackground(el: HTMLElement, _noiseLevel: number): void {
-  applyStaticVars(el);
-  applyWaveVars(el, computeWaveOffsets(performance.now()));
+export function applySeigaihaBackground(el: HTMLElement, noiseLevel: number): void {
+  currentNoiseLevel = clamp(noiseLevel);
+  targetNoiseLevel = currentNoiseLevel;
+  applyVars(el, currentNoiseLevel, performance.now());
 }
 
 export function initializeSeigaihaBackground(el: HTMLElement): void {
   targetEl = el;
-  debugStartedAt = performance.now();
-  lastDebugLogAt = 0;
+  cacheSeigaihaTiles();
+
+  const configured = Number.parseFloat(
+    getComputedStyle(el).getPropertyValue("--bg-noise")
+  );
+  if (Number.isFinite(configured)) {
+    currentNoiseLevel = clamp(configured);
+    targetNoiseLevel = currentNoiseLevel;
+  }
 
   if (rafId !== null) {
     window.cancelAnimationFrame(rafId);
   }
 
   lastApplied = {
-    lx: Number.NaN,
-    ly: Number.NaN,
-    mx: Number.NaN,
-    my: Number.NaN,
-    sx: Number.NaN,
-    sy: Number.NaN,
-    smallImage: "",
-    mediumImage: "",
-    largeImage: "",
+    noiseLevel: -1,
+    blurPx: -1,
+    cardOpacity: -1,
+    grainOffsetX: Number.NaN,
+    grainOffsetY: Number.NaN,
+    patternImage: "",
+    cardImage: "",
+    grainImage: "",
   };
 
-  applyStaticVars(el);
-  applyWaveVars(el, computeWaveOffsets(performance.now()));
+  applyVars(el, currentNoiseLevel, performance.now());
   rafId = window.requestAnimationFrame(render);
 }
 
