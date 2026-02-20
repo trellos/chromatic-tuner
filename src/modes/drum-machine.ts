@@ -1,4 +1,5 @@
 import type { ModeDefinition } from "./types.js";
+import { pulseRhythmBackground, setRhythmBackgroundIdleNoise } from "../ui/seigaihaBackground.js";
 
 // Mode factory for the drum machine screen: pattern editing, kit loading,
 // step scheduling/playhead animation, and lifecycle-managed UI wiring.
@@ -435,6 +436,7 @@ export function createDrumMachineMode(): ModeDefinition {
           }
         });
       }
+      pulseRhythmBackground(stepDuration * 1000);
       currentStep = (currentStep + 1) % stepsPerBar;
       nextStepTime += stepDuration;
     }
@@ -474,6 +476,7 @@ export function createDrumMachineMode(): ModeDefinition {
     }
     playheadEl?.classList.remove("is-active");
     if (playButton) playButton.textContent = "Play";
+    setRhythmBackgroundIdleNoise();
   };
 
   const attachUi = () => {
@@ -633,6 +636,7 @@ export function createDrumMachineMode(): ModeDefinition {
     setSignature(signature);
     setBpm(bpm);
     setKitLabel();
+    setRhythmBackgroundIdleNoise();
     attachUi();
     syncFullscreenLayoutMode();
     scheduleLayoutSync();

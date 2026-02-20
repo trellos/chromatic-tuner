@@ -1,4 +1,5 @@
 import type { ModeDefinition } from "./types.js";
+import { pulseRhythmBackground, setRhythmBackgroundIdleNoise } from "../ui/seigaihaBackground.js";
 
 let sessionBpm = 120;
 
@@ -249,6 +250,7 @@ export function createMetronomeMode(): ModeDefinition {
       const isAccent = accentEnabled && currentBeat === 0;
       playClick(nextNoteTime, isAccent);
       schedulePulse(nextNoteTime, isAccent);
+      pulseRhythmBackground((60 / bpm) * 1000);
       currentBeat = (currentBeat + 1) % beatsPerBar;
       nextNoteTime += 60 / bpm;
     }
@@ -278,6 +280,7 @@ export function createMetronomeMode(): ModeDefinition {
     pulseTimeouts.forEach((id) => window.clearTimeout(id));
     pulseTimeouts = [];
     starburstEl?.classList.remove("is-pulsing");
+    setRhythmBackgroundIdleNoise();
     const toggleButton =
       controlsEl?.querySelector<HTMLButtonElement>('[data-action="toggle"]');
     if (toggleButton) toggleButton.textContent = "Start";
@@ -476,6 +479,7 @@ export function createMetronomeMode(): ModeDefinition {
     setTimeSignature(timeSignature);
     setAccentEnabled(accentEnabled);
     setSoundLabel();
+    setRhythmBackgroundIdleNoise();
     attachUi();
   };
 

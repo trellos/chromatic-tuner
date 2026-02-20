@@ -9,27 +9,72 @@
   --panel: rgba(255, 255, 255, 0.88);
   --panel-strong: rgba(255, 255, 255, 0.96);
   --stroke: rgba(12, 16, 32, 0.12);
+  --bg-noise: 0.35;
+  --seigaiha-image: none;
+  --grain-image: none;
+  --seigaiha-size: 256px 256px;
+  --seigaiha-blur: 0px;
+  --seigaiha-grain-opacity: 0;
 }
+
 
 body {
   font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
   margin: 0;
   padding: 24px;
-  background:
+  background-image:
     radial-gradient(circle at top, rgba(0, 245, 212, 0.16), transparent 55%),
     radial-gradient(circle at 20% 20%, rgba(255, 107, 214, 0.18), transparent 40%),
     linear-gradient(140deg, #0b1020 0%, #111c2f 45%, #182238 100%);
+  background-size: cover, cover, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat;
   color: #f8fafc;
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
+  position: relative;
+  isolation: isolate;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+body::before {
+  z-index: 0;
+  background-image: var(--seigaiha-image);
+  background-size: var(--seigaiha-size);
+  background-position: 0 0;
+  background-repeat: repeat;
+  filter: blur(var(--seigaiha-blur));
+  opacity: 1;
+}
+
+body::after {
+  z-index: 0;
+  background-image: var(--grain-image);
+  background-size: var(--seigaiha-size);
+  background-position: 0 0;
+  background-repeat: repeat;
+  opacity: var(--seigaiha-grain-opacity);
+  mix-blend-mode: soft-light;
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
 }
 
 main {
@@ -189,9 +234,6 @@ body.drum-fullscreen .mode-stage {
   gap: 16px;
 }
 
-.mode-screen[data-mode="tuner"] > .tuna-field {
-  z-index: 0;
-}
 
 .mode-header {
   display: flex;
@@ -333,51 +375,6 @@ h1 {
   pointer-events: none;
 }
 
-
-.tuna-field {
-  --detune: 0;
-  --sharpness: 0;
-  --flatness: 0;
-  --state-rotation: 0deg;
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-  transform: rotate(var(--state-rotation));
-  transition: transform 140ms ease-out;
-}
-
-.tuna-tile {
-  position: absolute;
-  width: 17px;
-  height: 17px;
-  margin: 0;
-  background-image: url("./favicon.svg");
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.2;
-  filter: saturate(calc(0.85 + var(--detune) * 0.8));
-  transition:
-    left 140ms linear,
-    top 140ms linear,
-    transform 140ms linear,
-    opacity 120ms linear,
-    filter 120ms linear;
-}
-
-.tuna-field.is-detecting .tuna-tile {
-  opacity: 0.52;
-}
-
-.tuna-field.is-sharp .tuna-tile {
-  filter: hue-rotate(calc(var(--sharpness) * 12deg)) saturate(1.2);
-}
-
-.tuna-field.is-flat .tuna-tile {
-  filter: hue-rotate(calc(-1 * var(--flatness) * 10deg)) saturate(0.95);
-}
 
 /* SVG Strobe Pattern */
 .strobe-tuner svg {
