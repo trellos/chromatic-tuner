@@ -13,8 +13,10 @@
   --seigaiha-image: none;
   --grain-image: none;
   --seigaiha-size: 256px 256px;
-  --card-seigaiha-opacity: 0.07;
-  --seigaiha-grain-opacity: 0;
+  --seigaiha-opacity: 0.20;
+  --seigaiha-grain-opacity: 0.05;
+  --seigaiha-blur: 0px;
+  --card-seigaiha-opacity: 0.08;
 }
 
 
@@ -22,13 +24,13 @@ body {
   font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
   margin: 0;
   padding: 24px;
-  background-image:
-    radial-gradient(circle at top, rgba(0, 245, 212, 0.16), transparent 55%),
-    radial-gradient(circle at 20% 20%, rgba(255, 107, 214, 0.18), transparent 40%),
-    linear-gradient(140deg, #0b1020 0%, #111c2f 45%, #182238 100%);
-  background-size: cover, cover, cover;
-  background-position: center, center, center;
+  background:
+    radial-gradient(1200px 900px at 55% 25%, rgba(120, 255, 255, 0.10), rgba(0, 0, 0, 0) 55%),
+    radial-gradient(900px 700px at 25% 15%, rgba(255, 90, 220, 0.10), rgba(0, 0, 0, 0) 55%),
+    linear-gradient(135deg, #1b1a35 0%, #0b2b3a 50%, #071a2b 100%);
   background-repeat: no-repeat;
+  background-size: cover;
+  overflow-x: hidden;
   color: #f8fafc;
   min-height: 100vh;
   display: flex;
@@ -58,13 +60,14 @@ body::before {
   background-size: var(--seigaiha-size);
   background-position: 0 0;
   background-repeat: repeat;
-  opacity: 1;
+  opacity: var(--seigaiha-opacity);
+  filter: blur(var(--seigaiha-blur));
 }
 
 body::after {
   z-index: 0;
   background-image: var(--grain-image);
-  background-size: var(--seigaiha-size);
+  background-size: 256px 256px;
   background-position: 0 0;
   background-repeat: repeat;
   opacity: var(--seigaiha-grain-opacity);
@@ -207,6 +210,8 @@ body.drum-fullscreen .mode-stage {
   background-repeat: repeat;
   background-position: 0 0;
   opacity: var(--card-seigaiha-opacity);
+  filter: blur(var(--seigaiha-blur));
+  mix-blend-mode: multiply;
   z-index: 0;
 }
 
@@ -411,7 +416,7 @@ h1 {
 }
 
 .strobe-tuner.detecting svg {
-  opacity: 1;
+  opacity: var(--seigaiha-opacity);
 }
 
 #reading {
@@ -815,7 +820,7 @@ body.status-hidden #status {
 }
 
 .drum-playhead.is-active {
-  opacity: 1;
+  opacity: var(--seigaiha-opacity);
 }
 
 .drum-grid {
