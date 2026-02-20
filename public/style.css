@@ -9,6 +9,14 @@
   --panel: rgba(255, 255, 255, 0.88);
   --panel-strong: rgba(255, 255, 255, 0.96);
   --stroke: rgba(12, 16, 32, 0.12);
+  --seigaiha-small-size: 384px 384px;
+  --seigaiha-medium-size: 384px 384px;
+  --seigaiha-large-size: 384px 384px;
+  --waveL-pos: 0px 0px;
+  --waveM-pos: 0px 0px;
+  --waveS-pos: 0px 0px;
+  --cardWaveL-pos: 0px 0px;
+  --cardWaveM-pos: 0px 0px;
 }
 
 body {
@@ -30,6 +38,21 @@ body {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--seigaiha-large-image), var(--seigaiha-medium-image), var(--seigaiha-small-image);
+  background-size: var(--seigaiha-large-size), var(--seigaiha-medium-size), var(--seigaiha-small-size);
+  background-repeat: repeat, repeat, repeat;
+  background-position: var(--waveL-pos), var(--waveM-pos), var(--waveS-pos);
+  opacity: 0.22;
+  filter: none;
 }
 
 main {
@@ -42,6 +65,8 @@ main {
 
 .app {
   gap: 24px;
+  position: relative;
+  z-index: 1;
 }
 
 .brand {
@@ -153,6 +178,27 @@ body.drum-fullscreen .mode-stage {
   backdrop-filter: blur(12px);
   position: relative;
   overflow: auto;
+}
+
+.mode-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 0;
+  background-image: var(--seigaiha-large-image), var(--seigaiha-medium-image);
+  background-size: var(--seigaiha-large-size), var(--seigaiha-medium-size);
+  background-repeat: repeat, repeat;
+  background-position: var(--cardWaveL-pos), var(--cardWaveM-pos);
+  opacity: 0.08;
+  mix-blend-mode: multiply;
+}
+
+.mode-screen > * {
+  position: relative;
+  z-index: 1;
 }
 
 .mode-screen.is-active {

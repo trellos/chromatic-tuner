@@ -3,6 +3,7 @@ import { createTunerMode } from "./modes/tuner.js";
 import { createMetronomeMode } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { runModeTransition } from "./mode-transition.js";
+import { initializeSeigaihaBackground } from "./ui/seigaihaBackground.js";
 const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
 const drumExitEl = document.getElementById("drum-exit");
@@ -331,6 +332,7 @@ function initializeCarouselUi(): void {
 
 // Auto-start tuner mode on page load until the carousel is wired up.
 window.addEventListener("DOMContentLoaded", async () => {
+  initializeSeigaihaBackground();
   initializeCarouselUi();
   const tunerMode = MODE_REGISTRY.find((mode) => mode.id === "tuner");
   if (tunerMode?.onEnter) {
