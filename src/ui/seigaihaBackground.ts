@@ -2,48 +2,70 @@ import type { ModeId } from "../modes/types.js";
 
 type BackgroundMode = ModeId;
 
-type SeigaihaOpts = {
-  tileSize?: number;
-  radius?: number;
-  noise?: number;
-  includeGrain?: boolean;
+type SeigaihaTileSpec = {
+  radius: number;
+  tileSize: number;
 };
 
-// Tile must be a multiple of both dx=(2R) and the stagger period (2dy=2R)
-// so the pattern repeats without seams.
-const DEFAULT_RADIUS = 48;
-const DEFAULT_TILE_SIZE = 288;
+type TileGeometry = {
+  radius: number;
+  tileSize: number;
+  dx: number;
+  dy: number;
+};
 
-const NOISE_QUANTUM = 0.02;
+type WaveState = {
+  waveLx: number;
+  waveLy: number;
+  waveMx: number;
+  waveMy: number;
+  waveSx: number;
+  waveSy: number;
+  cardWaveLx: number;
+  cardWaveLy: number;
+  cardWaveMx: number;
+  cardWaveMy: number;
+};
+
+const DEBUG_WAVES = true;
+const DEBUG_DURATION_MS = 5000;
+const TILE_PADDING_CELLS = 2;
+
+const SMALL_TILE: SeigaihaTileSpec = { radius: 32, tileSize: 384 };
+const MEDIUM_TILE: SeigaihaTileSpec = { radius: 48, tileSize: 384 };
+const LARGE_TILE: SeigaihaTileSpec = { radius: 64, tileSize: 384 };
 
 let targetEl: HTMLElement | null = null;
 let activeMode: BackgroundMode = "tuner";
-
 let beatIntervalMs = 500;
 let lastBeatAt = performance.now();
 let tunerStability = 0;
 
-let targetNoise = 0.25;
-let currentNoise = 0.25;
 let rafId: number | null = null;
+let debugStartAt = 0;
+let lastDebugLogAt = 0;
 
-const seigaihaUrlCache = new Map<string, string>();
-const cardUrlCache = new Map<string, string>();
+const tileUrlCache = new Map<string, string>();
 
-let lastApplied = {
-  noise: -1,
-  blurPx: -1,
-  cardOpacity: -1,
-  patternImage: "",
-  cardImage: "",
+let lastWaveState: WaveState = {
+  waveLx: Number.NaN,
+  waveLy: Number.NaN,
+  waveMx: Number.NaN,
+  waveMy: Number.NaN,
+  waveSx: Number.NaN,
+  waveSy: Number.NaN,
+  cardWaveLx: Number.NaN,
+  cardWaveLy: Number.NaN,
+  cardWaveMx: Number.NaN,
+  cardWaveMy: Number.NaN,
 };
 
 function clamp(value: number, min = 0, max = 1): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+function quantizeHalfPixel(value: number): number {
+  return Math.round(value * 2) / 2;
 }
 
 function beatEnvelope(now: number): number {
@@ -53,200 +75,224 @@ function beatEnvelope(now: number): number {
   return Math.pow(Math.sin(progress * Math.PI), 0.85);
 }
 
-function buildArcPath(cx: number, cy: number, radius: number): string {
+function normalizeTileGeometry(spec: SeigaihaTileSpec): TileGeometry {
+  const radius = Math.max(8, Math.round(spec.radius));
+  const dx = 2 * radius;
+  const dy = radius;
+  const period = Math.max(dx, 2 * dy);
+  const tileSize = Math.max(period, Math.round(spec.tileSize / period) * period);
+
+  return { radius, tileSize, dx, dy };
+}
+
+function arcPath(cx: number, cy: number, radius: number): string {
   return `M ${(cx - radius).toFixed(2)} ${cy.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 1 ${(cx + radius).toFixed(2)} ${cy.toFixed(2)}`;
 }
 
-export function makeSeigaihaTileSvg(opts: SeigaihaOpts = {}): string {
-  const tileSize = opts.tileSize ?? DEFAULT_TILE_SIZE;
-  const baseRadius = opts.radius ?? DEFAULT_RADIUS;
-  const noise = clamp(opts.noise ?? 0);
-  const includeGrain = opts.includeGrain ?? true;
+function buildSeigaihaArcs(geometry: TileGeometry): string {
+  const { radius, tileSize, dx, dy } = geometry;
+  const radii = [radius, radius * (2 / 3), radius * (1 / 3)];
+  const strokeWidths = [radius * 0.046, radius * 0.036, radius * 0.027];
 
-  const patternOpacity = lerp(0.08, 0.13, 1 - noise);
-  const displacementScale = lerp(0, 2.4, noise);
-  const inkVarOpacity = lerp(0.0, 0.10, noise);
-  const grainOpacity = includeGrain ? lerp(0.0, 0.14, noise) : 0;
-
-  const dx = 2 * baseRadius;
-  const dy = baseRadius;
-
-  const radii = [baseRadius, (baseRadius * 2) / 3, baseRadius / 3];
-  const strokeWidths = [2.0, 1.6, 1.2];
-
-  const cols = Math.ceil(tileSize / dx) + 2;
-  const rows = Math.ceil(tileSize / dy) + 2;
+  const minY = -TILE_PADDING_CELLS * dy;
+  const maxY = tileSize + TILE_PADDING_CELLS * dy;
+  const minRow = Math.floor(minY / dy);
+  const maxRow = Math.ceil(maxY / dy);
 
   const arcs: string[] = [];
-  for (let row = -1; row < rows; row++) {
+
+  for (let row = minRow; row <= maxRow; row += 1) {
     const cy = row * dy;
     const parity = ((row % 2) + 2) % 2;
-    const xOffset = parity * baseRadius;
+    const xOffset = parity * radius;
 
-    for (let col = -1; col < cols; col++) {
+    const minX = -TILE_PADDING_CELLS * dx - xOffset;
+    const maxX = tileSize + TILE_PADDING_CELLS * dx - xOffset;
+    const minCol = Math.floor(minX / dx);
+    const maxCol = Math.ceil(maxX / dx);
+
+    for (let col = minCol; col <= maxCol; col += 1) {
       const cx = col * dx + xOffset;
-      for (let i = 0; i < radii.length; i++) {
-        const radius = radii[i] ?? baseRadius;
-        const strokeWidth = strokeWidths[i] ?? 1.2;
+      for (let i = 0; i < radii.length; i += 1) {
+        const r = radii[i] ?? radius;
+        const width = strokeWidths[i] ?? 1.2;
         arcs.push(
-          `<path d="${buildArcPath(cx, cy, radius)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="${patternOpacity.toFixed(3)}" stroke-width="${strokeWidth.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
+          `<path d="${arcPath(cx, cy, r)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="0.115" stroke-width="${width.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
         );
       }
     }
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${tileSize}" height="${tileSize}" viewBox="0 0 ${tileSize} ${tileSize}">
-    <defs>
-      <filter id="inkWarp" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="1" seed="13" stitchTiles="stitch" result="inkNoise"/>
-        <feDisplacementMap in="SourceGraphic" in2="inkNoise" scale="${displacementScale.toFixed(3)}" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
-      <filter id="grain" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="7" stitchTiles="stitch" result="grainNoise"/>
-        <feColorMatrix in="grainNoise" type="saturate" values="0" result="monoNoise"/>
-      </filter>
-    </defs>
-
-    <g filter="url(#inkWarp)">${arcs.join("")}</g>
-    <rect width="100%" height="100%" fill="rgb(232,241,255)" opacity="${inkVarOpacity.toFixed(3)}"/>
-    ${includeGrain ? `<rect width="100%" height="100%" filter="url(#grain)" opacity="${grainOpacity.toFixed(3)}"/>` : ""}
-  </svg>`;
+  return arcs.join("");
 }
 
-export function svgToDataUrl(svg: string): string {
+function makeSeigaihaTileSvg(spec: SeigaihaTileSpec): string {
+  const geometry = normalizeTileGeometry(spec);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.tileSize}" height="${geometry.tileSize}" viewBox="0 0 ${geometry.tileSize} ${geometry.tileSize}">${buildSeigaihaArcs(geometry)}</svg>`;
+}
+
+function svgToDataUrl(svg: string): string {
   const compact = svg.replace(/\s{2,}/g, " ").replace(/\n/g, "").trim();
   return `data:image/svg+xml,${encodeURIComponent(compact)}`;
 }
 
-function quantizeNoise(noise: number): number {
-  return Math.round(clamp(noise) / NOISE_QUANTUM) * NOISE_QUANTUM;
-}
-
-function getSeigaihaUrlForNoise(noise: number): string {
-  const key = quantizeNoise(noise).toFixed(2);
-  const cached = seigaihaUrlCache.get(key);
+function getTileUrl(spec: SeigaihaTileSpec): string {
+  const key = `${spec.radius}-${spec.tileSize}`;
+  const cached = tileUrlCache.get(key);
   if (cached) return cached;
 
-  const svg = makeSeigaihaTileSvg({
-    tileSize: DEFAULT_TILE_SIZE,
-    radius: DEFAULT_RADIUS,
-    noise: Number(key),
-    includeGrain: false,
-  });
-  const url = `url("${svgToDataUrl(svg)}")`;
-  seigaihaUrlCache.set(key, url);
+  const url = `url("${svgToDataUrl(makeSeigaihaTileSvg(spec))}")`;
+  tileUrlCache.set(key, url);
   return url;
 }
 
-function getCardSeigaihaUrlForNoise(noise: number): string {
-  const key = quantizeNoise(noise).toFixed(2);
-  const cached = cardUrlCache.get(key);
-  if (cached) return cached;
+function applyStaticBackgroundVars(el: HTMLElement): void {
+  el.style.setProperty("--seigaiha-small-image", getTileUrl(SMALL_TILE));
+  el.style.setProperty("--seigaiha-medium-image", getTileUrl(MEDIUM_TILE));
+  el.style.setProperty("--seigaiha-large-image", getTileUrl(LARGE_TILE));
 
-  const svg = makeSeigaihaTileSvg({
-    tileSize: DEFAULT_TILE_SIZE,
-    radius: DEFAULT_RADIUS,
-    noise: Number(key),
-    includeGrain: false,
-  });
-  const url = `url("${svgToDataUrl(svg)}")`;
-  cardUrlCache.set(key, url);
-  return url;
+  el.style.setProperty("--seigaiha-small-size", "384px 384px");
+  el.style.setProperty("--seigaiha-medium-size", "384px 384px");
+  el.style.setProperty("--seigaiha-large-size", "384px 384px");
+
+  el.style.setProperty("--seigaiha-opacity", "0.22");
+  el.style.setProperty("--card-seigaiha-opacity", "0.062");
 }
 
-function applyVars(el: HTMLElement, noise: number): void {
-  const quantized = quantizeNoise(noise);
-
-  const blurPx = lerp(0.0, 0.8, quantized);
-  const cardOpacity = lerp(0.05, 0.10, 1 - quantized);
-  const seigaihaOpacity = lerp(0.14, 0.24, 1 - quantized);
-  const grainOpacity = lerp(0.0, 0.14, quantized);
-
-  const patternImage = getSeigaihaUrlForNoise(quantized);
-  const cardImage = getCardSeigaihaUrlForNoise(quantized);
-
-  if (patternImage !== lastApplied.patternImage) {
-    el.style.setProperty("--seigaiha-image", patternImage);
-    lastApplied.patternImage = patternImage;
-  }
-
-  if (cardImage !== lastApplied.cardImage) {
-    el.style.setProperty("--card-seigaiha-image", cardImage);
-    lastApplied.cardImage = cardImage;
-  }
-
-  if (Math.abs(quantized - lastApplied.noise) > 0.001) {
-    el.style.setProperty("--bg-noise", quantized.toFixed(3));
-    el.style.setProperty("--seigaiha-opacity", seigaihaOpacity.toFixed(3));
-    el.style.setProperty("--seigaiha-grain-opacity", grainOpacity.toFixed(3));
-    lastApplied.noise = quantized;
-  }
-
-  if (Math.abs(blurPx - lastApplied.blurPx) > 0.001) {
-    el.style.setProperty("--seigaiha-blur", `${blurPx.toFixed(3)}px`);
-    lastApplied.blurPx = blurPx;
-  }
-
-  if (Math.abs(cardOpacity - lastApplied.cardOpacity) > 0.001) {
-    el.style.setProperty("--card-seigaiha-opacity", cardOpacity.toFixed(3));
-    lastApplied.cardOpacity = cardOpacity;
-  }
-
-  el.style.setProperty("--seigaiha-size", `${DEFAULT_TILE_SIZE}px ${DEFAULT_TILE_SIZE}px`);
-}
-
-function computeTargetNoise(now: number): number {
+function motionBoost(now: number): number {
   if (activeMode === "tuner") {
-    return clamp(0.18 + tunerStability * 0.55);
+    return 1 + tunerStability * 0.08;
   }
 
   if (activeMode === "metronome" || activeMode === "drum-machine") {
-    return clamp(0.14 + beatEnvelope(now) * 0.62);
+    return 1 + beatEnvelope(now) * 0.1;
   }
 
-  return 0.25;
+  return 1;
+}
+
+function computeWaveState(now: number): WaveState {
+  const t = now * 0.001;
+  const boost = motionBoost(now);
+
+  const waveLx = quantizeHalfPixel(Math.sin(t * 0.012) * 22 * boost);
+  const waveLy = quantizeHalfPixel(Math.cos(t * 0.010) * 16 * boost);
+  const waveMx = quantizeHalfPixel(Math.sin(t * 0.018) * 34 * boost);
+  const waveMy = quantizeHalfPixel(Math.cos(t * 0.015) * 26 * boost);
+  const waveSx = quantizeHalfPixel(Math.sin(t * 0.025) * 46 * boost);
+  const waveSy = quantizeHalfPixel(Math.cos(t * 0.021) * 34 * boost);
+
+  return {
+    waveLx,
+    waveLy,
+    waveMx,
+    waveMy,
+    waveSx,
+    waveSy,
+    cardWaveLx: quantizeHalfPixel(waveLx * 0.6),
+    cardWaveLy: quantizeHalfPixel(waveLy * 0.6),
+    cardWaveMx: quantizeHalfPixel(waveMx * 0.6),
+    cardWaveMy: quantizeHalfPixel(waveMy * 0.6),
+  };
+}
+
+function applyWaveVars(el: HTMLElement, state: WaveState): void {
+  if (state.waveLx !== lastWaveState.waveLx) {
+    el.style.setProperty("--waveL-x", String(state.waveLx));
+    lastWaveState.waveLx = state.waveLx;
+  }
+  if (state.waveLy !== lastWaveState.waveLy) {
+    el.style.setProperty("--waveL-y", String(state.waveLy));
+    lastWaveState.waveLy = state.waveLy;
+  }
+  if (state.waveMx !== lastWaveState.waveMx) {
+    el.style.setProperty("--waveM-x", String(state.waveMx));
+    lastWaveState.waveMx = state.waveMx;
+  }
+  if (state.waveMy !== lastWaveState.waveMy) {
+    el.style.setProperty("--waveM-y", String(state.waveMy));
+    lastWaveState.waveMy = state.waveMy;
+  }
+  if (state.waveSx !== lastWaveState.waveSx) {
+    el.style.setProperty("--waveS-x", String(state.waveSx));
+    lastWaveState.waveSx = state.waveSx;
+  }
+  if (state.waveSy !== lastWaveState.waveSy) {
+    el.style.setProperty("--waveS-y", String(state.waveSy));
+    lastWaveState.waveSy = state.waveSy;
+  }
+
+  if (state.cardWaveLx !== lastWaveState.cardWaveLx) {
+    el.style.setProperty("--cardWaveL-x", String(state.cardWaveLx));
+    lastWaveState.cardWaveLx = state.cardWaveLx;
+  }
+  if (state.cardWaveLy !== lastWaveState.cardWaveLy) {
+    el.style.setProperty("--cardWaveL-y", String(state.cardWaveLy));
+    lastWaveState.cardWaveLy = state.cardWaveLy;
+  }
+  if (state.cardWaveMx !== lastWaveState.cardWaveMx) {
+    el.style.setProperty("--cardWaveM-x", String(state.cardWaveMx));
+    lastWaveState.cardWaveMx = state.cardWaveMx;
+  }
+  if (state.cardWaveMy !== lastWaveState.cardWaveMy) {
+    el.style.setProperty("--cardWaveM-y", String(state.cardWaveMy));
+    lastWaveState.cardWaveMy = state.cardWaveMy;
+  }
 }
 
 function render(now: number): void {
   if (!targetEl) return;
 
-  targetNoise = computeTargetNoise(now);
-  currentNoise = lerp(currentNoise, targetNoise, 0.12);
+  const state = computeWaveState(now);
+  applyWaveVars(targetEl, state);
 
-  applyVars(targetEl, currentNoise);
+  if (
+    DEBUG_WAVES &&
+    now - debugStartAt <= DEBUG_DURATION_MS &&
+    now - lastDebugLogAt >= 1000
+  ) {
+    lastDebugLogAt = now;
+    console.debug("[seigaiha-vars]", {
+      waveLx: state.waveLx,
+      waveLy: state.waveLy,
+      waveMx: state.waveMx,
+      waveMy: state.waveMy,
+      waveSx: state.waveSx,
+      waveSy: state.waveSy,
+      cardWaveLx: state.cardWaveLx,
+      cardWaveLy: state.cardWaveLy,
+      cardWaveMx: state.cardWaveMx,
+      cardWaveMy: state.cardWaveMy,
+    });
+  }
 
   rafId = window.requestAnimationFrame(render);
 }
 
-export function applySeigaihaBackground(el: HTMLElement, noise: number): void {
-  currentNoise = clamp(noise);
-  targetNoise = currentNoise;
-  applyVars(el, currentNoise);
-}
-
 export function initializeSeigaihaBackground(el: HTMLElement): void {
   targetEl = el;
-
-  const configured = Number.parseFloat(
-    getComputedStyle(el).getPropertyValue("--bg-noise")
-  );
-  if (Number.isFinite(configured)) {
-    currentNoise = clamp(configured);
-    targetNoise = currentNoise;
-  }
+  debugStartAt = performance.now();
+  lastDebugLogAt = 0;
 
   if (rafId !== null) {
     window.cancelAnimationFrame(rafId);
   }
 
-  lastApplied = {
-    noise: -1,
-    blurPx: -1,
-    cardOpacity: -1,
-    patternImage: "",
-    cardImage: "",
+  lastWaveState = {
+    waveLx: Number.NaN,
+    waveLy: Number.NaN,
+    waveMx: Number.NaN,
+    waveMy: Number.NaN,
+    waveSx: Number.NaN,
+    waveSy: Number.NaN,
+    cardWaveLx: Number.NaN,
+    cardWaveLy: Number.NaN,
+    cardWaveMx: Number.NaN,
+    cardWaveMy: Number.NaN,
   };
 
+  applyStaticBackgroundVars(el);
+  applyWaveVars(el, computeWaveState(performance.now()));
   rafId = window.requestAnimationFrame(render);
 }
 

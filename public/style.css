@@ -10,14 +10,24 @@
   --panel-strong: rgba(255, 255, 255, 0.96);
   --stroke: rgba(12, 16, 32, 0.12);
   --bg-noise: 0.35;
-  --seigaiha-image: none;
-  --grain-image: none;
-  --card-seigaiha-image: none;
-  --seigaiha-size: 256px 256px;
-  --seigaiha-opacity: 0.20;
-  --seigaiha-grain-opacity: 0.05;
-  --seigaiha-blur: 0px;
-  --card-seigaiha-opacity: 0.08;
+  --seigaiha-small-image: none;
+  --seigaiha-medium-image: none;
+  --seigaiha-large-image: none;
+  --seigaiha-small-size: 384px 384px;
+  --seigaiha-medium-size: 384px 384px;
+  --seigaiha-large-size: 384px 384px;
+  --seigaiha-opacity: 0.22;
+  --card-seigaiha-opacity: 0.062;
+  --waveL-x: 0;
+  --waveL-y: 0;
+  --waveM-x: 0;
+  --waveM-y: 0;
+  --waveS-x: 0;
+  --waveS-y: 0;
+  --cardWaveL-x: 0;
+  --cardWaveL-y: 0;
+  --cardWaveM-x: 0;
+  --cardWaveM-y: 0;
 }
 
 
@@ -57,22 +67,27 @@ body::after {
 
 body::before {
   z-index: 0;
-  background-image: var(--seigaiha-image);
-  background-size: var(--seigaiha-size);
-  background-position: 0 0;
-  background-repeat: repeat;
+  background-image:
+    var(--seigaiha-large-image),
+    var(--seigaiha-medium-image),
+    var(--seigaiha-small-image);
+  background-size:
+    var(--seigaiha-large-size),
+    var(--seigaiha-medium-size),
+    var(--seigaiha-small-size);
+  background-position:
+    calc(var(--waveL-x) * 1px) calc(var(--waveL-y) * 1px),
+    calc(var(--waveM-x) * 1px) calc(var(--waveM-y) * 1px),
+    calc(var(--waveS-x) * 1px) calc(var(--waveS-y) * 1px);
+  background-repeat: repeat, repeat, repeat;
   opacity: var(--seigaiha-opacity);
-  filter: blur(var(--seigaiha-blur));
+  filter: none;
 }
 
 body::after {
   z-index: 0;
-  background-image: var(--grain-image);
-  background-size: 256px 256px;
-  background-position: 0 0;
-  background-repeat: repeat;
-  opacity: var(--seigaiha-grain-opacity);
-  mix-blend-mode: soft-light;
+  background: none;
+  opacity: 0;
 }
 
 body > * {
@@ -206,12 +221,14 @@ body.drum-fullscreen .mode-stage {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background-image: var(--card-seigaiha-image);
-  background-size: var(--seigaiha-size);
-  background-repeat: repeat;
-  background-position: 0 0;
+  background-image: var(--seigaiha-large-image), var(--seigaiha-medium-image);
+  background-size: var(--seigaiha-large-size), var(--seigaiha-medium-size);
+  background-repeat: repeat, repeat;
+  background-position:
+    calc(var(--cardWaveL-x) * 1px) calc(var(--cardWaveL-y) * 1px),
+    calc(var(--cardWaveM-x) * 1px) calc(var(--cardWaveM-y) * 1px);
   opacity: var(--card-seigaiha-opacity);
-  filter: blur(var(--seigaiha-blur));
+  filter: none;
   mix-blend-mode: multiply;
   z-index: 0;
 }
