@@ -22,7 +22,7 @@ const DEFAULT_TILE_SIZE = 288;
 const TILE_PADDING_CELLS = 2;
 const NOISE_QUANTUM = 0.02;
 const DRIFT_CYCLE_MS = 16000;
-const DEBUG_BG = true;
+const DEBUG = false;
 
 let targetEl: HTMLElement | null = null;
 let activeMode: BackgroundMode = "tuner";
@@ -35,7 +35,6 @@ let targetNoiseLevel = 0.25;
 let currentNoiseLevel = 0.25;
 let rafId: number | null = null;
 let lastDebugLogAt = 0;
-let debugStartedAt = 0;
 
 const seigaihaUrlCache = new Map<string, string>();
 const cardUrlCache = new Map<string, string>();
@@ -199,10 +198,10 @@ function getGrainImageUrl(): string {
 function applyVars(el: HTMLElement, noiseLevel: number, now: number): void {
   const quantized = quantizeNoiseLevel(noiseLevel);
 
-  const blurPx = lerp(0.0, 1.6, quantized);
+  const blurPx = lerp(0.0, 0.8, quantized);
   const cardOpacity = lerp(0.10, 0.05, quantized);
-  const seigaihaOpacity = 0.20;
-  const grainOpacity = lerp(0.06, 0.28, quantized);
+  const seigaihaOpacity = lerp(0.24, 0.14, quantized);
+  const grainOpacity = lerp(0.0, 0.14, quantized);
 
   const patternImage = getSeigaihaUrlForNoiseLevel(quantized);
   const cardImage = getCardSeigaihaUrlForNoiseLevel(quantized);
@@ -254,14 +253,9 @@ function applyVars(el: HTMLElement, noiseLevel: number, now: number): void {
 
   el.style.setProperty("--seigaiha-size", `${DEFAULT_TILE_SIZE}px ${DEFAULT_TILE_SIZE}px`);
 
-  const debugAgeMs = now - debugStartedAt;
-  if (DEBUG_BG && debugAgeMs <= 5000 && now - lastDebugLogAt >= 1000) {
+  if (DEBUG && now - lastDebugLogAt >= 1000) {
     lastDebugLogAt = now;
-    console.debug("[seigaiha]", {
-      noise: quantized.toFixed(3),
-      grainOpacity: grainOpacity.toFixed(3),
-      blurPx: blurPx.toFixed(3),
-    });
+    console.debug("[seigaiha] noiseLevel", quantized.toFixed(3));
   }
 }
 
@@ -306,8 +300,6 @@ export function applySeigaihaBackground(el: HTMLElement, noiseLevel: number): vo
 export function initializeSeigaihaBackground(el: HTMLElement): void {
   targetEl = el;
   cacheSeigaihaTiles();
-  debugStartedAt = performance.now();
-  lastDebugLogAt = 0;
 
   const configured = Number.parseFloat(
     getComputedStyle(el).getPropertyValue("--bg-noise")

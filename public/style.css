@@ -74,8 +74,8 @@ body::after {
   background-position: var(--grain-offset-x) var(--grain-offset-y);
   background-repeat: repeat;
   opacity: var(--seigaiha-grain-opacity);
-  mix-blend-mode: normal;
-  filter: blur(var(--seigaiha-blur));
+  mix-blend-mode: soft-light;
+  filter: blur(0.35px);
 }
 
 body > * {
