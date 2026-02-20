@@ -20,6 +20,7 @@ Instead, JS animates a scalar `noise ∈ [0,1]` and maps it to CSS vars:
 - `--seigaiha-grain-opacity` (primary material modulation)
 - `--seigaiha-blur` (tiny, prevents shimmer)
 - `--seigaiha-image` (cached SVG data URL)
+- `--card-seigaiha-image` (cached SVG data URL, no grain)
 - `--grain-image` (cached SVG data URL)
 - `--seigaiha-size` (px; must be integers)
 

@@ -12,6 +12,7 @@
   --bg-noise: 0.35;
   --seigaiha-image: none;
   --grain-image: none;
+  --card-seigaiha-image: none;
   --seigaiha-size: 256px 256px;
   --seigaiha-opacity: 0.20;
   --seigaiha-grain-opacity: 0.05;
@@ -205,7 +206,7 @@ body.drum-fullscreen .mode-stage {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background-image: var(--seigaiha-image);
+  background-image: var(--card-seigaiha-image);
   background-size: var(--seigaiha-size);
   background-repeat: repeat;
   background-position: 0 0;
