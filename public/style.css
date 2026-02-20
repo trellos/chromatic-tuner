@@ -481,6 +481,11 @@ body.status-hidden #status {
   display: grid;
   place-items: center;
   touch-action: none;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 245, 212, 0.62);
+  box-shadow:
+    0 0 0 8px rgba(0, 245, 212, 0.15),
+    0 16px 30px rgba(15, 23, 42, 0.2);
 }
 
 .metro-starburst {
@@ -1025,19 +1030,16 @@ body.drum-fullscreen .drum-ui {
 @media (max-width: 600px) and (orientation: portrait) {
   .drum-ui {
     flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 10px;
-    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
     align-items: center;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     padding: 10px 12px;
-    scroll-padding-inline: 6px;
-    -webkit-overflow-scrolling: touch;
   }
 
   .drum-ui > * {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
   }
 
   .drum-tempo {
@@ -1048,7 +1050,8 @@ body.drum-fullscreen .drum-ui {
   }
 
   .drum-play {
-    order: 2;
+    order: 4;
+    width: 100%;
   }
 
   #drum-beat-button {

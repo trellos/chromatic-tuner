@@ -258,7 +258,9 @@ test('drum machine fullscreen rotation is mobile-only', async ({ page }) => {
   expect(transform).toBe('none');
 });
 
-test('drum machine toolbar stays in a single row on mobile portrait', async ({ page }) => {
+test('drum machine toolbar wraps to two rows on mobile portrait so play is reachable', async ({
+  page,
+}) => {
   const portraitViewports = [
     { width: 320, height: 640 },
     { width: 390, height: 844 },
@@ -270,18 +272,27 @@ test('drum machine toolbar stays in a single row on mobile portrait', async ({ p
 
     await page.getByRole('tab', { name: 'Drum Machine' }).click();
     const drumUi = page.locator('.mode-screen[data-mode="drum-machine"] .drum-ui');
+    const playButton = page.locator('#drum-play-toggle');
     await expect(drumUi).toBeVisible();
+    await expect(playButton).toBeVisible();
 
-    const overlapsSingleRow = await drumUi.locator(':scope > *').evaluateAll((nodes) => {
-      const rects = nodes.map((node) => node.getBoundingClientRect());
-      if (rects.length < 2) return false;
-
-      const first = rects[0];
-      if (!first) return false;
-      return rects.every((rect) => rect.top < first.bottom && rect.bottom > first.top);
+    const hasTwoRows = await drumUi.locator(':scope > *').evaluateAll((nodes) => {
+      const rows = new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().top)));
+      return rows.size >= 2;
     });
 
-    expect(overlapsSingleRow).toBeTruthy();
+    const playIsOnSecondRow = await page.evaluate(() => {
+      const controls = Array.from(document.querySelectorAll('.mode-screen[data-mode="drum-machine"] .drum-ui > *'));
+      const play = document.querySelector('#drum-play-toggle');
+      if (!play || controls.length === 0) return false;
+      const tops = controls.map((node) => Math.round(node.getBoundingClientRect().top));
+      const firstRowTop = Math.min(...tops);
+      const playTop = Math.round(play.getBoundingClientRect().top);
+      return playTop > firstRowTop;
+    });
+
+    expect(hasTwoRows).toBeTruthy();
+    expect(playIsOnSecondRow).toBeTruthy();
   }
 });
 

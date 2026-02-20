@@ -37,10 +37,10 @@ export function createDrumMachineMode(): ModeDefinition {
     rock: {
       name: "Rock Drums",
       urls: {
-        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/kick.wav",
-        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/snare.wav",
-        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/hihat.wav",
-        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/tom1.wav",
+        kick: "https://bigsoundbank.com/UPLOAD/wav/1498.wav",
+        snare: "https://bigsoundbank.com/UPLOAD/wav/1496.wav",
+        hat: "https://bigsoundbank.com/UPLOAD/wav/1476.wav",
+        perc: "https://bigsoundbank.com/UPLOAD/wav/1486.wav",
       },
     },
     electro: {
@@ -240,141 +240,57 @@ export function createDrumMachineMode(): ModeDefinition {
     const hat = rows[2];
     const perc = rows[3];
 
-    const setHatEights = () => {
-      if (!hat) return;
-      for (let i = 0; i < 16; i += 2) setStep(hat, i, true);
-    };
-
-    const setHatSixteenths = (swing = false) => {
-      if (!hat) return;
-      for (let i = 0; i < 16; i++) {
-        const on = swing ? i % 2 === 0 || (i % 4 === 3 && Math.random() < 0.6) : true;
-        if (on) setStep(hat, i, true);
-      }
-    };
-
-    const setBackbeat = () => {
-      if (!snare) return;
-      setStep(snare, 4, true);
-      setStep(snare, 12, true);
-    };
-
-    const setFourOnFloor = () => {
-      if (!kick) return;
-      [0, 4, 8, 12].forEach((i) => setStep(kick, i, true));
-    };
-
-    const setRockKick = () => {
-      if (!kick) return;
-      setStep(kick, 0, true);
-      setStep(kick, 8, true);
-      setStep(kick, 6, Math.random() < 0.4);
-      setStep(kick, 10, Math.random() < 0.4);
-    };
-
-    const setShuffleKick = () => {
-      if (!kick) return;
-      setStep(kick, 0, true);
-      setStep(kick, 6, true);
-      setStep(kick, 12, true);
-      setStep(kick, 14, Math.random() < 0.5);
-    };
-
-    const setBreakKick = () => {
-      if (!kick) return;
-      [0, 6, 7, 10, 12].forEach((i) => setStep(kick, i, true));
-    };
-
-    const setPercOffbeats = (prob: number) => {
-      if (!perc) return;
-      for (let i = 0; i < 16; i++) {
-        if (i % 4 === 2 && Math.random() < prob) setStep(perc, i, true);
-      }
+    const applyPattern = (row: HTMLElement | undefined, indices: number[]) => {
+      if (!row) return;
+      indices.forEach((index) => setStep(row, index, true));
     };
 
     switch (beat) {
       case "rock":
-        setRockKick();
-        setBackbeat();
-        setHatEights();
-        setPercOffbeats(0.3);
+        applyPattern(kick, [0, 6, 8, 10]);
+        applyPattern(snare, [4, 12]);
+        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+        applyPattern(perc, [11]);
         break;
       case "shuffle":
-        setShuffleKick();
-        setBackbeat();
-        setHatSixteenths(true);
-        setPercOffbeats(0.2);
+        applyPattern(kick, [0, 6, 12]);
+        applyPattern(snare, [4, 12]);
+        applyPattern(hat, [0, 3, 4, 7, 8, 11, 12, 15]);
+        applyPattern(perc, [10]);
         break;
       case "disco":
-        setFourOnFloor();
-        setBackbeat();
-        setHatSixteenths();
+        applyPattern(kick, [0, 4, 8, 12]);
+        applyPattern(snare, [4, 12]);
+        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+        applyPattern(perc, [2, 6, 10, 14]);
         break;
       case "half-time":
-        if (kick) {
-          setStep(kick, 0, true);
-          setStep(kick, 8, Math.random() < 0.6);
-          setStep(kick, 12, Math.random() < 0.4);
-        }
-        if (snare) {
-          setStep(snare, 8, true);
-        }
-        if (hat) {
-          for (let i = 0; i < 16; i++) {
-            const on = i % 4 === 0 || (i % 8 === 6 && Math.random() < 0.6);
-            if (on) setStep(hat, i, true);
-          }
-        }
+        applyPattern(kick, [0, 7, 10]);
+        applyPattern(snare, [8]);
+        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+        applyPattern(perc, [3, 11]);
         break;
       case "breakbeat":
-        setBreakKick();
-        if (snare) {
-          setStep(snare, 4, true);
-          setStep(snare, 12, true);
-          setStep(snare, 14, true);
-        }
-        if (hat) {
-          for (let i = 0; i < 16; i++) {
-            const on = i % 2 === 0 || (i % 4 === 3 && Math.random() < 0.5);
-            if (on) setStep(hat, i, true);
-          }
-        }
-        setPercOffbeats(0.35);
+        applyPattern(kick, [0, 6, 7, 10, 12]);
+        applyPattern(snare, [4, 12, 14]);
+        applyPattern(hat, [0, 2, 3, 6, 8, 10, 11, 14]);
+        applyPattern(perc, [2, 10]);
         break;
       case "afrobeat":
-        if (kick) {
-          [0, 5, 8, 11, 15].forEach((i) => setStep(kick, i, true));
-        }
-        if (snare) {
-          [4, 12].forEach((i) => setStep(snare, i, true));
-          setStep(snare, 10, true);
-        }
-        if (hat) {
-          for (let i = 0; i < 16; i++) {
-            const on = i % 4 === 0 || i % 4 === 2;
-            if (on || Math.random() < 0.2) setStep(hat, i, true);
-          }
-        }
-        setPercOffbeats(0.4);
+        applyPattern(kick, [0, 5, 8, 11, 15]);
+        applyPattern(snare, [4, 10, 12]);
+        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+        applyPattern(perc, [3, 7, 11, 15]);
         break;
       case "minimal":
-        if (kick) {
-          setStep(kick, 0, true);
-          setStep(kick, 8, true);
-        }
-        if (snare) {
-          setStep(snare, 12, true);
-        }
-        if (hat) {
-          for (let i = 0; i < 16; i++) {
-            if (i % 4 === 2) setStep(hat, i, true);
-          }
-        }
+        applyPattern(kick, [0, 8]);
+        applyPattern(snare, [12]);
+        applyPattern(hat, [2, 6, 10, 14]);
         break;
       default:
-        setRockKick();
-        setBackbeat();
-        setHatEights();
+        applyPattern(kick, [0, 6, 8, 10]);
+        applyPattern(snare, [4, 12]);
+        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
         break;
     }
   };
@@ -451,11 +367,11 @@ export function createDrumMachineMode(): ModeDefinition {
     const osc = audioContext.createOscillator();
     const gain = audioContext.createGain();
     osc.type = currentKit === "electro" || currentKit === "house" ? "square" : "triangle";
-    if (voice === "kick") osc.frequency.value = currentKit === "electro" ? 90 : 120;
-    if (voice === "snare") osc.frequency.value = currentKit === "lofi" ? 190 : 240;
-    if (voice === "hat") osc.frequency.value = currentKit === "house" ? 780 : 520;
-    if (voice === "perc") osc.frequency.value = currentKit === "latin" ? 400 : 320;
-    gain.gain.value = 0.18;
+    if (voice === "kick") osc.frequency.value = currentKit === "electro" ? 90 : currentKit === "rock" ? 78 : 120;
+    if (voice === "snare") osc.frequency.value = currentKit === "lofi" ? 190 : currentKit === "rock" ? 210 : 240;
+    if (voice === "hat") osc.frequency.value = currentKit === "house" ? 780 : currentKit === "rock" ? 620 : 520;
+    if (voice === "perc") osc.frequency.value = currentKit === "latin" ? 400 : currentKit === "rock" ? 280 : 320;
+    gain.gain.value = currentKit === "rock" ? 0.22 : 0.18;
     osc.connect(gain);
     gain.connect(audioContext.destination);
     osc.start(time);

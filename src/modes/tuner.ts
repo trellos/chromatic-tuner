@@ -924,6 +924,24 @@ async function enterTunerMode(): Promise<void> {
     }
   };
 
+  await new Promise<void>((resolve) => {
+    const timer = window.setTimeout(() => {
+      resolve();
+    }, 500);
+    signal.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+
+  if (signal.aborted) {
+    return;
+  }
+
   await startWithHandling();
 }
 

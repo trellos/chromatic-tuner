@@ -93,6 +93,16 @@
                   <button type="button" role="menuitem" data-value="6/8">6/8</button>
                 </div>
               </div>
+              <div class="option-chip metro-option">
+                <button id="metro-sound-button" class="option-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+                  Sound Electro
+                </button>
+                <div id="metro-sound-menu" class="option-menu" role="menu">
+                  <button type="button" role="menuitem" data-sound="electro">Electro</button>
+                  <button type="button" role="menuitem" data-sound="drum">Drum</button>
+                  <button type="button" role="menuitem" data-sound="conga">Conga</button>
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -279,45 +289,7 @@
       </button>
     </main>
 
-    <script>
-      (() => {
-        const contexts = new Set();
-        const wrapContext = (Original) => {
-          if (!Original) return Original;
-          const Wrapped = function (...args) {
-            const ctx = new Original(...args);
-            contexts.add(ctx);
-            return ctx;
-          };
-          Wrapped.prototype = Original.prototype;
-          return Wrapped;
-        };
-        if (window.AudioContext) {
-          window.AudioContext = wrapContext(window.AudioContext);
-        }
-        if (window.webkitAudioContext) {
-          window.webkitAudioContext = wrapContext(window.webkitAudioContext);
-        }
-        const resumeAll = () => {
-          contexts.forEach((ctx) => {
-            if (ctx.state === "suspended") {
-              ctx.resume().catch(() => {});
-            }
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            gain.gain.value = 0;
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.01);
-          });
-          window.removeEventListener("touchstart", resumeAll);
-          window.removeEventListener("pointerdown", resumeAll);
-        };
-        window.addEventListener("touchstart", resumeAll, { passive: true });
-        window.addEventListener("pointerdown", resumeAll, { passive: true });
-      })();
-    </script>
+    
     <script type="module" src="./assets/app.js"></script>
   </body>
 </html>

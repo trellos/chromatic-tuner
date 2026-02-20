@@ -1,5 +1,7 @@
 import type { ModeDefinition } from "./types.js";
 
+let sessionBpm = 120;
+
 // Mode factory for the metronome screen: tempo/time-signature controls,
 // click scheduling, and lifecycle-managed event wiring.
 export function createMetronomeMode(): ModeDefinition {
@@ -11,6 +13,8 @@ export function createMetronomeMode(): ModeDefinition {
   const starburstEl = metronomeEl?.querySelector<HTMLElement>(".metro-starburst") ?? null;
   const timeButtonEl = document.getElementById("metro-time-button");
   const timeMenuEl = document.getElementById("metro-time-menu");
+  const soundButtonEl = document.getElementById("metro-sound-button");
+  const soundMenuEl = document.getElementById("metro-sound-menu");
   const controlsEl =
     metronomeEl?.querySelector<HTMLElement>(".metro-controls") ?? null;
 
@@ -20,22 +24,61 @@ export function createMetronomeMode(): ModeDefinition {
   const ROTATION_RANGE = 270;
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
-  const REGULAR_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2338.wav";
-  const ACCENT_URL = "https://bigsoundbank.com/UPLOAD/bwf-en/2304.wav";
+  const METRO_BPM_STORAGE_KEY = "tuna.metronome.bpm";
+  type MetronomeSoundId = "electro" | "drum" | "conga";
+  type SoundProfile = { label: string; regularUrl: string; accentUrl: string };
+  const SOUND_PROFILES: Record<MetronomeSoundId, SoundProfile> = {
+    electro: {
+      label: "Electro",
+      regularUrl:
+        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/hihat.wav",
+      accentUrl:
+        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/snare.wav",
+    },
+    drum: {
+      label: "Drum",
+      regularUrl:
+        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/hihat.wav",
+      accentUrl:
+        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/snare.wav",
+    },
+    conga: {
+      label: "Conga",
+      regularUrl:
+        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/conga.wav",
+      accentUrl:
+        "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/snare.wav",
+    },
+  };
 
   let bpm = 120;
   let timeSignature = "4/4";
   let accentEnabled = true;
+  let soundId: MetronomeSoundId = "electro";
   let isPlaying = false;
   let audioContext: AudioContext | null = null;
   let regularBuffer: AudioBuffer | null = null;
   let accentBuffer: AudioBuffer | null = null;
   let samplesLoadingPromise: Promise<void> | null = null;
+  let samplesRequestId = 0;
   let schedulerId: number | null = null;
   let nextNoteTime = 0;
   let currentBeat = 0;
   let uiAbort: AbortController | null = null;
   let pulseTimeouts: number[] = [];
+
+  const readStoredBpm = () => {
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(METRO_BPM_STORAGE_KEY);
+    } catch {
+      raw = null;
+    }
+    const parsed = raw ? Number.parseInt(raw, 10) : sessionBpm;
+    if (Number.isFinite(parsed)) {
+      bpm = clamp(parsed, BPM_MIN, BPM_MAX);
+    }
+  };
 
   const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -54,10 +97,34 @@ export function createMetronomeMode(): ModeDefinition {
 
   const setBpm = (value: number) => {
     bpm = clamp(Math.round(value), BPM_MIN, BPM_MAX);
+    sessionBpm = bpm;
+    try {
+      window.localStorage.setItem(METRO_BPM_STORAGE_KEY, String(bpm));
+    } catch {
+      // Some contexts disallow storage access; keep session fallback only.
+    }
     if (tempoValueEl) {
       tempoValueEl.textContent = String(bpm);
     }
     setDialRotation(bpm);
+  };
+
+  const setSoundLabel = () => {
+    if (!soundButtonEl) return;
+    soundButtonEl.textContent = `Sound ${SOUND_PROFILES[soundId].label}`;
+  };
+
+  const setSound = (nextSoundId: MetronomeSoundId) => {
+    if (nextSoundId === soundId) return;
+    soundId = nextSoundId;
+    regularBuffer = null;
+    accentBuffer = null;
+    samplesLoadingPromise = null;
+    samplesRequestId += 1;
+    setSoundLabel();
+    if (audioContext) {
+      void ensureSamples();
+    }
   };
 
   const setTimeSignature = (value: string) => {
@@ -92,21 +159,31 @@ export function createMetronomeMode(): ModeDefinition {
     }
 
     samplesLoadingPromise = (async () => {
-    const loadSample = async (url: string) => {
-      try {
-        const response = await fetch(url);
+      const requestedSoundId = soundId;
+      const requestId = ++samplesRequestId;
+      const loadSample = async (url: string) => {
+        try {
+          const response = await fetch(url);
           if (!response.ok) return null;
-        const data = await response.arrayBuffer();
-        return await audioContext!.decodeAudioData(data);
-      } catch {
-        return null;
-      }
-    };
+          const data = await response.arrayBuffer();
+          return await audioContext!.decodeAudioData(data);
+        } catch {
+          return null;
+        }
+      };
 
-    [regularBuffer, accentBuffer] = await Promise.all([
-      loadSample(REGULAR_URL),
-      loadSample(ACCENT_URL),
-    ]);
+      const profile = SOUND_PROFILES[requestedSoundId];
+      const [nextRegularBuffer, nextAccentBuffer] = await Promise.all([
+        loadSample(profile.regularUrl),
+        loadSample(profile.accentUrl),
+      ]);
+
+      if (requestId !== samplesRequestId || requestedSoundId !== soundId) {
+        return;
+      }
+
+      regularBuffer = nextRegularBuffer;
+      accentBuffer = nextAccentBuffer;
     })();
 
     try {
@@ -354,12 +431,51 @@ export function createMetronomeMode(): ModeDefinition {
       );
     }
 
+    if (soundButtonEl && soundMenuEl) {
+      soundButtonEl.addEventListener(
+        "click",
+        (event) => {
+          event.stopPropagation();
+          const isOpen = soundMenuEl.classList.contains("is-open");
+          soundMenuEl.classList.toggle("is-open", !isOpen);
+          soundButtonEl.setAttribute("aria-expanded", String(!isOpen));
+        },
+        { signal }
+      );
+
+      soundMenuEl.addEventListener(
+        "click",
+        (event) => {
+          const target = event.target as HTMLElement | null;
+          const value = target?.getAttribute("data-sound");
+          if (!value || !(value in SOUND_PROFILES)) return;
+          setSound(value as MetronomeSoundId);
+          soundMenuEl.classList.remove("is-open");
+          soundButtonEl.setAttribute("aria-expanded", "false");
+        },
+        { signal }
+      );
+
+      document.addEventListener(
+        "click",
+        (event) => {
+          if (soundMenuEl.contains(event.target as Node)) return;
+          if (soundButtonEl.contains(event.target as Node)) return;
+          soundMenuEl.classList.remove("is-open");
+          soundButtonEl.setAttribute("aria-expanded", "false");
+        },
+        { signal }
+      );
+    }
+
   };
 
   const enter = async () => {
+    readStoredBpm();
     setBpm(bpm);
     setTimeSignature(timeSignature);
     setAccentEnabled(accentEnabled);
+    setSoundLabel();
     attachUi();
   };
 
