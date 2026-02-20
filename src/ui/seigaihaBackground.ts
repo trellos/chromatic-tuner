@@ -5,16 +5,24 @@ type BackgroundMode = ModeId;
 type SeigaihaOpts = {
   tileSize?: number;
   radius?: number;
-  noise?: number;
-  includeGrain?: boolean;
+  noiseLevel?: number;
+};
+
+type TileGeometry = {
+  tileSize: number;
+  radius: number;
+  dx: number;
+  dy: number;
 };
 
 // Tile must be a multiple of both dx=(2R) and the stagger period (2dy=2R)
 // so the pattern repeats without seams.
 const DEFAULT_RADIUS = 48;
 const DEFAULT_TILE_SIZE = 288;
-
+const TILE_PADDING_CELLS = 2;
 const NOISE_QUANTUM = 0.02;
+const DRIFT_CYCLE_MS = 16000;
+const DEBUG_BG = true;
 
 let targetEl: HTMLElement | null = null;
 let activeMode: BackgroundMode = "tuner";
@@ -23,19 +31,26 @@ let beatIntervalMs = 500;
 let lastBeatAt = performance.now();
 let tunerStability = 0;
 
-let targetNoise = 0.25;
-let currentNoise = 0.25;
+let targetNoiseLevel = 0.25;
+let currentNoiseLevel = 0.25;
 let rafId: number | null = null;
+let lastDebugLogAt = 0;
+let debugStartedAt = 0;
 
 const seigaihaUrlCache = new Map<string, string>();
 const cardUrlCache = new Map<string, string>();
 
+let grainImageUrl = "";
+
 let lastApplied = {
-  noise: -1,
+  noiseLevel: -1,
   blurPx: -1,
   cardOpacity: -1,
+  grainOffsetX: Number.NaN,
+  grainOffsetY: Number.NaN,
   patternImage: "",
   cardImage: "",
+  grainImage: "",
 };
 
 function clamp(value: number, min = 0, max = 1): number {
@@ -53,63 +68,86 @@ function beatEnvelope(now: number): number {
   return Math.pow(Math.sin(progress * Math.PI), 0.85);
 }
 
+function normalizeTileGeometry(tileSize: number, radius: number): TileGeometry {
+  const safeRadius = Math.max(8, Math.round(radius));
+  const dx = 2 * safeRadius;
+  const dy = safeRadius;
+  const period = Math.max(dx, 2 * dy);
+  const resolvedTileSize = Math.max(period, Math.round(tileSize / period) * period);
+
+  return {
+    tileSize: resolvedTileSize,
+    radius: safeRadius,
+    dx,
+    dy,
+  };
+}
+
 function buildArcPath(cx: number, cy: number, radius: number): string {
   return `M ${(cx - radius).toFixed(2)} ${cy.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 1 ${(cx + radius).toFixed(2)} ${cy.toFixed(2)}`;
 }
 
-export function makeSeigaihaTileSvg(opts: SeigaihaOpts = {}): string {
-  const tileSize = opts.tileSize ?? DEFAULT_TILE_SIZE;
-  const baseRadius = opts.radius ?? DEFAULT_RADIUS;
-  const noise = clamp(opts.noise ?? 0);
-  const includeGrain = opts.includeGrain ?? true;
-
-  const patternOpacity = lerp(0.08, 0.13, 1 - noise);
-  const displacementScale = lerp(0, 2.4, noise);
-  const inkVarOpacity = lerp(0.0, 0.10, noise);
-  const grainOpacity = includeGrain ? lerp(0.0, 0.14, noise) : 0;
-
-  const dx = 2 * baseRadius;
-  const dy = baseRadius;
-
-  const radii = [baseRadius, (baseRadius * 2) / 3, baseRadius / 3];
+function makeSeigaihaArcs(geometry: TileGeometry, noiseLevel: number): string {
+  const { tileSize, radius, dx, dy } = geometry;
+  const radii = [radius, (radius * 2) / 3, radius / 3];
   const strokeWidths = [2.0, 1.6, 1.2];
 
-  const cols = Math.ceil(tileSize / dx) + 2;
-  const rows = Math.ceil(tileSize / dy) + 2;
+  const minY = -TILE_PADDING_CELLS * dy;
+  const maxY = tileSize + TILE_PADDING_CELLS * dy;
+  const minRow = Math.floor(minY / dy);
+  const maxRow = Math.ceil(maxY / dy);
 
   const arcs: string[] = [];
-  for (let row = -1; row < rows; row++) {
+  const strokeOpacity = lerp(0.08, 0.13, 1 - noiseLevel);
+
+  for (let row = minRow; row <= maxRow; row += 1) {
     const cy = row * dy;
     const parity = ((row % 2) + 2) % 2;
-    const xOffset = parity * baseRadius;
+    const xOffset = parity * radius;
 
-    for (let col = -1; col < cols; col++) {
+    const minX = -TILE_PADDING_CELLS * dx - xOffset;
+    const maxX = tileSize + TILE_PADDING_CELLS * dx - xOffset;
+    const minCol = Math.floor(minX / dx);
+    const maxCol = Math.ceil(maxX / dx);
+
+    for (let col = minCol; col <= maxCol; col += 1) {
       const cx = col * dx + xOffset;
-      for (let i = 0; i < radii.length; i++) {
-        const radius = radii[i] ?? baseRadius;
+      for (let i = 0; i < radii.length; i += 1) {
+        const arcRadius = radii[i] ?? radius;
         const strokeWidth = strokeWidths[i] ?? 1.2;
         arcs.push(
-          `<path d="${buildArcPath(cx, cy, radius)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="${patternOpacity.toFixed(3)}" stroke-width="${strokeWidth.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
+          `<path d="${buildArcPath(cx, cy, arcRadius)}" fill="none" stroke="rgb(236,244,255)" stroke-opacity="${strokeOpacity.toFixed(3)}" stroke-width="${strokeWidth.toFixed(2)}" vector-effect="non-scaling-stroke"/>`
         );
       }
     }
   }
 
+  return arcs.join("");
+}
+
+export function makeSeigaihaTileSvg(opts: SeigaihaOpts = {}): string {
+  const geometry = normalizeTileGeometry(
+    opts.tileSize ?? DEFAULT_TILE_SIZE,
+    opts.radius ?? DEFAULT_RADIUS
+  );
+  const noiseLevel = clamp(opts.noiseLevel ?? 0);
+  const inkVarOpacity = lerp(0.0, 0.10, noiseLevel);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.tileSize}" height="${geometry.tileSize}" viewBox="0 0 ${geometry.tileSize} ${geometry.tileSize}">
+    ${makeSeigaihaArcs(geometry, noiseLevel)}
+    <rect width="100%" height="100%" fill="rgb(232,241,255)" opacity="${inkVarOpacity.toFixed(3)}"/>
+  </svg>`;
+}
+
+function makeGrainTileSvg(tileSize = 256): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${tileSize}" height="${tileSize}" viewBox="0 0 ${tileSize} ${tileSize}">
     <defs>
-      <filter id="inkWarp" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="1" seed="13" stitchTiles="stitch" result="inkNoise"/>
-        <feDisplacementMap in="SourceGraphic" in2="inkNoise" scale="${displacementScale.toFixed(3)}" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
       <filter id="grain" x="0" y="0" width="100%" height="100%">
         <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="7" stitchTiles="stitch" result="grainNoise"/>
         <feColorMatrix in="grainNoise" type="saturate" values="0" result="monoNoise"/>
       </filter>
     </defs>
-
-    <g filter="url(#inkWarp)">${arcs.join("")}</g>
-    <rect width="100%" height="100%" fill="rgb(232,241,255)" opacity="${inkVarOpacity.toFixed(3)}"/>
-    ${includeGrain ? `<rect width="100%" height="100%" filter="url(#grain)" opacity="${grainOpacity.toFixed(3)}"/>` : ""}
+    <rect width="100%" height="100%" filter="url(#grain)" opacity="0.75"/>
   </svg>`;
 }
 
@@ -118,52 +156,62 @@ export function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml,${encodeURIComponent(compact)}`;
 }
 
-function quantizeNoise(noise: number): number {
-  return Math.round(clamp(noise) / NOISE_QUANTUM) * NOISE_QUANTUM;
+function quantizeNoiseLevel(noiseLevel: number): number {
+  return Math.round(clamp(noiseLevel) / NOISE_QUANTUM) * NOISE_QUANTUM;
 }
 
-function getSeigaihaUrlForNoise(noise: number): string {
-  const key = quantizeNoise(noise).toFixed(2);
-  const cached = seigaihaUrlCache.get(key);
-  if (cached) return cached;
+function cacheSeigaihaTiles(): void {
+  if (seigaihaUrlCache.size > 0 && cardUrlCache.size > 0) {
+    return;
+  }
 
-  const svg = makeSeigaihaTileSvg({
-    tileSize: DEFAULT_TILE_SIZE,
-    radius: DEFAULT_RADIUS,
-    noise: Number(key),
-    includeGrain: false,
-  });
-  const url = `url("${svgToDataUrl(svg)}")`;
-  seigaihaUrlCache.set(key, url);
-  return url;
+  for (let i = 0; i <= Math.round(1 / NOISE_QUANTUM); i += 1) {
+    const key = (i * NOISE_QUANTUM).toFixed(2);
+    const noiseLevel = Number(key);
+    const svg = makeSeigaihaTileSvg({
+      tileSize: DEFAULT_TILE_SIZE,
+      radius: DEFAULT_RADIUS,
+      noiseLevel,
+    });
+    const url = `url("${svgToDataUrl(svg)}")`;
+    seigaihaUrlCache.set(key, url);
+    cardUrlCache.set(key, url);
+  }
 }
 
-function getCardSeigaihaUrlForNoise(noise: number): string {
-  const key = quantizeNoise(noise).toFixed(2);
-  const cached = cardUrlCache.get(key);
-  if (cached) return cached;
-
-  const svg = makeSeigaihaTileSvg({
-    tileSize: DEFAULT_TILE_SIZE,
-    radius: DEFAULT_RADIUS,
-    noise: Number(key),
-    includeGrain: false,
-  });
-  const url = `url("${svgToDataUrl(svg)}")`;
-  cardUrlCache.set(key, url);
-  return url;
+function getSeigaihaUrlForNoiseLevel(noiseLevel: number): string {
+  const key = quantizeNoiseLevel(noiseLevel).toFixed(2);
+  return seigaihaUrlCache.get(key) ?? seigaihaUrlCache.get("0.00") ?? "none";
 }
 
-function applyVars(el: HTMLElement, noise: number): void {
-  const quantized = quantizeNoise(noise);
+function getCardSeigaihaUrlForNoiseLevel(noiseLevel: number): string {
+  const key = quantizeNoiseLevel(noiseLevel).toFixed(2);
+  return cardUrlCache.get(key) ?? cardUrlCache.get("0.00") ?? "none";
+}
 
-  const blurPx = lerp(0.0, 0.8, quantized);
-  const cardOpacity = lerp(0.05, 0.10, 1 - quantized);
-  const seigaihaOpacity = lerp(0.14, 0.24, 1 - quantized);
-  const grainOpacity = lerp(0.0, 0.14, quantized);
+function getGrainImageUrl(): string {
+  if (!grainImageUrl) {
+    grainImageUrl = `url("${svgToDataUrl(makeGrainTileSvg())}")`;
+  }
+  return grainImageUrl;
+}
 
-  const patternImage = getSeigaihaUrlForNoise(quantized);
-  const cardImage = getCardSeigaihaUrlForNoise(quantized);
+function applyVars(el: HTMLElement, noiseLevel: number, now: number): void {
+  const quantized = quantizeNoiseLevel(noiseLevel);
+
+  const blurPx = lerp(0.0, 1.6, quantized);
+  const cardOpacity = lerp(0.10, 0.05, quantized);
+  const seigaihaOpacity = 0.20;
+  const grainOpacity = lerp(0.06, 0.28, quantized);
+
+  const patternImage = getSeigaihaUrlForNoiseLevel(quantized);
+  const cardImage = getCardSeigaihaUrlForNoiseLevel(quantized);
+  const grainImage = getGrainImageUrl();
+
+  const driftPhase = now / DRIFT_CYCLE_MS;
+  const driftScale = lerp(0.1, 1, quantized);
+  const grainOffsetX = Number((Math.sin(driftPhase * Math.PI * 2) * 18 * driftScale).toFixed(2));
+  const grainOffsetY = Number((Math.cos(driftPhase * Math.PI * 1.6) * 14 * driftScale).toFixed(2));
 
   if (patternImage !== lastApplied.patternImage) {
     el.style.setProperty("--seigaiha-image", patternImage);
@@ -175,11 +223,16 @@ function applyVars(el: HTMLElement, noise: number): void {
     lastApplied.cardImage = cardImage;
   }
 
-  if (Math.abs(quantized - lastApplied.noise) > 0.001) {
+  if (grainImage !== lastApplied.grainImage) {
+    el.style.setProperty("--grain-image", grainImage);
+    lastApplied.grainImage = grainImage;
+  }
+
+  if (Math.abs(quantized - lastApplied.noiseLevel) > 0.001) {
     el.style.setProperty("--bg-noise", quantized.toFixed(3));
     el.style.setProperty("--seigaiha-opacity", seigaihaOpacity.toFixed(3));
     el.style.setProperty("--seigaiha-grain-opacity", grainOpacity.toFixed(3));
-    lastApplied.noise = quantized;
+    lastApplied.noiseLevel = quantized;
   }
 
   if (Math.abs(blurPx - lastApplied.blurPx) > 0.001) {
@@ -192,47 +245,76 @@ function applyVars(el: HTMLElement, noise: number): void {
     lastApplied.cardOpacity = cardOpacity;
   }
 
+  if (grainOffsetX !== lastApplied.grainOffsetX || grainOffsetY !== lastApplied.grainOffsetY) {
+    el.style.setProperty("--grain-offset-x", `${grainOffsetX}px`);
+    el.style.setProperty("--grain-offset-y", `${grainOffsetY}px`);
+    lastApplied.grainOffsetX = grainOffsetX;
+    lastApplied.grainOffsetY = grainOffsetY;
+  }
+
   el.style.setProperty("--seigaiha-size", `${DEFAULT_TILE_SIZE}px ${DEFAULT_TILE_SIZE}px`);
+
+  const debugAgeMs = now - debugStartedAt;
+  if (DEBUG_BG && debugAgeMs <= 5000 && now - lastDebugLogAt >= 1000) {
+    lastDebugLogAt = now;
+    console.debug("[seigaiha]", {
+      noise: quantized.toFixed(3),
+      grainOpacity: grainOpacity.toFixed(3),
+      blurPx: blurPx.toFixed(3),
+    });
+  }
 }
 
-function computeTargetNoise(now: number): number {
+function computeDriftNoise(now: number): number {
+  const t = now / DRIFT_CYCLE_MS;
+  const slow = 0.5 + 0.5 * Math.sin(t * Math.PI * 2);
+  const slower = 0.5 + 0.5 * Math.sin(t * Math.PI * 0.9 + 1.1);
+  return (slow * 0.65 + slower * 0.35) * 0.16;
+}
+
+function computeTargetNoiseLevel(now: number): number {
+  const drift = computeDriftNoise(now);
+
   if (activeMode === "tuner") {
-    return clamp(0.18 + tunerStability * 0.55);
+    return clamp(0.04 + tunerStability * 0.58 + drift);
   }
 
   if (activeMode === "metronome" || activeMode === "drum-machine") {
-    return clamp(0.14 + beatEnvelope(now) * 0.62);
+    return clamp(0.08 + beatEnvelope(now) * 0.58 + drift);
   }
 
-  return 0.25;
+  return clamp(0.12 + drift);
 }
 
 function render(now: number): void {
   if (!targetEl) return;
 
-  targetNoise = computeTargetNoise(now);
-  currentNoise = lerp(currentNoise, targetNoise, 0.12);
+  targetNoiseLevel = computeTargetNoiseLevel(now);
+  currentNoiseLevel = lerp(currentNoiseLevel, targetNoiseLevel, 0.12);
 
-  applyVars(targetEl, currentNoise);
+  applyVars(targetEl, currentNoiseLevel, now);
 
   rafId = window.requestAnimationFrame(render);
 }
 
-export function applySeigaihaBackground(el: HTMLElement, noise: number): void {
-  currentNoise = clamp(noise);
-  targetNoise = currentNoise;
-  applyVars(el, currentNoise);
+export function applySeigaihaBackground(el: HTMLElement, noiseLevel: number): void {
+  currentNoiseLevel = clamp(noiseLevel);
+  targetNoiseLevel = currentNoiseLevel;
+  applyVars(el, currentNoiseLevel, performance.now());
 }
 
 export function initializeSeigaihaBackground(el: HTMLElement): void {
   targetEl = el;
+  cacheSeigaihaTiles();
+  debugStartedAt = performance.now();
+  lastDebugLogAt = 0;
 
   const configured = Number.parseFloat(
     getComputedStyle(el).getPropertyValue("--bg-noise")
   );
   if (Number.isFinite(configured)) {
-    currentNoise = clamp(configured);
-    targetNoise = currentNoise;
+    currentNoiseLevel = clamp(configured);
+    targetNoiseLevel = currentNoiseLevel;
   }
 
   if (rafId !== null) {
@@ -240,13 +322,17 @@ export function initializeSeigaihaBackground(el: HTMLElement): void {
   }
 
   lastApplied = {
-    noise: -1,
+    noiseLevel: -1,
     blurPx: -1,
     cardOpacity: -1,
+    grainOffsetX: Number.NaN,
+    grainOffsetY: Number.NaN,
     patternImage: "",
     cardImage: "",
+    grainImage: "",
   };
 
+  applyVars(el, currentNoiseLevel, performance.now());
   rafId = window.requestAnimationFrame(render);
 }
 
