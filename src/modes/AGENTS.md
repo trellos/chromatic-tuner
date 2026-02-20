@@ -22,6 +22,12 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Tempo dial, start/stop scheduling, time-menu accents.
 - `onEnter`: attach controls and sync UI state.
 - `onExit`: stop scheduler and detach listeners.
+- **Hard UI/audio invariants (do not remove without explicit product sign-off):**
+  - The metronome sound dropdown must be able to render beyond the bottom of the metronome card (no clipping at `.mode-screen` or `.mode-stage`).
+  - Opening the metronome sound selector must not create a scrollbar in the metronome card.
+  - Sound selection must audibly change playback immediately.
+  - Keep freely-usable sample sources configured for all metronome sound profiles (`electro`, `drum`, `conga`) with both regular and accent URLs, and preserve per-profile fallback tones so sound changes remain audible if sample fetching fails.
+  - Preserve regression coverage in `tests/ui.spec.ts` for the metronome sound menu overflow + no-scrollbar behavior.
 
 ### Drum Machine (`src/modes/drum-machine.ts`)
 - 4-row, 16-step sequencer with presets and playhead.
