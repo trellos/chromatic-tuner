@@ -15,16 +15,11 @@ type TileGeometry = {
 };
 
 type WaveState = {
-  waveLx: number;
-  waveLy: number;
-  waveMx: number;
-  waveMy: number;
-  waveSx: number;
-  waveSy: number;
-  cardWaveLx: number;
-  cardWaveLy: number;
-  cardWaveMx: number;
-  cardWaveMy: number;
+  waveLPos: string;
+  waveMPos: string;
+  waveSPos: string;
+  cardWaveLPos: string;
+  cardWaveMPos: string;
 };
 
 const DEBUG_WAVES = true;
@@ -35,7 +30,6 @@ const SMALL_TILE: SeigaihaTileSpec = { radius: 32, tileSize: 384 };
 const MEDIUM_TILE: SeigaihaTileSpec = { radius: 48, tileSize: 384 };
 const LARGE_TILE: SeigaihaTileSpec = { radius: 64, tileSize: 384 };
 
-let targetEl: HTMLElement | null = null;
 let activeMode: BackgroundMode = "tuner";
 let beatIntervalMs = 500;
 let lastBeatAt = performance.now();
@@ -45,19 +39,16 @@ let rafId: number | null = null;
 let debugStartAt = 0;
 let lastDebugLogAt = 0;
 
+let rootEl: HTMLElement | null = null;
+
 const tileUrlCache = new Map<string, string>();
 
 let lastWaveState: WaveState = {
-  waveLx: Number.NaN,
-  waveLy: Number.NaN,
-  waveMx: Number.NaN,
-  waveMy: Number.NaN,
-  waveSx: Number.NaN,
-  waveSy: Number.NaN,
-  cardWaveLx: Number.NaN,
-  cardWaveLy: Number.NaN,
-  cardWaveMx: Number.NaN,
-  cardWaveMy: Number.NaN,
+  waveLPos: "",
+  waveMPos: "",
+  waveSPos: "",
+  cardWaveLPos: "",
+  cardWaveMPos: "",
 };
 
 function clamp(value: number, min = 0, max = 1): number {
@@ -66,6 +57,10 @@ function clamp(value: number, min = 0, max = 1): number {
 
 function quantizeHalfPixel(value: number): number {
   return Math.round(value * 2) / 2;
+}
+
+function pos(x: number, y: number): string {
+  return `${x}px ${y}px`;
 }
 
 function beatEnvelope(now: number): number {
@@ -81,7 +76,6 @@ function normalizeTileGeometry(spec: SeigaihaTileSpec): TileGeometry {
   const dy = radius;
   const period = Math.max(dx, 2 * dy);
   const tileSize = Math.max(period, Math.round(spec.tileSize / period) * period);
-
   return { radius, tileSize, dx, dy };
 }
 
@@ -146,28 +140,26 @@ function getTileUrl(spec: SeigaihaTileSpec): string {
   return url;
 }
 
-function applyStaticBackgroundVars(el: HTMLElement): void {
-  el.style.setProperty("--seigaiha-small-image", getTileUrl(SMALL_TILE));
-  el.style.setProperty("--seigaiha-medium-image", getTileUrl(MEDIUM_TILE));
-  el.style.setProperty("--seigaiha-large-image", getTileUrl(LARGE_TILE));
+function applyStaticBackgroundVars(root: HTMLElement): void {
+  root.style.setProperty("--seigaiha-small-image", getTileUrl(SMALL_TILE));
+  root.style.setProperty("--seigaiha-medium-image", getTileUrl(MEDIUM_TILE));
+  root.style.setProperty("--seigaiha-large-image", getTileUrl(LARGE_TILE));
 
-  el.style.setProperty("--seigaiha-small-size", "384px 384px");
-  el.style.setProperty("--seigaiha-medium-size", "384px 384px");
-  el.style.setProperty("--seigaiha-large-size", "384px 384px");
+  root.style.setProperty("--seigaiha-small-size", "384px 384px");
+  root.style.setProperty("--seigaiha-medium-size", "384px 384px");
+  root.style.setProperty("--seigaiha-large-size", "384px 384px");
 
-  el.style.setProperty("--seigaiha-opacity", "0.22");
-  el.style.setProperty("--card-seigaiha-opacity", "0.062");
+  root.style.setProperty("--seigaiha-opacity", "0.22");
+  root.style.setProperty("--card-seigaiha-opacity", "0.062");
 }
 
 function motionBoost(now: number): number {
   if (activeMode === "tuner") {
     return 1 + tunerStability * 0.08;
   }
-
   if (activeMode === "metronome" || activeMode === "drum-machine") {
     return 1 + beatEnvelope(now) * 0.1;
   }
-
   return 1;
 }
 
@@ -176,75 +168,49 @@ function computeWaveState(now: number): WaveState {
   const boost = motionBoost(now);
 
   const waveLx = quantizeHalfPixel(Math.sin(t * 0.012) * 22 * boost);
-  const waveLy = quantizeHalfPixel(Math.cos(t * 0.010) * 16 * boost);
+  const waveLy = quantizeHalfPixel(Math.cos(t * 0.01) * 16 * boost);
   const waveMx = quantizeHalfPixel(Math.sin(t * 0.018) * 34 * boost);
   const waveMy = quantizeHalfPixel(Math.cos(t * 0.015) * 26 * boost);
   const waveSx = quantizeHalfPixel(Math.sin(t * 0.025) * 46 * boost);
   const waveSy = quantizeHalfPixel(Math.cos(t * 0.021) * 34 * boost);
 
   return {
-    waveLx,
-    waveLy,
-    waveMx,
-    waveMy,
-    waveSx,
-    waveSy,
-    cardWaveLx: quantizeHalfPixel(waveLx * 0.6),
-    cardWaveLy: quantizeHalfPixel(waveLy * 0.6),
-    cardWaveMx: quantizeHalfPixel(waveMx * 0.6),
-    cardWaveMy: quantizeHalfPixel(waveMy * 0.6),
+    waveLPos: pos(waveLx, waveLy),
+    waveMPos: pos(waveMx, waveMy),
+    waveSPos: pos(waveSx, waveSy),
+    cardWaveLPos: pos(quantizeHalfPixel(waveLx * 0.6), quantizeHalfPixel(waveLy * 0.6)),
+    cardWaveMPos: pos(quantizeHalfPixel(waveMx * 0.6), quantizeHalfPixel(waveMy * 0.6)),
   };
 }
 
-function applyWaveVars(el: HTMLElement, state: WaveState): void {
-  if (state.waveLx !== lastWaveState.waveLx) {
-    el.style.setProperty("--waveL-x", String(state.waveLx));
-    lastWaveState.waveLx = state.waveLx;
+function applyWaveVars(root: HTMLElement, state: WaveState): void {
+  if (state.waveLPos !== lastWaveState.waveLPos) {
+    root.style.setProperty("--waveL-pos", state.waveLPos);
+    lastWaveState.waveLPos = state.waveLPos;
   }
-  if (state.waveLy !== lastWaveState.waveLy) {
-    el.style.setProperty("--waveL-y", String(state.waveLy));
-    lastWaveState.waveLy = state.waveLy;
+  if (state.waveMPos !== lastWaveState.waveMPos) {
+    root.style.setProperty("--waveM-pos", state.waveMPos);
+    lastWaveState.waveMPos = state.waveMPos;
   }
-  if (state.waveMx !== lastWaveState.waveMx) {
-    el.style.setProperty("--waveM-x", String(state.waveMx));
-    lastWaveState.waveMx = state.waveMx;
+  if (state.waveSPos !== lastWaveState.waveSPos) {
+    root.style.setProperty("--waveS-pos", state.waveSPos);
+    lastWaveState.waveSPos = state.waveSPos;
   }
-  if (state.waveMy !== lastWaveState.waveMy) {
-    el.style.setProperty("--waveM-y", String(state.waveMy));
-    lastWaveState.waveMy = state.waveMy;
+  if (state.cardWaveLPos !== lastWaveState.cardWaveLPos) {
+    root.style.setProperty("--cardWaveL-pos", state.cardWaveLPos);
+    lastWaveState.cardWaveLPos = state.cardWaveLPos;
   }
-  if (state.waveSx !== lastWaveState.waveSx) {
-    el.style.setProperty("--waveS-x", String(state.waveSx));
-    lastWaveState.waveSx = state.waveSx;
-  }
-  if (state.waveSy !== lastWaveState.waveSy) {
-    el.style.setProperty("--waveS-y", String(state.waveSy));
-    lastWaveState.waveSy = state.waveSy;
-  }
-
-  if (state.cardWaveLx !== lastWaveState.cardWaveLx) {
-    el.style.setProperty("--cardWaveL-x", String(state.cardWaveLx));
-    lastWaveState.cardWaveLx = state.cardWaveLx;
-  }
-  if (state.cardWaveLy !== lastWaveState.cardWaveLy) {
-    el.style.setProperty("--cardWaveL-y", String(state.cardWaveLy));
-    lastWaveState.cardWaveLy = state.cardWaveLy;
-  }
-  if (state.cardWaveMx !== lastWaveState.cardWaveMx) {
-    el.style.setProperty("--cardWaveM-x", String(state.cardWaveMx));
-    lastWaveState.cardWaveMx = state.cardWaveMx;
-  }
-  if (state.cardWaveMy !== lastWaveState.cardWaveMy) {
-    el.style.setProperty("--cardWaveM-y", String(state.cardWaveMy));
-    lastWaveState.cardWaveMy = state.cardWaveMy;
+  if (state.cardWaveMPos !== lastWaveState.cardWaveMPos) {
+    root.style.setProperty("--cardWaveM-pos", state.cardWaveMPos);
+    lastWaveState.cardWaveMPos = state.cardWaveMPos;
   }
 }
 
 function render(now: number): void {
-  if (!targetEl) return;
+  if (!rootEl) return;
 
   const state = computeWaveState(now);
-  applyWaveVars(targetEl, state);
+  applyWaveVars(rootEl, state);
 
   if (
     DEBUG_WAVES &&
@@ -252,25 +218,14 @@ function render(now: number): void {
     now - lastDebugLogAt >= 1000
   ) {
     lastDebugLogAt = now;
-    console.debug("[seigaiha-vars]", {
-      waveLx: state.waveLx,
-      waveLy: state.waveLy,
-      waveMx: state.waveMx,
-      waveMy: state.waveMy,
-      waveSx: state.waveSx,
-      waveSy: state.waveSy,
-      cardWaveLx: state.cardWaveLx,
-      cardWaveLy: state.cardWaveLy,
-      cardWaveMx: state.cardWaveMx,
-      cardWaveMy: state.cardWaveMy,
-    });
+    console.debug("[seigaiha-vars]", state);
   }
 
   rafId = window.requestAnimationFrame(render);
 }
 
-export function initializeSeigaihaBackground(el: HTMLElement): void {
-  targetEl = el;
+export function initializeSeigaihaBackground(_el: HTMLElement): void {
+  rootEl = document.documentElement;
   debugStartAt = performance.now();
   lastDebugLogAt = 0;
 
@@ -279,20 +234,15 @@ export function initializeSeigaihaBackground(el: HTMLElement): void {
   }
 
   lastWaveState = {
-    waveLx: Number.NaN,
-    waveLy: Number.NaN,
-    waveMx: Number.NaN,
-    waveMy: Number.NaN,
-    waveSx: Number.NaN,
-    waveSy: Number.NaN,
-    cardWaveLx: Number.NaN,
-    cardWaveLy: Number.NaN,
-    cardWaveMx: Number.NaN,
-    cardWaveMy: Number.NaN,
+    waveLPos: "",
+    waveMPos: "",
+    waveSPos: "",
+    cardWaveLPos: "",
+    cardWaveMPos: "",
   };
 
-  applyStaticBackgroundVars(el);
-  applyWaveVars(el, computeWaveState(performance.now()));
+  applyStaticBackgroundVars(rootEl);
+  applyWaveVars(rootEl, computeWaveState(performance.now()));
   rafId = window.requestAnimationFrame(render);
 }
 
