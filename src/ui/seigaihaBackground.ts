@@ -26,7 +26,6 @@ const DEBUG = false;
 
 let targetEl: HTMLElement | null = null;
 let activeMode: BackgroundMode = "tuner";
-
 let beatIntervalMs = 500;
 let lastBeatAt = performance.now();
 let tunerStability = 0;
@@ -36,8 +35,9 @@ let currentNoiseLevel = 0.25;
 let rafId: number | null = null;
 let lastDebugLogAt = 0;
 
-const seigaihaUrlCache = new Map<string, string>();
-const cardUrlCache = new Map<string, string>();
+let seigaihaSmallImageUrl = "";
+let seigaihaMediumImageUrl = "";
+let seigaihaLargeImageUrl = "";
 
 let grainImageUrl = "";
 
@@ -54,10 +54,6 @@ let lastApplied = {
 
 function clamp(value: number, min = 0, max = 1): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }
 
 function beatEnvelope(now: number): number {
@@ -217,10 +213,8 @@ function applyVars(el: HTMLElement, noiseLevel: number, now: number): void {
     lastApplied.patternImage = patternImage;
   }
 
-  if (cardImage !== lastApplied.cardImage) {
-    el.style.setProperty("--card-seigaiha-image", cardImage);
-    lastApplied.cardImage = cardImage;
-  }
+function applyStaticVars(el: HTMLElement): void {
+  initializeSeigaihaImages();
 
   if (grainImage !== lastApplied.grainImage) {
     el.style.setProperty("--grain-image", grainImage);
@@ -233,15 +227,13 @@ function applyVars(el: HTMLElement, noiseLevel: number, now: number): void {
     el.style.setProperty("--seigaiha-grain-opacity", grainOpacity.toFixed(3));
     lastApplied.noiseLevel = quantized;
   }
-
-  if (Math.abs(blurPx - lastApplied.blurPx) > 0.001) {
-    el.style.setProperty("--seigaiha-blur", `${blurPx.toFixed(3)}px`);
-    lastApplied.blurPx = blurPx;
+  if (seigaihaMediumImageUrl !== lastApplied.mediumImage) {
+    el.style.setProperty("--seigaiha-medium-image", seigaihaMediumImageUrl);
+    lastApplied.mediumImage = seigaihaMediumImageUrl;
   }
-
-  if (Math.abs(cardOpacity - lastApplied.cardOpacity) > 0.001) {
-    el.style.setProperty("--card-seigaiha-opacity", cardOpacity.toFixed(3));
-    lastApplied.cardOpacity = cardOpacity;
+  if (seigaihaLargeImageUrl !== lastApplied.largeImage) {
+    el.style.setProperty("--seigaiha-large-image", seigaihaLargeImageUrl);
+    lastApplied.largeImage = seigaihaLargeImageUrl;
   }
 
   if (grainOffsetX !== lastApplied.grainOffsetX || grainOffsetY !== lastApplied.grainOffsetY) {
@@ -282,6 +274,8 @@ function computeTargetNoiseLevel(now: number): number {
 
 function render(now: number): void {
   if (!targetEl) return;
+  const offsets = computeWaveOffsets(now);
+  applyWaveVars(targetEl, offsets);
 
   targetNoiseLevel = computeTargetNoiseLevel(now);
   currentNoiseLevel = lerp(currentNoiseLevel, targetNoiseLevel, 0.12);

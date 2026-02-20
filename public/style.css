@@ -10,8 +10,9 @@
   --panel-strong: rgba(255, 255, 255, 0.96);
   --stroke: rgba(12, 16, 32, 0.12);
   --bg-noise: 0.35;
-  --seigaiha-image: none;
-  --grain-image: none;
+  --seigaiha-small-image: none;
+  --seigaiha-medium-image: none;
+  --seigaiha-large-image: none;
   --card-seigaiha-image: none;
   --seigaiha-size: 288px 288px;
   --seigaiha-opacity: 0.20;
@@ -59,10 +60,19 @@ body::after {
 
 body::before {
   z-index: 0;
-  background-image: var(--seigaiha-image);
-  background-size: var(--seigaiha-size);
-  background-position: 0 0;
-  background-repeat: repeat;
+  background-image:
+    var(--seigaiha-large-image),
+    var(--seigaiha-medium-image),
+    var(--seigaiha-small-image);
+  background-size:
+    var(--seigaiha-large-size),
+    var(--seigaiha-medium-size),
+    var(--seigaiha-small-size);
+  background-position:
+    calc(var(--waveL-x) * 1px) calc(var(--waveL-y) * 1px),
+    calc(var(--waveM-x) * 1px) calc(var(--waveM-y) * 1px),
+    calc(var(--waveS-x) * 1px) calc(var(--waveS-y) * 1px);
+  background-repeat: repeat, repeat, repeat;
   opacity: var(--seigaiha-opacity);
   filter: none;
 }
@@ -209,12 +219,14 @@ body.drum-fullscreen .mode-stage {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background-image: var(--card-seigaiha-image);
-  background-size: var(--seigaiha-size);
-  background-repeat: repeat;
-  background-position: 0 0;
+  background-image: var(--seigaiha-large-image), var(--seigaiha-medium-image);
+  background-size: var(--seigaiha-large-size), var(--seigaiha-medium-size);
+  background-repeat: repeat, repeat;
+  background-position:
+    calc(var(--waveL-x) * 0.6px) calc(var(--waveL-y) * 0.6px),
+    calc(var(--waveM-x) * 0.6px) calc(var(--waveM-y) * 0.6px);
   opacity: var(--card-seigaiha-opacity);
-  filter: blur(var(--seigaiha-blur));
+  filter: none;
   mix-blend-mode: multiply;
   z-index: 0;
 }
