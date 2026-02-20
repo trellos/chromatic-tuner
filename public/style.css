@@ -134,6 +134,10 @@ body.drum-fullscreen .mode-stage {
   touch-action: pan-y;
 }
 
+.mode-stage.metronome-overflow-visible {
+  overflow: visible;
+}
+
 .mode-screen {
   display: none;
   width: min(720px, 100%);
@@ -183,6 +187,10 @@ body.drum-fullscreen .mode-stage {
 .mode-screen[data-mode="tuner"] {
   --tuner-dial-size: min(520px, calc(var(--mode-panel-height) - 140px), 90vw);
   overflow: hidden;
+}
+
+.mode-screen[data-mode="metronome"] {
+  overflow: visible;
 }
 
 .mode-screen[data-mode="tuner"].is-active {
@@ -470,6 +478,7 @@ body.status-hidden #status {
   flex-direction: column;
   align-items: center;
   gap: 18px;
+  overflow: visible;
 }
 
 .tempo-dial {
@@ -637,6 +646,7 @@ body.status-hidden #status {
 .metro-option {
   position: relative;
   padding: 6px;
+  overflow: visible;
 }
 
 .option-btn {
@@ -656,12 +666,13 @@ body.status-hidden #status {
   left: 50%;
   transform: translateX(-50%);
   background: #ffffff;
+  isolation: isolate;
   border: 1px solid rgba(12, 16, 32, 0.12);
   border-radius: 12px;
   padding: 6px;
   display: none;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
-  z-index: 2;
+  z-index: 20;
   min-width: 120px;
 }
 

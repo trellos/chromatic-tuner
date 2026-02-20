@@ -357,6 +357,36 @@ test('drum machine fullscreen keeps toolbar buttons visible and parallel to grid
   expect(gridTransform).toBe('none');
 });
 
+test('metronome sound menu opens without creating a scrollbar on the metronome card', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Metronome' }).click();
+
+  const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
+  const soundButton = page.locator('#metro-sound-button');
+  const soundMenu = page.locator('#metro-sound-menu');
+
+  await expect(metronomeScreen).toHaveClass(/is-active/);
+  await soundButton.click();
+  await expect(soundMenu).toHaveClass(/is-open/);
+
+  const overflowState = await metronomeScreen.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const menu = element.querySelector<HTMLElement>('#metro-sound-menu');
+    const cardRect = element.getBoundingClientRect();
+    const menuRect = menu?.getBoundingClientRect();
+    return {
+      overflowY: style.overflowY,
+      hasVerticalOverflow: element.scrollHeight > element.clientHeight + 1,
+      menuBottom: menuRect?.bottom ?? 0,
+      cardBottom: cardRect.bottom,
+    };
+  });
+
+  expect(overflowState.overflowY).toBe('visible');
+  expect(overflowState.hasVerticalOverflow).toBeFalsy();
+  expect(overflowState.menuBottom).toBeGreaterThan(overflowState.cardBottom);
+});
+
 test('mode switching remains responsive after a runtime hook error', async ({ page }) => {
   await page.goto('/');
 

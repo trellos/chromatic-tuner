@@ -17,6 +17,7 @@ export function createMetronomeMode(): ModeDefinition {
   const soundMenuEl = document.getElementById("metro-sound-menu");
   const controlsEl =
     metronomeEl?.querySelector<HTMLElement>(".metro-controls") ?? null;
+  const modeStageEl = metronomeEl?.closest<HTMLElement>(".mode-stage") ?? null;
 
   const BPM_MIN = 40;
   const BPM_MAX = 220;
@@ -26,7 +27,19 @@ export function createMetronomeMode(): ModeDefinition {
   const SCHEDULE_AHEAD = 0.1;
   const METRO_BPM_STORAGE_KEY = "tuna.metronome.bpm";
   type MetronomeSoundId = "electro" | "drum" | "conga";
-  type SoundProfile = { label: string; regularUrl: string; accentUrl: string };
+  type ToneProfile = {
+    type: OscillatorType;
+    frequency: number;
+    gain: number;
+    duration: number;
+  };
+  type SoundProfile = {
+    label: string;
+    regularUrl: string;
+    accentUrl: string;
+    regularTone: ToneProfile;
+    accentTone: ToneProfile;
+  };
   const SOUND_PROFILES: Record<MetronomeSoundId, SoundProfile> = {
     electro: {
       label: "Electro",
@@ -34,6 +47,8 @@ export function createMetronomeMode(): ModeDefinition {
         "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/hihat.wav",
       accentUrl:
         "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/snare.wav",
+      regularTone: { type: "square", frequency: 920, gain: 0.18, duration: 0.04 },
+      accentTone: { type: "square", frequency: 1220, gain: 0.26, duration: 0.055 },
     },
     drum: {
       label: "Drum",
@@ -41,6 +56,8 @@ export function createMetronomeMode(): ModeDefinition {
         "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/hihat.wav",
       accentUrl:
         "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/acoustic/snare.wav",
+      regularTone: { type: "triangle", frequency: 690, gain: 0.2, duration: 0.05 },
+      accentTone: { type: "triangle", frequency: 960, gain: 0.28, duration: 0.07 },
     },
     conga: {
       label: "Conga",
@@ -48,6 +65,8 @@ export function createMetronomeMode(): ModeDefinition {
         "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/conga.wav",
       accentUrl:
         "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/snare.wav",
+      regularTone: { type: "sine", frequency: 510, gain: 0.23, duration: 0.06 },
+      accentTone: { type: "sawtooth", frequency: 770, gain: 0.3, duration: 0.08 },
     },
   };
 
@@ -218,15 +237,18 @@ export function createMetronomeMode(): ModeDefinition {
     }
 
     if (!audioContext) return;
+    const tone = accent
+      ? SOUND_PROFILES[soundId].accentTone
+      : SOUND_PROFILES[soundId].regularTone;
     const osc = audioContext.createOscillator();
     const gain = audioContext.createGain();
-    osc.type = "square";
-    osc.frequency.value = accent ? 980 : 740;
-    gain.gain.value = accent ? 0.25 : 0.18;
+    osc.type = tone.type;
+    osc.frequency.value = tone.frequency;
+    gain.gain.value = tone.gain;
     osc.connect(gain);
     gain.connect(audioContext.destination);
     osc.start(time);
-    osc.stop(time + 0.05);
+    osc.stop(time + tone.duration);
   };
 
   const schedulePulse = (time: number, accent: boolean) => {
@@ -471,6 +493,7 @@ export function createMetronomeMode(): ModeDefinition {
   };
 
   const enter = async () => {
+    modeStageEl?.classList.add("metronome-overflow-visible");
     readStoredBpm();
     setBpm(bpm);
     setTimeSignature(timeSignature);
@@ -481,6 +504,7 @@ export function createMetronomeMode(): ModeDefinition {
 
   const exit = () => {
     stop();
+    modeStageEl?.classList.remove("metronome-overflow-visible");
     uiAbort?.abort();
     uiAbort = null;
   };
