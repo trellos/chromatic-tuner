@@ -14,6 +14,13 @@ const A4 = 440;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 const SHOW_STATUS = new URLSearchParams(window.location.search).has("debug");
 
+class AudioInteractionRequiredError extends Error {
+  constructor(message = "Audio requires a user interaction to start.") {
+    super(message);
+    this.name = "AudioInteractionRequiredError";
+  }
+}
+
 // Creates an AudioContext with an iOS-specific warmup path to reduce
 // first-start failures observed on Safari.
 async function createAudioContext(
@@ -441,6 +448,19 @@ let testOsc: OscillatorNode | null = null;
 let micGainNode: GainNode | null = null;
 let oscGainNode: GainNode | null = null;
 let tunerUiAbort: AbortController | null = null;
+let awaitingAudioUnlock = false;
+let lastAudioMessageAt = 0;
+
+function setAudioDiagnostics(): void {
+  const diagnostics = {
+    isIOS,
+    awaitingAudioUnlock,
+    contextState: audioContext?.state ?? "none",
+    hasWorkletNode: workletNode !== null,
+    lastAudioMessageAgeMs: lastAudioMessageAt === 0 ? null : Math.max(0, Math.round(performance.now() - lastAudioMessageAt)),
+  };
+  (window as any).__tunerAudioDiagnostics = diagnostics;
+}
 
 function stopAnimationLoop(): void {
   if (animationFrameId !== null) {
@@ -463,6 +483,9 @@ function cleanupAudio(): void {
   audioContext = null;
   workletNode = null;
   scriptNode = null;
+  lastAudioMessageAt = 0;
+  awaitingAudioUnlock = false;
+  setAudioDiagnostics();
 }
 
 // Builds the tuner audio graph and starts pitch updates from the worklet
@@ -492,9 +515,12 @@ async function startAudio() {
   const ctx = await createAudioContext(AudioCtx);
   audioContext = ctx;
   await ctx.resume();
-  if (!ctx) {
-    throw new Error("AudioContext failed to initialize.");
+  if (ctx.state !== "running") {
+    throw new AudioInteractionRequiredError(
+      `AudioContext stayed in "${ctx.state}" after resume.`
+    );
   }
+  setAudioDiagnostics();
 
   setStatus("Loading worklet moduleâ€¦");
   if (!ctx.audioWorklet) {
@@ -674,6 +700,8 @@ async function startAudio() {
   }
 
   workletNode.port.onmessage = (ev) => {
+    lastAudioMessageAt = performance.now();
+    setAudioDiagnostics();
     const data = ev.data as any;
 
     if (data?.type === "worklet-ready") {
@@ -848,6 +876,8 @@ async function enterTunerMode(): Promise<void> {
 
   const startWithHandling = async () => {
     try {
+      awaitingAudioUnlock = false;
+      setAudioDiagnostics();
       await startAudio();
     } catch (err) {
       console.error(err);
@@ -864,14 +894,22 @@ async function enterTunerMode(): Promise<void> {
         }
       }
 
-      if (isIOS && err instanceof Error && err.name === "NotAllowedError") {
-        // On iOS, prompt for a tap only if needed.
+      const needsInteraction =
+        err instanceof Error &&
+        (err.name === "NotAllowedError" || err.name === "AudioInteractionRequiredError");
+
+      if (isIOS && needsInteraction) {
+        // On iOS, prompt for a tap only when user interaction is required.
+        awaitingAudioUnlock = true;
+        setAudioDiagnostics();
         if (SHOW_STATUS) {
           setStatus("Tap to start audio...");
         }
         const onFirstInteraction = () => {
           document.removeEventListener("click", onFirstInteraction);
           document.removeEventListener("touchend", onFirstInteraction);
+          awaitingAudioUnlock = false;
+          setAudioDiagnostics();
           startWithHandling();
         };
         document.addEventListener("click", onFirstInteraction, { once: true });
@@ -910,6 +948,5 @@ export function createTunerMode(): ModeDefinition {
     onExit: exitTunerMode,
   };
 }
-
 
 
