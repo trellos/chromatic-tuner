@@ -1,5 +1,7 @@
 import type { ModeDefinition } from "./types.js";
 
+let sessionBpm = 120;
+
 // Mode factory for the metronome screen: tempo/time-signature controls,
 // click scheduling, and lifecycle-managed event wiring.
 export function createMetronomeMode(): ModeDefinition {
@@ -58,6 +60,7 @@ export function createMetronomeMode(): ModeDefinition {
   let regularBuffer: AudioBuffer | null = null;
   let accentBuffer: AudioBuffer | null = null;
   let samplesLoadingPromise: Promise<void> | null = null;
+  let samplesRequestId = 0;
   let schedulerId: number | null = null;
   let nextNoteTime = 0;
   let currentBeat = 0;
@@ -65,8 +68,13 @@ export function createMetronomeMode(): ModeDefinition {
   let pulseTimeouts: number[] = [];
 
   const readStoredBpm = () => {
-    const raw = window.localStorage.getItem(METRO_BPM_STORAGE_KEY);
-    const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(METRO_BPM_STORAGE_KEY);
+    } catch {
+      raw = null;
+    }
+    const parsed = raw ? Number.parseInt(raw, 10) : sessionBpm;
     if (Number.isFinite(parsed)) {
       bpm = clamp(parsed, BPM_MIN, BPM_MAX);
     }
@@ -89,7 +97,12 @@ export function createMetronomeMode(): ModeDefinition {
 
   const setBpm = (value: number) => {
     bpm = clamp(Math.round(value), BPM_MIN, BPM_MAX);
-    window.localStorage.setItem(METRO_BPM_STORAGE_KEY, String(bpm));
+    sessionBpm = bpm;
+    try {
+      window.localStorage.setItem(METRO_BPM_STORAGE_KEY, String(bpm));
+    } catch {
+      // Some contexts disallow storage access; keep session fallback only.
+    }
     if (tempoValueEl) {
       tempoValueEl.textContent = String(bpm);
     }
@@ -107,6 +120,7 @@ export function createMetronomeMode(): ModeDefinition {
     regularBuffer = null;
     accentBuffer = null;
     samplesLoadingPromise = null;
+    samplesRequestId += 1;
     setSoundLabel();
     if (audioContext) {
       void ensureSamples();
@@ -145,22 +159,31 @@ export function createMetronomeMode(): ModeDefinition {
     }
 
     samplesLoadingPromise = (async () => {
-    const loadSample = async (url: string) => {
-      try {
-        const response = await fetch(url);
+      const requestedSoundId = soundId;
+      const requestId = ++samplesRequestId;
+      const loadSample = async (url: string) => {
+        try {
+          const response = await fetch(url);
           if (!response.ok) return null;
-        const data = await response.arrayBuffer();
-        return await audioContext!.decodeAudioData(data);
-      } catch {
-        return null;
-      }
-    };
+          const data = await response.arrayBuffer();
+          return await audioContext!.decodeAudioData(data);
+        } catch {
+          return null;
+        }
+      };
 
-    const profile = SOUND_PROFILES[soundId];
-    [regularBuffer, accentBuffer] = await Promise.all([
-      loadSample(profile.regularUrl),
-      loadSample(profile.accentUrl),
-    ]);
+      const profile = SOUND_PROFILES[requestedSoundId];
+      const [nextRegularBuffer, nextAccentBuffer] = await Promise.all([
+        loadSample(profile.regularUrl),
+        loadSample(profile.accentUrl),
+      ]);
+
+      if (requestId !== samplesRequestId || requestedSoundId !== soundId) {
+        return;
+      }
+
+      regularBuffer = nextRegularBuffer;
+      accentBuffer = nextAccentBuffer;
     })();
 
     try {
