@@ -13,7 +13,7 @@
   --seigaiha-image: none;
   --grain-image: none;
   --seigaiha-size: 256px 256px;
-  --seigaiha-blur: 0px;
+  --card-seigaiha-opacity: 0.07;
   --seigaiha-grain-opacity: 0;
 }
 
@@ -58,7 +58,6 @@ body::before {
   background-size: var(--seigaiha-size);
   background-position: 0 0;
   background-repeat: repeat;
-  filter: blur(var(--seigaiha-blur));
   opacity: 1;
 }
 
@@ -194,6 +193,26 @@ body.drum-fullscreen .mode-stage {
   backdrop-filter: blur(12px);
   position: relative;
   overflow: auto;
+}
+
+
+.mode-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: var(--seigaiha-image);
+  background-size: var(--seigaiha-size);
+  background-repeat: repeat;
+  background-position: 0 0;
+  opacity: var(--card-seigaiha-opacity);
+  z-index: 0;
+}
+
+.mode-screen > * {
+  position: relative;
+  z-index: 1;
 }
 
 .mode-screen.is-active {

@@ -43,7 +43,7 @@ export function makeSeigaihaTileSvg(opts: SeigaihaOpts = {}): string {
   const baseRadius = opts.radius ?? DEFAULT_RADIUS;
   const noise = clamp(opts.noise ?? 0);
 
-  const patternOpacity = lerp(0.05, 0.08, 1 - noise);
+  const patternOpacity = lerp(0.06, 0.10, 1 - noise);
   const dx = 2 * baseRadius;
   const dy = baseRadius;
   const radii = [baseRadius, (baseRadius * 2) / 3, baseRadius / 3];
@@ -93,7 +93,6 @@ export function applySeigaihaBackground(el: HTMLElement, noise: number): void {
   const tileSize = DEFAULT_TILE_SIZE;
 
   const grainOpacity = lerp(0.0, 0.14, clampedNoise);
-  const patternBlurPx = lerp(0.0, 0.8, clampedNoise);
 
   const seigaihaSvg = makeSeigaihaTileSvg({
     tileSize,
@@ -106,9 +105,10 @@ export function applySeigaihaBackground(el: HTMLElement, noise: number): void {
   el.style.setProperty("--seigaiha-image", `url("${svgToDataUrl(seigaihaSvg)}")`);
   el.style.setProperty("--grain-image", `url("${svgToDataUrl(grainSvg)}")`);
   el.style.setProperty("--seigaiha-size", `${tileSize}px ${tileSize}px`);
-  el.style.setProperty("--seigaiha-blur", `${patternBlurPx.toFixed(3)}px`);
   el.style.setProperty("--seigaiha-grain-opacity", grainOpacity.toFixed(3));
+  el.style.setProperty("--card-seigaiha-opacity", lerp(0.05, 0.09, 1 - clampedNoise).toFixed(3));
 }
+
 
 function renderBackground(now: number): void {
   if (!targetEl) return;
