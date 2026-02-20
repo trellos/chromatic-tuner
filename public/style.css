@@ -13,11 +13,13 @@
   --seigaiha-image: none;
   --grain-image: none;
   --card-seigaiha-image: none;
-  --seigaiha-size: 256px 256px;
+  --seigaiha-size: 288px 288px;
   --seigaiha-opacity: 0.20;
   --seigaiha-grain-opacity: 0.05;
   --seigaiha-blur: 0px;
   --card-seigaiha-opacity: 0.08;
+  --grain-offset-x: 0px;
+  --grain-offset-y: 0px;
 }
 
 
@@ -69,10 +71,11 @@ body::after {
   z-index: 0;
   background-image: var(--grain-image);
   background-size: 256px 256px;
-  background-position: 0 0;
+  background-position: var(--grain-offset-x) var(--grain-offset-y);
   background-repeat: repeat;
   opacity: var(--seigaiha-grain-opacity);
   mix-blend-mode: soft-light;
+  filter: blur(0.35px);
 }
 
 body > * {
