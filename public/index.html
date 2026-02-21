@@ -165,7 +165,7 @@
                 <div class="drum-beat-picker">
                   <button
                     id="drum-kit-button"
-                    class="ghost-btn drum-random"
+                    class="ghost-btn drum-random drum-kit-trigger"
                     type="button"
                     aria-haspopup="menu"
                     aria-expanded="false"
@@ -181,6 +181,17 @@
                     <button type="button" role="menuitem" data-kit="woodblock">Woodblock Ensemble</button>
                   </div>
                 </div>
+                <button
+                  id="drum-share-button"
+                  class="drum-share-button"
+                  type="button"
+                  aria-label="Share track"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 3L8.2 6.8a1 1 0 0 0 1.4 1.4L11 6.8V14a1 1 0 1 0 2 0V6.8l1.4 1.4a1 1 0 1 0 1.4-1.4L12 3z" />
+                    <path d="M7 11a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2.2a1 1 0 0 0 0 2H17v6H7v-6h2.2a1 1 0 1 0 0-2H7z" />
+                  </svg>
+                </button>
                 <button id="drum-play-toggle" class="primary-btn drum-play" type="button">Play</button>
               </div>
 

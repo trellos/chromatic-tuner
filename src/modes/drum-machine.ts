@@ -23,6 +23,7 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   const drumGridsEl = drumMockEl?.querySelector<HTMLElement>(".drum-grids") ?? null;
   const playheadEl = drumMockEl?.querySelector<HTMLElement>(".drum-playhead") ?? null;
   const playButton = document.getElementById("drum-play-toggle");
+  const shareButton = document.getElementById("drum-share-button");
   const beatButton = document.getElementById("drum-beat-button");
   const beatMenu = document.getElementById("drum-beat-menu");
   const kitButton = document.getElementById("drum-kit-button");
@@ -131,6 +132,31 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
 
   const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
+
+  type SharedTrackPayload = {
+    version: number;
+    bpm: number;
+    kit: KitId;
+    steps: string;
+  };
+
+  // Shared URL format: ?mode=drum-machine&track=<base64url(JSON)>
+  // JSON payload (v1): { version: 1, bpm: number, kit: KitId, steps: string }
+  // `steps` is a 64-char row-major bitstring for the 4x16 grid; parser also accepts legacy `v`.
+  const TRACK_PARAM_KEY = "track";
+  const TRACK_FORMAT_VERSION = 1;
+
+  const toBase64Url = (value: string) =>
+    btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+
+  const fromBase64Url = (value: string) => {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return atob(padded);
+  };
+
+  const isKitId = (value: string): value is KitId => value in DRUM_KITS;
+
 
   const getRandomnessTarget = () =>
     clamp(options.getRandomnessTarget?.() ?? DEFAULT_RANDOMNESS_TARGET, 0, 1);
@@ -403,6 +429,95 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
         applyPattern(snare, [4, 12]);
         applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
         break;
+    }
+  };
+
+
+  const getActiveGrid = () =>
+    drumMockEl?.querySelector<HTMLElement>(`.drum-grid[data-signature="${signature}"]`) ?? null;
+
+  const getTrackStepBits = (grid: HTMLElement | null): string => {
+    if (!grid) return "";
+    const rows = Array.from(grid.querySelectorAll<HTMLElement>(".drum-row"));
+    return rows
+      .map((row) =>
+        Array.from(row.querySelectorAll<HTMLButtonElement>(".step"))
+          .map((step) => (step.classList.contains("is-on") ? "1" : "0"))
+          .join("")
+      )
+      .join("");
+  };
+
+  const applyTrackStepBits = (grid: HTMLElement | null, bits: string) => {
+    if (!grid) return false;
+    const rows = Array.from(grid.querySelectorAll<HTMLElement>(".drum-row"));
+    const expectedLength = rows.length * getStepsPerBar();
+    if (bits.length !== expectedLength || /[^01]/.test(bits)) return false;
+    rows.forEach((row, rowIndex) => {
+      const rowBits = bits.slice(
+        rowIndex * getStepsPerBar(),
+        (rowIndex + 1) * getStepsPerBar()
+      );
+      clearRow(row);
+      Array.from(row.querySelectorAll<HTMLButtonElement>(".step")).forEach(
+        (step, stepIndex) => {
+          step.classList.toggle("is-on", rowBits[stepIndex] === "1");
+        }
+      );
+    });
+    return true;
+  };
+
+  const getShareUrl = () => {
+    const activeGrid = getActiveGrid();
+    const payload: SharedTrackPayload = {
+      version: TRACK_FORMAT_VERSION,
+      bpm,
+      kit: currentKit,
+      steps: getTrackStepBits(activeGrid),
+    };
+    const encoded = toBase64Url(JSON.stringify(payload));
+    const url = new URL(window.location.href);
+    url.searchParams.set("mode", "drum-machine");
+    url.searchParams.set(TRACK_PARAM_KEY, encoded);
+    return url.toString();
+  };
+
+  const copyShareUrl = async () => {
+    const shareUrl = getShareUrl();
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        shareButton?.setAttribute("aria-label", "Share URL copied");
+      } else {
+        window.prompt("Copy this drum track URL", shareUrl);
+      }
+    } catch {
+      window.prompt("Copy this drum track URL", shareUrl);
+    }
+  };
+
+  const hydrateTrackFromUrl = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const encodedTrack = params.get(TRACK_PARAM_KEY);
+    if (!encodedTrack) return false;
+    try {
+      const raw = fromBase64Url(encodedTrack);
+      const parsed = JSON.parse(raw) as Partial<SharedTrackPayload> & { v?: number };
+      const parsedVersion =
+        typeof parsed.version === "number"
+          ? parsed.version
+          : typeof parsed.v === "number"
+            ? parsed.v
+            : null;
+      if (parsedVersion !== TRACK_FORMAT_VERSION || typeof parsed.steps !== "string") return false;
+      if (typeof parsed.bpm === "number") setBpm(parsed.bpm);
+      if (typeof parsed.kit === "string" && isKitId(parsed.kit)) {
+        await setKit(parsed.kit);
+      }
+      return applyTrackStepBits(getActiveGrid(), parsed.steps);
+    } catch {
+      return false;
     }
   };
 
@@ -688,6 +803,16 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
       { signal }
     );
 
+    if (shareButton) {
+      shareButton.addEventListener(
+        "click",
+        () => {
+          void copyShareUrl();
+        },
+        { signal }
+      );
+    }
+
     if (playButton) {
       playButton.addEventListener(
         "click",
@@ -790,7 +915,10 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     syncResponsiveLayout();
     scheduleLayoutSync();
     if (!hasSeedPattern) {
-      applyStandardRock();
+      const hydrated = await hydrateTrackFromUrl();
+      if (!hydrated) {
+        applyStandardRock();
+      }
       hasSeedPattern = true;
     }
   };

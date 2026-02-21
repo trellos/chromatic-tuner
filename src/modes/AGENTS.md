@@ -59,6 +59,16 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Switching drum kit while transport is running must apply to newly scheduled steps immediately; any already-started sample source may finish naturally.
   - Keep kit sample loading/caching resilient to rapid switching so stale async fetch completion cannot overwrite the currently selected kit.
   - Prefer text-only embedded sample sources for new audio assets when possible to avoid binary-diff PR tooling failures.
+- Share URL track format (`?track=<base64url(JSON)>`):
+  - Include `mode=drum-machine` in generated share URLs so links open directly in drum mode.
+  - JSON payload is versioned with `version` (currently `1`) and must remain backward-compatible when evolving.
+  - Current `version: 1` payload fields:
+    - `version`: number (`1`)
+    - `bpm`: number (`60..180`)
+    - `kit`: kit id (`rock|electro|house|lofi|latin`)
+    - `steps`: 64-char bitstring (`0|1`), row-major order over 4 rows × 16 steps (this is the user-edited loop)
+  - Do not serialize the beat preset selector value in new links; share payloads must preserve the actual edited loop, plus kit and tempo.
+  - Parser should continue accepting legacy `v` (number) as version fallback for already-shared links, but new links should emit `version`.
 
 ## Guardrails
 
