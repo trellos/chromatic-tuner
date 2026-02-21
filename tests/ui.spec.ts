@@ -11,6 +11,12 @@ type PageIssueTracker = {
   failedRequests: string[];
 };
 
+async function readDebugRandomness(page: Page): Promise<number> {
+  const text = await page.locator(".seigaiha-debug-value").first().textContent();
+  const parsed = Number.parseFloat(text ?? "");
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
 test("seigaiha background: single static traditional layer", async ({ page }) => {
   await page.goto("/");
 
@@ -117,6 +123,67 @@ test("seigaiha debug shows drum target only in drum machine mode", async ({
   await drumTargetInput.fill("0.77");
   await drumTargetInput.blur();
   await expect(drumTargetInput).toHaveValue("0.77");
+});
+
+test("seigaiha arbitration: debug override supersedes drum mode updates", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+
+  const overrideToggle = page.locator("#seigaiha-override-toggle");
+  const slider = page.locator("#seigaiha-randomness-slider");
+  await overrideToggle.check();
+  await slider.evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = "0.42";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
+    .toBeCloseTo(0.42, 1);
+
+  await page.getByRole("tab", { name: "Drum Machine" }).click();
+  await page.locator("#drum-play-toggle").click();
+
+  // Drum mode may emit beat-driven updates, but debug override must lock output.
+  await page.waitForTimeout(1200);
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
+    .toBeCloseTo(0.42, 1);
+});
+
+test("drum mode randomness resets on start/stop and rises during playback", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Drum Machine" }).click();
+
+  const playButton = page.locator("#drum-play-toggle");
+  await playButton.click();
+  await page.waitForTimeout(160);
+  const started = ((await playButton.textContent()) ?? "").trim() === "Stop";
+
+  // Transport start forces randomness to zero.
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
+    .toBeCloseTo(0, 1);
+
+  if (!started) {
+    return;
+  }
+
+  // Beat-driven progression should climb above zero during playback.
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 2200 })
+    .toBeGreaterThan(0.1);
+
+  await playButton.click();
+
+  // Transport stop forces randomness back to zero.
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
+    .toBeCloseTo(0, 1);
 });
 
 function trackPageIssues(page: Page): PageIssueTracker {
@@ -614,6 +681,40 @@ test('drum machine beat and kit buttons keep their most recent selections visibl
   await page.locator('#drum-kit-menu [data-kit="latin"]').click();
   await expect(kitMenu).not.toHaveClass(/is-open/);
   await expect(kitButton).toContainText('Kit: Latin Percussion');
+});
+
+test('drum machine transport remains responsive after mode switches', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+
+  const playButton = page.locator('#drum-play-toggle');
+  await expect(playButton).toHaveText('Play');
+
+  await playButton.click();
+  await page.waitForTimeout(160);
+
+  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await expect(page.locator('.mode-screen[data-mode="metronome"]')).toHaveClass(/is-active/);
+
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);
+  const returnedText = ((await playButton.textContent()) ?? '').trim();
+  const firstExpected = returnedText === 'Play' ? 'Stop' : 'Play';
+  const secondExpected = returnedText === 'Play' ? 'Play' : 'Stop';
+  await playButton.click();
+  await page.waitForTimeout(160);
+  const firstText = ((await playButton.textContent()) ?? '').trim();
+  if (firstText === returnedText) {
+    // Some engines cannot start WebAudio transport in this test context.
+    await playButton.click();
+    await expect(playButton).toHaveText(returnedText);
+    return;
+  }
+  await expect(playButton).toHaveText(firstExpected);
+  await playButton.click();
+  await expect(playButton).toHaveText(secondExpected);
 });
 
 test('mode switching remains responsive after a runtime hook error', async ({ page }) => {

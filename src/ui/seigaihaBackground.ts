@@ -37,6 +37,10 @@ function quantizeRandomness(value: number): number {
   return clamp(q, 0, 1);
 }
 
+export function quantizeSeigaihaRandomnessForCache(value: number): number {
+  return quantizeRandomness(value);
+}
+
 type SeigaihaState = {
   randomness: number;
   seed: number;
@@ -73,6 +77,8 @@ export type SeigaihaRenderStats = {
   lastRenderAtMs: number;
 };
 
+export type SeigaihaRandomnessDriver = "debug" | "mode" | "tuner" | "none";
+
 const NO_NOTE_DECAY_MS = 1000;
 const DEFAULT_TUNER_SMOOTHING_TIME_CONSTANT_MS = 220;
 const RANDOMNESS_CACHE_STEP = 1 / 480;
@@ -103,7 +109,7 @@ const seigaihaState: SeigaihaState = {
   tunerSmoothingTimeConstantMs: DEFAULT_TUNER_SMOOTHING_TIME_CONSTANT_MS,
 };
 
-function generateTraditionalSeigaihaSvg(options: {
+export function generateTraditionalSeigaihaSvg(options: {
   radius: number;
   paperColor: string;
   inkColor: string;
@@ -447,23 +453,40 @@ function startNoNoteDecayLoop(): void {
 }
 
 function applyModeDrivenRandomness(): void {
-  if (seigaihaState.debugOverrideEnabled) {
+  const driver = resolveSeigaihaRandomnessDriver({
+    debugOverrideEnabled: seigaihaState.debugOverrideEnabled,
+    modeRandomness: seigaihaState.modeRandomness,
+    lastDetuneAbsCents: seigaihaState.lastDetuneAbsCents,
+  });
+
+  if (driver === "debug") {
     stopTunerSmoothingLoop();
     applyRandomness(seigaihaState.debugOverrideRandomness);
     return;
   }
-  if (seigaihaState.modeRandomness !== null) {
+  if (driver === "mode") {
     stopTunerSmoothingLoop();
-    applyRandomness(seigaihaState.modeRandomness);
+    applyRandomness(seigaihaState.modeRandomness ?? 0);
     return;
   }
-  if (seigaihaState.lastDetuneAbsCents === null) {
+  if (driver === "none") {
     stopTunerSmoothingLoop();
     return;
   }
-  const mapped = mapSeigaihaDetuneToRandomness(seigaihaState.lastDetuneAbsCents);
+  const mapped = mapSeigaihaDetuneToRandomness(seigaihaState.lastDetuneAbsCents ?? 0);
   seigaihaState.tunerTargetRandomness = mapped;
   startTunerSmoothingLoop();
+}
+
+export function resolveSeigaihaRandomnessDriver(options: {
+  debugOverrideEnabled: boolean;
+  modeRandomness: number | null;
+  lastDetuneAbsCents: number | null;
+}): SeigaihaRandomnessDriver {
+  if (options.debugOverrideEnabled) return "debug";
+  if (options.modeRandomness !== null) return "mode";
+  if (options.lastDetuneAbsCents !== null) return "tuner";
+  return "none";
 }
 
 export function installSeigaihaBackground(): void {
