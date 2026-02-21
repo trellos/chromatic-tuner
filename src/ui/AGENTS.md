@@ -17,7 +17,7 @@ Future entries should follow the same principles:
 ## Build / Runtime Audio Prerequisite
 
 - UI validation in metronome/drum contexts assumes `public/assets/audio/**/*.wav` is hydrated from Git LFS.
-- `npm run build` and `npm run dev` enforce this via `scripts/verify-audio-assets.mjs`; if that check fails, hydrate first with `git lfs pull --include="public/assets/audio/**"`.
+- `npm run build` and `npm run dev` enforce this via `scripts/verify-audio-assets.mjs` (including one auto-hydration attempt via `git lfs pull --include="public/assets/audio/**"`); if that check still fails, hydrate/fix LFS in the runner before retrying.
 
 ## Integration Expectations
 

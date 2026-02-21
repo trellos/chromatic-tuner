@@ -1,7 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 
+const execFileAsync = promisify(execFile);
 const LFS_POINTER_PREFIX = "version https://git-lfs.github.com/spec/v1";
+const LFS_AUDIO_INCLUDE = "public/assets/audio/**";
 
 async function listWavs(rootDir) {
   const found = [];
@@ -23,27 +27,66 @@ async function listWavs(rootDir) {
   return found.sort();
 }
 
-export async function verifyBundledAudioAssets(projectRoot) {
-  const audioRoot = path.join(projectRoot, "public", "assets", "audio");
-  const wavFiles = await listWavs(audioRoot);
-  const problems = [];
+function isLfsPointer(data) {
+  return data.subarray(0, 64).toString("utf8").startsWith(LFS_POINTER_PREFIX);
+}
+
+function isRiffWav(data) {
+  return data.length >= 12 && data.subarray(0, 4).toString("ascii") === "RIFF";
+}
+
+async function collectAudioProblems(projectRoot, wavFiles) {
+  const pointerFiles = [];
+  const invalidWavFiles = [];
 
   for (const wavPath of wavFiles) {
     const data = await readFile(wavPath);
-    const header = data.subarray(0, 64).toString("utf8");
-    if (header.startsWith(LFS_POINTER_PREFIX)) {
-      problems.push(
-        `${path.relative(projectRoot, wavPath)} is a Git LFS pointer in the working tree`
-      );
+    const relative = path.relative(projectRoot, wavPath);
+
+    if (isLfsPointer(data)) {
+      pointerFiles.push(relative);
       continue;
     }
 
-    // We only need a lightweight guardrail for build-time correctness.
-    // If this file is not a WAV header, runtime decode will fail and fall back.
-    if (data.length < 12 || data.subarray(0, 4).toString("ascii") !== "RIFF") {
-      problems.push(`${path.relative(projectRoot, wavPath)} is not a RIFF WAV file`);
+    // Lightweight corruption guardrail: runtime decode expects RIFF header.
+    if (!isRiffWav(data)) {
+      invalidWavFiles.push(relative);
     }
   }
+
+  return { pointerFiles, invalidWavFiles };
+}
+
+async function hydrateLfsAudio(projectRoot) {
+  try {
+    await execFileAsync("git", ["lfs", "pull", `--include=${LFS_AUDIO_INCLUDE}`], {
+      cwd: projectRoot,
+    });
+    return null;
+  } catch (error) {
+    const stderr = typeof error?.stderr === "string" ? error.stderr.trim() : "";
+    const stdout = typeof error?.stdout === "string" ? error.stdout.trim() : "";
+    return stderr || stdout || String(error);
+  }
+}
+
+export async function verifyBundledAudioAssets(projectRoot) {
+  const audioRoot = path.join(projectRoot, "public", "assets", "audio");
+  const wavFiles = await listWavs(audioRoot);
+
+  let { pointerFiles, invalidWavFiles } = await collectAudioProblems(projectRoot, wavFiles);
+  let hydrationError = null;
+
+  // CI checkouts often skip LFS by default; auto-hydrate once before failing.
+  if (pointerFiles.length > 0) {
+    hydrationError = await hydrateLfsAudio(projectRoot);
+    ({ pointerFiles, invalidWavFiles } = await collectAudioProblems(projectRoot, wavFiles));
+  }
+
+  const problems = [
+    ...pointerFiles.map((file) => `${file} is a Git LFS pointer in the working tree`),
+    ...invalidWavFiles.map((file) => `${file} is not a RIFF WAV file`),
+  ];
 
   if (problems.length > 0) {
     const details = problems.map((line) => `  - ${line}`).join("\n");
@@ -51,8 +94,13 @@ export async function verifyBundledAudioAssets(projectRoot) {
       [
         "Bundled audio verification failed.",
         details,
-        "Fix: ensure Git LFS objects are present before build (for example: git lfs pull --include='public/assets/audio/**').",
-      ].join("\n")
+        hydrationError
+          ? `LFS hydration attempt failed: ${hydrationError}`
+          : null,
+        `Fix: ensure Git LFS objects are present before build (for example: git lfs pull --include='${LFS_AUDIO_INCLUDE}').`,
+      ]
+        .filter(Boolean)
+        .join("\n")
     );
   }
 }

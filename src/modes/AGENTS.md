@@ -73,7 +73,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 ## Audio Asset Hydration Guardrail
 
 - Bundled metronome/drum `.wav` assets under `public/assets/audio` are tracked with Git LFS (`.gitattributes`), so local clones/CI must hydrate LFS objects before running the app.
-- `npm run build` and `npm run dev` now execute `scripts/verify-audio-assets.mjs` before bundling/startup. This check fails if any `public/assets/audio/**/*.wav` file is still an LFS pointer (or malformed non-RIFF data).
+- `npm run build` and `npm run dev` now execute `scripts/verify-audio-assets.mjs` before bundling/startup. The verifier auto-attempts `git lfs pull --include="public/assets/audio/**"` once, then fails if any `public/assets/audio/**/*.wav` file is still an LFS pointer (or malformed non-RIFF data).
 - If the verifier fails, run `git lfs pull --include="public/assets/audio/**"` and retry.
 
 ## Guardrails
