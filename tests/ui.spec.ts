@@ -90,6 +90,35 @@ async function assertNoOffscreenText(page: Page): Promise<void> {
   expect(offenders, `Found text clipping:\n${offenders.join('\n')}`).toEqual([]);
 }
 
+
+
+test('seigaiha background covers the full viewport height to the bottom edge', async ({ page }) => {
+  await page.goto('/');
+
+  const coverage = await page.evaluate(() => {
+    const viewport = window.visualViewport;
+    const visualBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
+
+    const bodyBottom = document.body.getBoundingClientRect().bottom;
+    const htmlBottom = document.documentElement.getBoundingClientRect().bottom;
+    const before = getComputedStyle(document.body, '::before');
+
+    return {
+      bodyGap: visualBottom - bodyBottom,
+      htmlGap: visualBottom - htmlBottom,
+      beforePosition: before.position,
+      beforeInset: before.inset,
+      beforeImage: before.backgroundImage,
+    };
+  });
+
+  expect(coverage.beforePosition).toBe('fixed');
+  expect(coverage.beforeInset).toBe('0px');
+  expect(coverage.beforeImage).toContain('url(');
+  expect(coverage.bodyGap).toBeLessThanOrEqual(1.5);
+  expect(coverage.htmlGap).toBeLessThanOrEqual(1.5);
+});
+
 test('app loads and key UI is visible with no runtime/network failures', async ({ page }) => {
   const issues = trackPageIssues(page);
 
