@@ -72,3 +72,9 @@ For each feature/refactor, actively prune:
 4. Test-only runtime branches that leak into app logic.
 
 If behavior shape changes, update comments and AGENTS docs in the same change.
+
+
+## Git LFS hydration in CI
+
+- Workflows that run `npm run build`, `npm run dev`, or Playwright must checkout with LFS enabled (`actions/checkout@v4` + `with: lfs: true`) so `public/assets/audio/*.wav` assets are hydrated before audio verification executes.
+- If CI still reports LFS pointers in `public/assets/audio`, add an explicit `git lfs pull --include="public/assets/audio/**"` step before build/test commands.
