@@ -13,3 +13,14 @@ Metronome and drum-machine samples are now stored as `.wav` files under this dir
 ## Provenance
 
 Current assets were decoded from the prior in-repo embedded WAV data URLs generated for this project.
+
+
+## Build-time guardrail
+
+`npm run build` and `npm run dev` run an audio verification step that fails fast when any `public/assets/audio/**/*.wav` file is an LFS pointer or a non-RIFF blob.
+
+If this fails after clone/pull, hydrate LFS objects before building:
+
+```bash
+git lfs pull --include="public/assets/audio/**"
+```

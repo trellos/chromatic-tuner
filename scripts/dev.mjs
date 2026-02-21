@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import chokidar from "chokidar";
 import * as esbuild from "esbuild";
 import { rm, mkdir, cp } from "node:fs/promises";
+import { verifyBundledAudioAssets } from "./verify-audio-assets.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -118,6 +119,7 @@ function startServer() {
 }
 
 async function main() {
+  await verifyBundledAudioAssets(projectRoot);
   await cleanDistOnce();
   await copyPublic();
   await startEsbuildWatch();

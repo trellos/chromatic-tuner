@@ -2,6 +2,7 @@
 import { build } from "esbuild";
 import { rm, mkdir, cp } from "node:fs/promises";
 import path from "node:path";
+import { verifyBundledAudioAssets } from "./verify-audio-assets.mjs";
 
 const projectRoot = process.cwd();
 const distDir = path.join(projectRoot, "dist");
@@ -46,6 +47,7 @@ async function bundleWorklet() {
 }
 
 async function main() {
+  await verifyBundledAudioAssets(projectRoot);
   await cleanDist();
   await copyPublic();
 
