@@ -578,7 +578,7 @@ test('metronome sound button keeps the most recent sound selection visible', asy
   const soundButton = page.locator('#metro-sound-button');
   const soundMenu = page.locator('#metro-sound-menu');
 
-  await expect(soundButton).toHaveText('Sound Electro');
+  await expect(soundButton).toHaveText('Sound Woodblock');
 
   await soundButton.click();
   await expect(soundMenu).toHaveClass(/is-open/);
