@@ -642,8 +642,7 @@ async function switchMode(id: ModeId): Promise<void> {
   const previousMode = getModeById(activeModeId);
   const nextMode = getModeById(id);
   try {
-    await runModeTransition({
-      exitCurrent: previousMode?.onExit,
+    const transitionPlan = {
       applyUiState: () => {
         activeModeId = id;
         updateCarouselState();
@@ -657,11 +656,13 @@ async function switchMode(id: ModeId): Promise<void> {
           setCarouselHidden(false);
         }
       },
-      enterNext: nextMode?.onEnter,
-      onError: (error) => {
+      onError: (error: unknown) => {
         console.error("Mode switch failed", error);
       },
-    });
+      ...(previousMode?.onExit ? { exitCurrent: previousMode.onExit } : {}),
+      ...(nextMode?.onEnter ? { enterNext: nextMode.onEnter } : {}),
+    };
+    await runModeTransition(transitionPlan);
   } finally {
     isSwitching = false;
   }

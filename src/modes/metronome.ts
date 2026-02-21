@@ -108,6 +108,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   let currentBeat = 0;
   let uiAbort: AbortController | null = null;
   let pulseTimeouts: number[] = [];
+  let barResetTimeouts: number[] = [];
   let randomnessAnimationId: number | null = null;
   let playbackStartTime = 0;
 
@@ -249,10 +250,13 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
 
   const resetTransportPhase = () => {
     if (!audioContext || !isPlaying) return;
+    clearPulseTimeouts();
+    clearBarResetTimeouts();
     currentBeat = 0;
     nextNoteTime = audioContext.currentTime + 0.05;
     playbackStartTime = nextNoteTime;
     options.onRandomnessChange?.(0);
+    scheduleClicks();
   };
 
   const setTimeSignature = (value: string) => {
@@ -265,6 +269,27 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     accentEnabled = enabled;
     updateTimeButtonLabel();
     resetTransportPhase();
+  };
+
+  const clearPulseTimeouts = () => {
+    pulseTimeouts.forEach((id) => window.clearTimeout(id));
+    pulseTimeouts = [];
+    starburstEl?.classList.remove("is-pulsing");
+  };
+
+  const clearBarResetTimeouts = () => {
+    barResetTimeouts.forEach((id) => window.clearTimeout(id));
+    barResetTimeouts = [];
+  };
+
+  const scheduleBarReset = (time: number) => {
+    if (!audioContext) return;
+    const delay = Math.max(0, (time - audioContext.currentTime) * 1000);
+    const timeout = window.setTimeout(() => {
+      barResetTimeouts = barResetTimeouts.filter((id) => id !== timeout);
+      options.onRandomnessChange?.(0);
+    }, delay);
+    barResetTimeouts.push(timeout);
   };
 
   const ensureAudioContext = async () => {
@@ -391,6 +416,9 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     if (!audioContext) return;
     const beatsPerBar = getBeatsPerBar();
     while (nextNoteTime < audioContext.currentTime + SCHEDULE_AHEAD) {
+      if (currentBeat === 0) {
+        scheduleBarReset(nextNoteTime);
+      }
       const isAccent = accentEnabled && currentBeat === 0;
       playClick(nextNoteTime, isAccent);
       schedulePulse(nextNoteTime, isAccent);
@@ -420,14 +448,13 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     if (!isPlaying) return;
     isPlaying = false;
     stopRandomnessLoop();
+    clearBarResetTimeouts();
     options.onRandomnessChange?.(0);
     if (schedulerId !== null) {
       window.clearInterval(schedulerId);
       schedulerId = null;
     }
-    pulseTimeouts.forEach((id) => window.clearTimeout(id));
-    pulseTimeouts = [];
-    starburstEl?.classList.remove("is-pulsing");
+    clearPulseTimeouts();
     const toggleButton =
       controlsEl?.querySelector<HTMLButtonElement>('[data-action="toggle"]');
     if (toggleButton) toggleButton.textContent = "Start";

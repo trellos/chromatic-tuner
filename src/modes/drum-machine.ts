@@ -203,7 +203,9 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     beat
       .split("-")
       .map((segment) =>
-        segment ? segment[0].toUpperCase() + segment.slice(1).toLowerCase() : ""
+        segment
+          ? segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase()
+          : ""
       )
       .join("-");
 
@@ -352,7 +354,9 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   ) => {
     if (!grid) return false;
     const rows = grid.querySelectorAll<HTMLElement>(".drum-row");
-    for (const row of rows) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
       const steps = row.querySelectorAll<HTMLButtonElement>(".step");
       for (let offset = 0; offset < stepsPerBeat; offset++) {
         if (steps[beatStartStep + offset]?.classList.contains("is-on")) {
@@ -641,9 +645,10 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
       );
     }
     while (nextStepTime < audioContext.currentTime + SCHEDULE_AHEAD) {
-      const activeGrid = drumMockEl?.querySelector<HTMLElement>(
-        `.drum-grid[data-signature="${signature}"]`
-      );
+      const activeGrid =
+        drumMockEl?.querySelector<HTMLElement>(
+          `.drum-grid[data-signature="${signature}"]`
+        ) ?? null;
       const stepToHighlight = currentStep;
       const isBeatBoundary = stepToHighlight % stepsPerBeat === 0;
       if (activeGrid) {

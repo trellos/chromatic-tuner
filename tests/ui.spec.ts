@@ -638,6 +638,36 @@ test('metronome time button shows "No Accent" after selecting no-accent mode', a
   await expect(timeButton).toHaveText('Time No Accent');
 });
 
+test("metronome time-signature change resets seigaiha phase to bar start", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Metronome" }).click();
+
+  const playButton = page.locator(
+    '.mode-screen[data-mode="metronome"] [data-action="toggle"]'
+  );
+  const timeButton = page.locator("#metro-time-button");
+
+  await playButton.click();
+  await page.waitForTimeout(180);
+  const started = ((await playButton.textContent()) ?? "").trim() === "Stop";
+  if (!started) {
+    return;
+  }
+
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 2200 })
+    .toBeGreaterThan(0.08);
+
+  await timeButton.click();
+  await page.locator('#metro-time-menu [data-value="3/4"]').click();
+
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
+    .toBeLessThan(0.05);
+});
+
 test('metronome sound button keeps the most recent sound selection visible', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Metronome' }).click();

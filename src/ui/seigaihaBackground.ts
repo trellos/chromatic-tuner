@@ -59,6 +59,9 @@ type SeigaihaState = {
   tunerSmoothingRaf: number | null;
   tunerSmoothingLastAtMs: number;
   tunerSmoothingTimeConstantMs: number;
+  installedPatternKey: number | null;
+  installedTileWidth: number;
+  installedTileHeight: number;
 };
 
 export type SeigaihaMappingPoint = {
@@ -107,6 +110,9 @@ const seigaihaState: SeigaihaState = {
   tunerSmoothingRaf: null,
   tunerSmoothingLastAtMs: 0,
   tunerSmoothingTimeConstantMs: DEFAULT_TUNER_SMOOTHING_TIME_CONSTANT_MS,
+  installedPatternKey: null,
+  installedTileWidth: 0,
+  installedTileHeight: 0,
 };
 
 export function generateTraditionalSeigaihaSvg(options: {
@@ -368,7 +374,12 @@ function applyRandomness(randomness: number): void {
   if (Math.abs(next - seigaihaState.randomness) < 0.0002) {
     return;
   }
+  const prevKey = quantizeRandomness(seigaihaState.randomness);
+  const nextKey = quantizeRandomness(next);
   seigaihaState.randomness = next;
+  if (nextKey === prevKey && seigaihaState.installedPatternKey !== null) {
+    return;
+  }
   installSeigaihaBackground();
 }
 
@@ -490,14 +501,22 @@ export function resolveSeigaihaRandomnessDriver(options: {
 }
 
 export function installSeigaihaBackground(): void {
-  const { dataUrl, tileWidth, tileHeight } = getOrCreateCachedPattern(
-    seigaihaState.randomness
-  );
-
+  const key = quantizeRandomness(seigaihaState.randomness);
+  if (seigaihaState.installedPatternKey === key) {
+    return;
+  }
+  const { dataUrl, tileWidth, tileHeight } = getOrCreateCachedPattern(key);
   setRootVar("--seigaiha-url", dataUrl);
-  setRootVar("--seigaiha-size-x", `${tileWidth}px`);
-  setRootVar("--seigaiha-size-y", `${tileHeight}px`);
+  if (seigaihaState.installedTileWidth !== tileWidth) {
+    setRootVar("--seigaiha-size-x", `${tileWidth}px`);
+    seigaihaState.installedTileWidth = tileWidth;
+  }
+  if (seigaihaState.installedTileHeight !== tileHeight) {
+    setRootVar("--seigaiha-size-y", `${tileHeight}px`);
+    seigaihaState.installedTileHeight = tileHeight;
+  }
   setRootVar("--seigaiha-pos", "0px 0px");
+  seigaihaState.installedPatternKey = key;
   seigaihaState.renderCount += 1;
   seigaihaState.lastRenderAtMs = performance.now();
 }

@@ -50,6 +50,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  will-change: background-image;
+  transform: translateZ(0);
 
   background-image: var(--seigaiha-url);
   background-repeat: repeat;
