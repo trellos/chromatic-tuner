@@ -70,6 +70,12 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Do not serialize the beat preset selector value in new links; share payloads must preserve the actual edited loop, plus kit and tempo.
   - Parser should continue accepting legacy `v` (number) as version fallback for already-shared links, but new links should emit `version`.
 
+## Audio Asset Hydration Guardrail
+
+- Bundled metronome/drum `.wav` assets under `public/assets/audio` are tracked with Git LFS (`.gitattributes`), so local clones/CI must hydrate LFS objects before running the app.
+- `npm run build` and `npm run dev` now execute `scripts/verify-audio-assets.mjs` before bundling/startup. This check fails if any `public/assets/audio/**/*.wav` file is still an LFS pointer (or malformed non-RIFF data).
+- If the verifier fails, run `git lfs pull --include="public/assets/audio/**"` and retry.
+
 ## Guardrails
 
 - Keep cross-mode coupling out of mode files.

@@ -14,6 +14,11 @@ Future entries should follow the same principles:
 - exposes small integration APIs to callers,
 - avoids mode-specific business logic.
 
+## Build / Runtime Audio Prerequisite
+
+- UI validation in metronome/drum contexts assumes `public/assets/audio/**/*.wav` is hydrated from Git LFS.
+- `npm run build` and `npm run dev` enforce this via `scripts/verify-audio-assets.mjs`; if that check fails, hydrate first with `git lfs pull --include="public/assets/audio/**"`.
+
 ## Integration Expectations
 
 - `src/main.ts` should wire UI modules into app lifecycle.
