@@ -1,9 +1,14 @@
+import {
+  createSeigaihaWebGlRenderer,
+  type SeigaihaRendererBackend,
+  type SeigaihaWebGlRenderer,
+} from "./seigaihaWebglRenderer.js";
+
 function svgToDataUrl(svg: string): string {
   const encoded = encodeURIComponent(svg)
     .replace(/%0A/g, "")
-    .replace(/%09/g, "")
-    .replace(/%20/g, " ");
-  return `url("data:image/svg+xml,${encoded}")`;
+    .replace(/%09/g, "");
+  return `data:image/svg+xml;charset=utf-8,${encoded}`;
 }
 
 function semiAnnulusPath(cx: number, cy: number, rOuter: number, rInner: number): string {
@@ -37,8 +42,98 @@ function quantizeRandomness(value: number): number {
   return clamp(q, 0, 1);
 }
 
+function pickInterpolationSteps(): number {
+  const isMobileLike =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
+  return isMobileLike ? MOBILE_INTERPOLATION_STEPS : DESKTOP_INTERPOLATION_STEPS;
+}
+
+function stepToRandomness(step: number, stepCount: number): number {
+  if (stepCount <= 0) return 0;
+  return quantizeRandomness(step / stepCount);
+}
+
+function pushFrameTimeSample(nowMs: number): void {
+  const last = seigaihaState.perfLastSampleAtMs;
+  seigaihaState.perfLastSampleAtMs = nowMs;
+  if (last <= 0) return;
+  const dtMs = clamp(nowMs - last, 0, 1000);
+  const index = seigaihaState.frameTimesWriteIndex;
+  seigaihaState.frameTimesMs[index] = dtMs;
+  seigaihaState.frameTimesWriteIndex = (index + 1) % FRAME_TIME_SAMPLE_CAPACITY;
+  seigaihaState.frameTimesCount = Math.min(
+    FRAME_TIME_SAMPLE_CAPACITY,
+    seigaihaState.frameTimesCount + 1
+  );
+}
+
+function recordRenderSwap(nowMs: number): void {
+  recordRecentEvent(seigaihaState.renderSwapAtMs, nowMs);
+}
+
+function recordRenderDraw(nowMs: number): void {
+  recordRecentEvent(seigaihaState.renderDrawAtMs, nowMs);
+}
+
+function recordTextureUpload(nowMs: number): void {
+  recordRecentEvent(seigaihaState.textureUploadAtMs, nowMs);
+}
+
+function recordRecentEvent(target: number[], nowMs: number): void {
+  target.push(nowMs);
+  pruneRecentEvents(target, nowMs);
+}
+
+function pruneRecentEvents(target: number[], nowMs: number): void {
+  const cutoff = nowMs - SWAP_SAMPLE_WINDOW_MS;
+  while (target.length > 0) {
+    const first = target[0];
+    if (first === undefined || first >= cutoff) break;
+    target.shift();
+  }
+}
+
+function countRecentEvents(target: number[], nowMs: number): number {
+  pruneRecentEvents(target, nowMs);
+  return target.length;
+}
+
+function resolveInterpolatedFrames(randomness: number): {
+  keyA: number;
+  keyB: number;
+  blendA: number;
+  blendB: number;
+} {
+  return resolveSeigaihaInterpolationForTest(randomness, pickInterpolationSteps());
+}
+
 export function quantizeSeigaihaRandomnessForCache(value: number): number {
   return quantizeRandomness(value);
+}
+
+export function resolveSeigaihaInterpolationForTest(
+  randomness: number,
+  stepCount: number
+): {
+  keyA: number;
+  keyB: number;
+  blendA: number;
+  blendB: number;
+} {
+  const steps = Math.max(1, Math.floor(stepCount));
+  const clamped = clamp(randomness, 0, 1);
+  const scaled = clamped * steps;
+  const i0 = Math.floor(scaled);
+  const i1 = Math.min(steps, i0 + 1);
+  const blendB = clamp(i1 === i0 ? 0 : scaled - i0, 0, 1);
+  return {
+    keyA: stepToRandomness(i0, steps),
+    keyB: stepToRandomness(i1, steps),
+    blendA: clamp(1 - blendB, 0, 1),
+    blendB,
+  };
 }
 
 type SeigaihaState = {
@@ -53,15 +148,31 @@ type SeigaihaState = {
   noNoteDecayRaf: number | null;
   modeRandomness: number | null;
   patternCache: Map<number, CachedPattern>;
+  renderer: SeigaihaWebGlRenderer | null;
+  rendererBackend: SeigaihaRendererBackend;
+  rendererInitAttempted: boolean;
   renderCount: number;
   lastRenderAtMs: number;
+  renderSwapAtMs: number[];
+  renderDrawAtMs: number[];
+  textureUploadAtMs: number[];
   tunerTargetRandomness: number | null;
   tunerSmoothingRaf: number | null;
   tunerSmoothingLastAtMs: number;
   tunerSmoothingTimeConstantMs: number;
-  installedPatternKey: number | null;
-  installedTileWidth: number;
-  installedTileHeight: number;
+  installedPatternKeyA: number | null;
+  installedPatternKeyB: number | null;
+  installedBlendA: number;
+  installedBlendB: number;
+  cacheLookups: number;
+  cacheHits: number;
+  cacheMisses: number;
+  frameTimesMs: number[];
+  frameTimesWriteIndex: number;
+  frameTimesCount: number;
+  perfLastSampleAtMs: number;
+  prewarmQueue: number[];
+  prewarmTimer: number | null;
 };
 
 export type SeigaihaMappingPoint = {
@@ -73,11 +184,31 @@ type CachedPattern = {
   dataUrl: string;
   tileWidth: number;
   tileHeight: number;
+  texture: WebGLTexture | null;
+  textureReady: boolean;
+  textureLoading: boolean;
+  textureFailed: boolean;
 };
 
 export type SeigaihaRenderStats = {
   renderCount: number;
   lastRenderAtMs: number;
+};
+
+export type SeigaihaPerformanceStats = {
+  avgFps: number;
+  p95FrameTimeMs: number;
+  maxFrameTimeMs: number;
+  renderSwapsPerSec: number;
+  renderDrawsPerSec: number;
+  textureUploadsPerSec: number;
+  cacheLookups: number;
+  cacheHits: number;
+  cacheMisses: number;
+  cacheHitRate: number;
+  cacheSize: number;
+  cacheMaxEntries: number;
+  sampleCount: number;
 };
 
 export type SeigaihaRandomnessDriver = "debug" | "mode" | "tuner" | "none";
@@ -86,6 +217,13 @@ const NO_NOTE_DECAY_MS = 1000;
 const DEFAULT_TUNER_SMOOTHING_TIME_CONSTANT_MS = 220;
 const RANDOMNESS_CACHE_STEP = 1 / 480;
 const RANDOMNESS_CACHE_MAX_ENTRIES = 640;
+const DESKTOP_INTERPOLATION_STEPS = 96;
+const MOBILE_INTERPOLATION_STEPS = 48;
+const SWAP_SAMPLE_WINDOW_MS = 1000;
+const FRAME_TIME_SAMPLE_CAPACITY = 240;
+const PREWARM_RADIUS = 3;
+const PREWARM_BATCH_SIZE = 2;
+const PREWARM_DELAY_MS = 8;
 const DEFAULT_MAPPING: SeigaihaMappingPoint[] = [
   { cents: 2, randomness: 0 },
   { cents: 4, randomness: 0.2 },
@@ -104,15 +242,31 @@ const seigaihaState: SeigaihaState = {
   noNoteDecayRaf: null,
   modeRandomness: null,
   patternCache: new Map(),
+  renderer: null,
+  rendererBackend: "none",
+  rendererInitAttempted: false,
   renderCount: 0,
   lastRenderAtMs: 0,
+  renderSwapAtMs: [],
+  renderDrawAtMs: [],
+  textureUploadAtMs: [],
   tunerTargetRandomness: null,
   tunerSmoothingRaf: null,
   tunerSmoothingLastAtMs: 0,
   tunerSmoothingTimeConstantMs: DEFAULT_TUNER_SMOOTHING_TIME_CONSTANT_MS,
-  installedPatternKey: null,
-  installedTileWidth: 0,
-  installedTileHeight: 0,
+  installedPatternKeyA: null,
+  installedPatternKeyB: null,
+  installedBlendA: -1,
+  installedBlendB: -1,
+  cacheLookups: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
+  frameTimesMs: new Array<number>(FRAME_TIME_SAMPLE_CAPACITY).fill(0),
+  frameTimesWriteIndex: 0,
+  frameTimesCount: 0,
+  perfLastSampleAtMs: 0,
+  prewarmQueue: [],
+  prewarmTimer: null,
 };
 
 export function generateTraditionalSeigaihaSvg(options: {
@@ -199,28 +353,28 @@ export function generateTraditionalSeigaihaSvg(options: {
 
     for (let col = 0; col < colPeriod; col++) {
       const nextCol = (col + 1) % colPeriod;
-      const pairShrink = (shrinkByCol[col] + shrinkByCol[nextCol]) * 0.5;
+      const pairShrink = ((shrinkByCol[col] ?? 0) + (shrinkByCol[nextCol] ?? 0)) * 0.5;
       edgeCompaction[col] = clamp(stepX * (0.72 * pairShrink), 0, maxNeighborPull);
-      localStepByCol[col] = stepX - edgeCompaction[col];
+      localStepByCol[col] = stepX - (edgeCompaction[col] ?? 0);
     }
 
     const rawPeriodWidth = localStepByCol.reduce((sum, value) => sum + value, 0);
     const widthCorrection = (tileWidth - rawPeriodWidth) / colPeriod;
     for (let col = 0; col < colPeriod; col++) {
-      localStepByCol[col] += widthCorrection;
+      localStepByCol[col] = (localStepByCol[col] ?? 0) + widthCorrection;
     }
 
     let cursorX = 0;
     for (let col = 0; col < colPeriod; col++) {
       centerByCol[col] = cursorX;
-      cursorX += localStepByCol[col];
+      cursorX += localStepByCol[col] ?? 0;
     }
 
     const waves: Array<{ cx: number; radius: number; col: number }> = [];
     for (let cycle = cycleMin; cycle <= cycleMax; cycle++) {
       for (let col = 0; col < colPeriod; col++) {
-        const cx = centerByCol[col] + cycle * tileWidth + xOffset;
-        const waveR = radiusByCol[col];
+        const cx = (centerByCol[col] ?? 0) + cycle * tileWidth + xOffset;
+        const waveR = radiusByCol[col] ?? r;
         if (cx + waveR < minX || cx - waveR > maxX) continue;
         waves.push({ cx, radius: waveR, col });
       }
@@ -238,7 +392,9 @@ export function generateTraditionalSeigaihaSvg(options: {
         );
       }
       for (let bandIndex = 0; bandIndex < blueBands.length; bandIndex++) {
-        const [kOuter, kInner] = blueBands[bandIndex];
+        const band = blueBands[bandIndex];
+        if (!band) continue;
+        const [kOuter, kInner] = band;
         const activationThreshold =
           hash01(periodicRow, wave.col * 41 + bandIndex, seed + 1777) * 1.35;
         const fade = clamp((randomnessClamped - activationThreshold) / 0.22, 0, 1);
@@ -263,16 +419,39 @@ export function generateTraditionalSeigaihaSvg(options: {
   return { svg, tileWidth, tileHeight };
 }
 
-function setRootVar(name: string, value: string): void {
-  document.documentElement.style.setProperty(name, value);
+function ensureRenderer(): SeigaihaWebGlRenderer | null {
+  if (seigaihaState.rendererInitAttempted) {
+    return seigaihaState.renderer;
+  }
+  seigaihaState.rendererInitAttempted = true;
+  seigaihaState.renderer = createSeigaihaWebGlRenderer();
+  seigaihaState.rendererBackend = seigaihaState.renderer.backend;
+  if (typeof document !== "undefined") {
+    document.body.setAttribute(
+      "data-seigaiha-render-ready",
+      seigaihaState.rendererBackend === "webgl" ? "0" : "na"
+    );
+  }
+  return seigaihaState.renderer;
+}
+
+function disposePatternTexture(pattern: CachedPattern): void {
+  if (!pattern.texture) return;
+  seigaihaState.renderer?.deleteTexture(pattern.texture);
+  pattern.texture = null;
+  pattern.textureReady = false;
+  pattern.textureLoading = false;
 }
 
 function getOrCreateCachedPattern(randomness: number): CachedPattern {
   const key = quantizeRandomness(randomness);
+  seigaihaState.cacheLookups += 1;
   const existing = seigaihaState.patternCache.get(key);
   if (existing) {
+    seigaihaState.cacheHits += 1;
     return existing;
   }
+  seigaihaState.cacheMisses += 1;
 
   const { svg, tileWidth, tileHeight } = generateTraditionalSeigaihaSvg({
     radius: 40,
@@ -287,6 +466,10 @@ function getOrCreateCachedPattern(randomness: number): CachedPattern {
     dataUrl: svgToDataUrl(svg),
     tileWidth,
     tileHeight,
+    texture: null,
+    textureReady: false,
+    textureLoading: false,
+    textureFailed: false,
   };
   seigaihaState.patternCache.set(key, created);
 
@@ -294,11 +477,90 @@ function getOrCreateCachedPattern(randomness: number): CachedPattern {
   if (seigaihaState.patternCache.size > RANDOMNESS_CACHE_MAX_ENTRIES) {
     const oldestKey = seigaihaState.patternCache.keys().next().value;
     if (oldestKey !== undefined) {
+      const oldest = seigaihaState.patternCache.get(oldestKey);
+      if (oldest) {
+        disposePatternTexture(oldest);
+      }
       seigaihaState.patternCache.delete(oldestKey);
     }
   }
 
   return created;
+}
+
+function enqueuePrewarmKey(key: number): void {
+  const quantized = quantizeRandomness(key);
+  if (seigaihaState.patternCache.has(quantized)) return;
+  if (seigaihaState.prewarmQueue.includes(quantized)) return;
+  seigaihaState.prewarmQueue.push(quantized);
+}
+
+function schedulePrewarmWork(): void {
+  if (typeof window === "undefined") return;
+  if (seigaihaState.prewarmTimer !== null) return;
+  seigaihaState.prewarmTimer = window.setTimeout(() => {
+    seigaihaState.prewarmTimer = null;
+    processPrewarmQueue();
+  }, PREWARM_DELAY_MS);
+}
+
+function processPrewarmQueue(): void {
+  const renderer = ensureRenderer();
+  if (!renderer || renderer.backend === "none") return;
+  for (let i = 0; i < PREWARM_BATCH_SIZE; i++) {
+    const key = seigaihaState.prewarmQueue.shift();
+    if (key === undefined) break;
+    const pattern = getOrCreateCachedPattern(key);
+    uploadPatternTextureWhenReady(pattern, renderer);
+  }
+  if (seigaihaState.prewarmQueue.length > 0) {
+    schedulePrewarmWork();
+  }
+}
+
+function prewarmPatternNeighborhood(frame: { keyA: number; keyB: number }): void {
+  const bases = frame.keyA === frame.keyB ? [frame.keyA] : [frame.keyA, frame.keyB];
+  for (const base of bases) {
+    for (let offset = 1; offset <= PREWARM_RADIUS; offset++) {
+      const delta = offset * RANDOMNESS_CACHE_STEP;
+      enqueuePrewarmKey(base - delta);
+      enqueuePrewarmKey(base + delta);
+    }
+  }
+  schedulePrewarmWork();
+}
+
+function uploadPatternTextureWhenReady(
+  pattern: CachedPattern,
+  renderer: SeigaihaWebGlRenderer
+): void {
+  if (pattern.textureReady || pattern.textureLoading || pattern.textureFailed) {
+    return;
+  }
+  const texture = pattern.texture ?? renderer.createTexture();
+  if (!texture) {
+    pattern.textureFailed = true;
+    return;
+  }
+  pattern.texture = texture;
+  pattern.textureLoading = true;
+
+  const image = new Image();
+  image.onload = () => {
+    const uploaded = renderer.uploadTexture(texture, image);
+    pattern.textureLoading = false;
+    pattern.textureReady = uploaded;
+    pattern.textureFailed = !uploaded;
+    if (uploaded) {
+      recordTextureUpload(performance.now());
+      installSeigaihaBackground();
+    }
+  };
+  image.onerror = () => {
+    pattern.textureLoading = false;
+    pattern.textureFailed = true;
+  };
+  image.src = pattern.dataUrl;
 }
 
 function normalizeMapping(points: SeigaihaMappingPoint[]): SeigaihaMappingPoint[] {
@@ -370,16 +632,9 @@ export function mapSeigaihaDetuneToRandomness(absCents: number): number {
 }
 
 function applyRandomness(randomness: number): void {
+  pushFrameTimeSample(performance.now());
   const next = clamp(randomness, 0, 1);
-  if (Math.abs(next - seigaihaState.randomness) < 0.0002) {
-    return;
-  }
-  const prevKey = quantizeRandomness(seigaihaState.randomness);
-  const nextKey = quantizeRandomness(next);
   seigaihaState.randomness = next;
-  if (nextKey === prevKey && seigaihaState.installedPatternKey !== null) {
-    return;
-  }
   installSeigaihaBackground();
 }
 
@@ -501,24 +756,59 @@ export function resolveSeigaihaRandomnessDriver(options: {
 }
 
 export function installSeigaihaBackground(): void {
-  const key = quantizeRandomness(seigaihaState.randomness);
-  if (seigaihaState.installedPatternKey === key) {
+  const renderer = ensureRenderer();
+  if (!renderer || renderer.backend === "none") {
     return;
   }
-  const { dataUrl, tileWidth, tileHeight } = getOrCreateCachedPattern(key);
-  setRootVar("--seigaiha-url", dataUrl);
-  if (seigaihaState.installedTileWidth !== tileWidth) {
-    setRootVar("--seigaiha-size-x", `${tileWidth}px`);
-    seigaihaState.installedTileWidth = tileWidth;
+  const frame = resolveInterpolatedFrames(seigaihaState.randomness);
+  const now = performance.now();
+  const hasPatternSwap =
+    seigaihaState.installedPatternKeyA !== frame.keyA ||
+    seigaihaState.installedPatternKeyB !== frame.keyB;
+  const hasBlendSwap =
+    Math.abs(seigaihaState.installedBlendA - frame.blendA) > 0.0005 ||
+    Math.abs(seigaihaState.installedBlendB - frame.blendB) > 0.0005;
+
+  if (!hasPatternSwap && !hasBlendSwap) {
+    return;
   }
-  if (seigaihaState.installedTileHeight !== tileHeight) {
-    setRootVar("--seigaiha-size-y", `${tileHeight}px`);
-    seigaihaState.installedTileHeight = tileHeight;
+
+  const primary = getOrCreateCachedPattern(frame.keyA);
+  const secondary = frame.keyB === frame.keyA ? primary : getOrCreateCachedPattern(frame.keyB);
+  uploadPatternTextureWhenReady(primary, renderer);
+  if (secondary !== primary) {
+    uploadPatternTextureWhenReady(secondary, renderer);
   }
-  setRootVar("--seigaiha-pos", "0px 0px");
-  seigaihaState.installedPatternKey = key;
-  seigaihaState.renderCount += 1;
-  seigaihaState.lastRenderAtMs = performance.now();
+  if (hasPatternSwap) {
+    prewarmPatternNeighborhood(frame);
+  }
+
+  if (!primary.texture || !secondary.texture || !primary.textureReady || !secondary.textureReady) {
+    return;
+  }
+
+  renderer.render({
+    textureA: primary.texture,
+    textureB: secondary.texture,
+    blendA: frame.blendA,
+    blendB: frame.blendB,
+    tileWidth: primary.tileWidth,
+    tileHeight: primary.tileHeight,
+  });
+  recordRenderDraw(now);
+  if (typeof document !== "undefined") {
+    document.body.setAttribute("data-seigaiha-render-ready", "1");
+  }
+
+  seigaihaState.installedPatternKeyA = frame.keyA;
+  seigaihaState.installedPatternKeyB = frame.keyB;
+  seigaihaState.installedBlendA = frame.blendA;
+  seigaihaState.installedBlendB = frame.blendB;
+  if (hasPatternSwap) {
+    seigaihaState.renderCount += 1;
+    recordRenderSwap(now);
+  }
+  seigaihaState.lastRenderAtMs = now;
 }
 
 export function setSeigaihaRandomness(value: number): void {
@@ -536,6 +826,53 @@ export function getSeigaihaRenderStats(): SeigaihaRenderStats {
   return {
     renderCount: seigaihaState.renderCount,
     lastRenderAtMs: seigaihaState.lastRenderAtMs,
+  };
+}
+
+export function getSeigaihaRendererBackend(): SeigaihaRendererBackend {
+  ensureRenderer();
+  return seigaihaState.rendererBackend;
+}
+
+export function getSeigaihaPerformanceStats(): SeigaihaPerformanceStats {
+  const count = seigaihaState.frameTimesCount;
+  const samples = seigaihaState.frameTimesMs.slice(0, count);
+  let avgFrameMs = 0;
+  let maxFrameMs = 0;
+  if (samples.length > 0) {
+    const sum = samples.reduce((acc, value) => acc + value, 0);
+    avgFrameMs = sum / samples.length;
+    maxFrameMs = samples.reduce((max, value) => Math.max(max, value), 0);
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  const p95Index =
+    sorted.length > 0 ? Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95)) : 0;
+  const p95FrameTimeMs = sorted.length > 0 ? sorted[p95Index] ?? 0 : 0;
+  const now = performance.now();
+  const recentSwaps = countRecentEvents(seigaihaState.renderSwapAtMs, now);
+  const recentDraws = countRecentEvents(seigaihaState.renderDrawAtMs, now);
+  const recentUploads = countRecentEvents(seigaihaState.textureUploadAtMs, now);
+  const renderSwapsPerSec = (recentSwaps * 1000) / SWAP_SAMPLE_WINDOW_MS;
+  const renderDrawsPerSec = (recentDraws * 1000) / SWAP_SAMPLE_WINDOW_MS;
+  const textureUploadsPerSec = (recentUploads * 1000) / SWAP_SAMPLE_WINDOW_MS;
+  const cacheHitRate =
+    seigaihaState.cacheLookups > 0
+      ? seigaihaState.cacheHits / seigaihaState.cacheLookups
+      : 0;
+  return {
+    avgFps: avgFrameMs > 0 ? 1000 / avgFrameMs : 0,
+    p95FrameTimeMs,
+    maxFrameTimeMs: maxFrameMs,
+    renderSwapsPerSec,
+    renderDrawsPerSec,
+    textureUploadsPerSec,
+    cacheLookups: seigaihaState.cacheLookups,
+    cacheHits: seigaihaState.cacheHits,
+    cacheMisses: seigaihaState.cacheMisses,
+    cacheHitRate,
+    cacheSize: seigaihaState.patternCache.size,
+    cacheMaxEntries: RANDOMNESS_CACHE_MAX_ENTRIES,
+    sampleCount: samples.length,
   };
 }
 

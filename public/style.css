@@ -10,10 +10,6 @@
   --panel-strong: #ffffff;
   --stroke: rgba(12, 16, 32, 0.12);
 
-  --seigaiha-url: none;
-  --seigaiha-size-x: 384px;
-  --seigaiha-size-y: 384px;
-  --seigaiha-pos: 0px 0px;
 }
 
 html {
@@ -26,7 +22,12 @@ body {
   margin: 0;
   padding: 24px;
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  background: #12398f;
+  background:
+    radial-gradient(92% 70% at 50% 110%, rgba(156, 232, 255, 1) 0%, rgba(126, 206, 255, 0.72) 28%, rgba(72, 138, 244, 0.34) 52%, transparent 74%),
+    radial-gradient(70% 58% at 8% 10%, rgba(184, 126, 255, 0.82) 0%, rgba(132, 92, 240, 0.42) 36%, transparent 74%),
+    radial-gradient(72% 56% at 6% 100%, rgba(206, 178, 255, 0.82) 0%, rgba(150, 132, 255, 0.38) 44%, transparent 76%),
+    linear-gradient(180deg, #061343 0%, #174abf 44%, #1b57cb 66%, #0e327f 100%);
+  background-color: #12398f;
   color: #f8fafc;
   min-height: 100vh;
   min-height: 100dvh;
@@ -44,33 +45,21 @@ body {
   isolation: isolate;
 }
 
-body::before {
-  content: "";
+.seigaiha-canvas {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
   z-index: 0;
-  will-change: background-image;
+  will-change: transform;
   transform: translateZ(0);
-
-  background-image: var(--seigaiha-url);
-  background-repeat: repeat;
-  background-size: var(--seigaiha-size-x) var(--seigaiha-size-y);
-  background-position: var(--seigaiha-pos);
-  opacity: 0.50;
+  opacity: 0;
+  transition: opacity 120ms linear;
 }
 
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  background:
-    radial-gradient(92% 70% at 50% 110%, rgba(156, 232, 255, 1) 0%, rgba(126, 206, 255, 0.72) 28%, rgba(72, 138, 244, 0.34) 52%, transparent 74%),
-    radial-gradient(70% 58% at 8% 10%, rgba(184, 126, 255, 0.82) 0%, rgba(132, 92, 240, 0.42) 36%, transparent 74%),
-    radial-gradient(72% 56% at 6% 100%, rgba(206, 178, 255, 0.82) 0%, rgba(150, 132, 255, 0.38) 44%, transparent 76%),
-    linear-gradient(180deg, #061343 0%, #174abf 44%, #1b57cb 66%, #0e327f 100%);
+body[data-seigaiha-render-ready="1"] .seigaiha-canvas {
+  opacity: 1;
 }
 
 .seigaiha-debug-control {
@@ -145,6 +134,18 @@ body::after {
   justify-self: end;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   opacity: 0.9;
+}
+
+.seigaiha-debug-metrics {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.22);
+  background: rgba(9, 16, 36, 0.6);
+  font-size: 10px;
+  line-height: 1.4;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  white-space: pre;
 }
 
 .seigaiha-debug-table {

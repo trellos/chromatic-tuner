@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   generateTraditionalSeigaihaSvg,
   quantizeSeigaihaRandomnessForCache,
+  resolveSeigaihaInterpolationForTest,
 } from "../src/ui/seigaihaBackground.ts";
 
 test("seigaiha generator is deterministic for same seed/options", () => {
@@ -91,5 +92,20 @@ test("seigaiha cache quantization is stable and bounded", () => {
   expect(nearA).toBe(nearB);
   expect(clampedLow).toBe(0);
   expect(clampedHigh).toBe(1);
+});
+
+test("seigaiha interpolation resolves adjacent frame keys and blend weights", () => {
+  const nearQuarter = resolveSeigaihaInterpolationForTest(0.26, 96);
+  const atOne = resolveSeigaihaInterpolationForTest(1, 96);
+  const belowZero = resolveSeigaihaInterpolationForTest(-1, 96);
+
+  expect(nearQuarter.keyB).toBeGreaterThanOrEqual(nearQuarter.keyA);
+  expect(nearQuarter.blendA + nearQuarter.blendB).toBeCloseTo(1, 6);
+  expect(atOne.keyA).toBe(1);
+  expect(atOne.keyB).toBe(1);
+  expect(atOne.blendA).toBe(1);
+  expect(atOne.blendB).toBe(0);
+  expect(belowZero.keyA).toBe(0);
+  expect(belowZero.keyB).toBeGreaterThanOrEqual(0);
 });
 

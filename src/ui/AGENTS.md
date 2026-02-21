@@ -27,7 +27,7 @@ Primary implementation:
 
 Integration points:
 - `src/main.ts` (mode callbacks, debug controls, and state wiring)
-- `public/style.css` (`body::before` pattern layer + gradient mood layer)
+- `public/style.css` (`.seigaiha-canvas` fixed render surface + gradient mood layer)
 
 ### Artistic Intent
 
@@ -53,7 +53,7 @@ At high randomness, pattern should feel organic but still recognizably seigaiha.
 5. Smaller waves should pull horizontal neighbors inward.
 6. Color variation is per-band (independent by band), not whole-wave only.
 7. Accent color transition must fade in gradually with randomness (avoid hard threshold pops).
-8. Background remains a single CSS `url(...)` image layer.
+8. Background remains a single persistent fullscreen surface.
 
 ### Seigaiha Geometry / Tiling Rules
 
