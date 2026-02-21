@@ -1,3 +1,4 @@
+import { DRUM_MACHINE_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import type { ModeDefinition } from "./types.js";
 
 // Mode factory for the drum machine screen: pattern editing, kit loading,
@@ -31,52 +32,52 @@ export function createDrumMachineMode(): ModeDefinition {
     urls: Record<VoiceId, string>;
   };
 
-  // Public-domain / freely-usable internet samples. If network/CDN blocks them,
-  // synth fallback in playVoice() still allows all kits to be auditioned.
+  // Local, bundled kit samples (generated in-repo) so playback works offline too.
+  // If decode fails for any reason, synth fallback in playVoice() still works.
   const DRUM_KITS: Record<KitId, DrumKit> = {
     rock: {
       name: "Rock Drums",
       urls: {
-        kick: "https://bigsoundbank.com/UPLOAD/wav/1498.wav",
-        snare: "https://bigsoundbank.com/UPLOAD/wav/1496.wav",
-        hat: "https://bigsoundbank.com/UPLOAD/wav/1476.wav",
-        perc: "https://bigsoundbank.com/UPLOAD/wav/1486.wav",
+        kick: DRUM_MACHINE_SAMPLE_URLS.rock.kick,
+        snare: DRUM_MACHINE_SAMPLE_URLS.rock.snare,
+        hat: DRUM_MACHINE_SAMPLE_URLS.rock.hat,
+        perc: DRUM_MACHINE_SAMPLE_URLS.rock.perc,
       },
     },
     electro: {
       name: "Electro Drum Machine",
       urls: {
-        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/kick.wav",
-        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/snare.wav",
-        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/hihat.wav",
-        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/electronic/cowbell.wav",
+        kick: DRUM_MACHINE_SAMPLE_URLS.electro.kick,
+        snare: DRUM_MACHINE_SAMPLE_URLS.electro.snare,
+        hat: DRUM_MACHINE_SAMPLE_URLS.electro.hat,
+        perc: DRUM_MACHINE_SAMPLE_URLS.electro.perc,
       },
     },
     house: {
       name: "House Drums",
       urls: {
-        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/kick.wav",
-        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/snare.wav",
-        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/hihat.wav",
-        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/house/clap.wav",
+        kick: DRUM_MACHINE_SAMPLE_URLS.house.kick,
+        snare: DRUM_MACHINE_SAMPLE_URLS.house.snare,
+        hat: DRUM_MACHINE_SAMPLE_URLS.house.hat,
+        perc: DRUM_MACHINE_SAMPLE_URLS.house.perc,
       },
     },
     lofi: {
       name: "Lo-Fi Pocket",
       urls: {
-        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/kick.wav",
-        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/snare.wav",
-        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/hihat.wav",
-        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/linndrum/tamb.wav",
+        kick: DRUM_MACHINE_SAMPLE_URLS.lofi.kick,
+        snare: DRUM_MACHINE_SAMPLE_URLS.lofi.snare,
+        hat: DRUM_MACHINE_SAMPLE_URLS.lofi.hat,
+        perc: DRUM_MACHINE_SAMPLE_URLS.lofi.perc,
       },
     },
     latin: {
       name: "Latin Percussion",
       urls: {
-        kick: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/kick.wav",
-        snare: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/snare.wav",
-        hat: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/hihat.wav",
-        perc: "https://cdn.jsdelivr.net/gh/jakesgordon/javascript-drum-machine@master/sounds/latin/conga.wav",
+        kick: DRUM_MACHINE_SAMPLE_URLS.latin.kick,
+        snare: DRUM_MACHINE_SAMPLE_URLS.latin.snare,
+        hat: DRUM_MACHINE_SAMPLE_URLS.latin.hat,
+        perc: DRUM_MACHINE_SAMPLE_URLS.latin.perc,
       },
     },
   };
