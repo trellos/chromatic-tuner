@@ -59,8 +59,8 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
     - `version`: number (`1`)
     - `bpm`: number (`60..180`)
     - `kit`: kit id (`rock|electro|house|lofi|latin`)
-    - `beat`: beat preset id (`rock|shuffle|disco|half-time|breakbeat|afrobeat|minimal`)
-    - `steps`: 64-char bitstring (`0|1`), row-major order over 4 rows × 16 steps.
+    - `steps`: 64-char bitstring (`0|1`), row-major order over 4 rows × 16 steps (this is the user-edited loop)
+  - Do not serialize the beat preset selector value in new links; share payloads must preserve the actual edited loop, plus kit and tempo.
   - Parser should continue accepting legacy `v` (number) as version fallback for already-shared links, but new links should emit `version`.
 
 ## Guardrails

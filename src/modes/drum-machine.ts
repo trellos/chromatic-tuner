@@ -125,7 +125,6 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     version: number;
     bpm: number;
     kit: KitId;
-    beat: string;
     steps: string;
   };
 
@@ -426,7 +425,6 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
       version: TRACK_FORMAT_VERSION,
       bpm,
       kit: currentKit,
-      beat: currentBeat,
       steps: getTrackStepBits(activeGrid),
     };
     const encoded = toBase64Url(JSON.stringify(payload));
@@ -465,7 +463,6 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
             : null;
       if (parsedVersion !== TRACK_FORMAT_VERSION || typeof parsed.steps !== "string") return false;
       if (typeof parsed.bpm === "number") setBpm(parsed.bpm);
-      if (typeof parsed.beat === "string") applyBeat(parsed.beat);
       if (typeof parsed.kit === "string" && isKitId(parsed.kit)) {
         await setKit(parsed.kit);
       }

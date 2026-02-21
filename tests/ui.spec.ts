@@ -218,7 +218,6 @@ test('drum machine share URL opens directly in drum mode and restores pattern', 
     version: 1,
     bpm: 133,
     kit: 'latin',
-    beat: 'minimal',
     steps: '1000000010000000000000000001000000000000000000000000000000001000',
   };
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8')
@@ -233,7 +232,6 @@ test('drum machine share URL opens directly in drum mode and restores pattern', 
   await expect(drumScreen).toHaveClass(/is-active/);
   await expect(page.locator('#drum-tempo-value')).toHaveText('133');
   await expect(page.locator('#drum-kit-label')).toHaveText('Latin Percussion');
-  await expect(page.locator('#drum-beat-button')).toContainText('Minimal');
 
   const selectedSteps = await page.evaluate(() =>
     Array.from(document.querySelectorAll('.mode-screen[data-mode="drum-machine"] .drum-row .step.is-on')).map(
