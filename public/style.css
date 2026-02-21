@@ -365,22 +365,6 @@ body.drum-fullscreen .mode-stage {
   text-align: center;
 }
 
-.mode-footer,
-.drum-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.mode-chip {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: rgba(15, 23, 42, 0.08);
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
 
 .tuner-stack {
   position: relative;
@@ -1060,10 +1044,6 @@ body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
 }
 
 body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .mode-header {
-  display: none;
-}
-
-body.drum-fullscreen .drum-footer {
   display: none;
 }
 

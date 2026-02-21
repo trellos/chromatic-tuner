@@ -20,6 +20,11 @@ type MetronomeModeOptions = {
 // Mode factory for the metronome screen: tempo/time-signature controls,
 // click scheduling, and lifecycle-managed event wiring.
 export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDefinition {
+  // Lifecycle overview:
+  // 1) `enterMode` syncs persisted UI state and wires listeners.
+  // 2) UI actions can start/stop transport and edit tempo/signature/sound.
+  // 3) `startTransport` owns scheduler + randomness loop startup.
+  // 4) `exitMode` stops transport and releases every listener/timer resource.
   const metronomeEl = document.querySelector<HTMLElement>(
     '.mode-screen[data-mode="metronome"]'
   );
@@ -347,7 +352,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     pulseTimeouts.push(timeout);
   };
 
-  const schedule = () => {
+  const scheduleClicks = () => {
     if (!audioContext) return;
     const beatsPerBar = getBeatsPerBar();
     while (nextNoteTime < audioContext.currentTime + SCHEDULE_AHEAD) {
@@ -359,7 +364,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     }
   };
 
-  const start = async () => {
+  const startTransport = async () => {
     if (isPlaying) return;
     await ensureAudioContext();
     void ensureSamples();
@@ -370,13 +375,13 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     playbackStartTime = nextNoteTime;
     options.onRandomnessChange?.(0);
     startRandomnessLoop();
-    schedulerId = window.setInterval(schedule, LOOKAHEAD_MS);
+    schedulerId = window.setInterval(scheduleClicks, LOOKAHEAD_MS);
     const toggleButton =
       controlsEl?.querySelector<HTMLButtonElement>('[data-action="toggle"]');
     if (toggleButton) toggleButton.textContent = "Stop";
   };
 
-  const stop = () => {
+  const stopTransport = () => {
     if (!isPlaying) return;
     isPlaying = false;
     stopRandomnessLoop();
@@ -433,8 +438,8 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
           if (action === "decrease") setBpm(bpm - 1);
           if (action === "increase") setBpm(bpm + 1);
           if (action === "toggle") {
-            if (isPlaying) stop();
-            else void start();
+            if (isPlaying) stopTransport();
+            else void startTransport();
           }
         },
         { signal }
@@ -580,7 +585,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
 
   };
 
-  const enter = async () => {
+  const enterMode = async () => {
     modeStageEl?.classList.add("metronome-overflow-visible");
     readStoredBpm();
     setBpm(bpm);
@@ -591,8 +596,8 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     options.onRandomnessChange?.(0);
   };
 
-  const exit = () => {
-    stop();
+  const exitMode = () => {
+    stopTransport();
     modeStageEl?.classList.remove("metronome-overflow-visible");
     uiAbort?.abort();
     uiAbort = null;
@@ -605,7 +610,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     icon: "MT",
     preserveState: false,
     canFullscreen: false,
-    onEnter: enter,
-    onExit: exit,
+    onEnter: enterMode,
+    onExit: exitMode,
   };
 }

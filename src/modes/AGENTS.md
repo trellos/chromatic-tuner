@@ -44,6 +44,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Fullscreen is supported only in this mode.
 - `onEnter`: bind controls, sync layout, seed initial pattern once.
 - `onExit`: stop scheduler and detach listeners/observers.
+- Fullscreen layout behavior is controlled by existing responsive CSS/media rules; do not add no-op class toggles without matching styles.
 - Background effect contract:
   - Does not currently drive seigaiha randomness directly.
   - Background follows global/default state unless another mode-specific source is active.

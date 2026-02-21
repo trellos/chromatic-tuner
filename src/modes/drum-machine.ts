@@ -4,6 +4,11 @@ import type { ModeDefinition } from "./types.js";
 // Mode factory for the drum machine screen: pattern editing, kit loading,
 // step scheduling/playhead animation, and lifecycle-managed UI wiring.
 export function createDrumMachineMode(): ModeDefinition {
+  // Lifecycle overview:
+  // 1) `enterMode` syncs UI state, wires listeners, and seeds the initial pattern.
+  // 2) UI interactions mutate pattern/tempo/kit and can start/stop transport.
+  // 3) `startTransport` owns scheduler startup; `scheduleSteps` drives playback.
+  // 4) `exitMode` stops transport and tears down observers/listeners.
   const drumModeEl = document.querySelector<HTMLElement>(
     '.mode-screen[data-mode="drum-machine"]'
   );
@@ -171,24 +176,7 @@ export function createDrumMachineMode(): ModeDefinition {
     window.requestAnimationFrame(syncLayout);
   };
 
-  const getViewportBounds = () => {
-    const viewport = window.visualViewport;
-    const width = viewport?.width ?? window.innerWidth;
-    const height = viewport?.height ?? window.innerHeight;
-    return { width, height };
-  };
-
-  const shouldUseRotatedFullscreenLayout = () => {
-    const { width, height } = getViewportBounds();
-    if (width > 600) return false;
-    return height > width;
-  };
-
-  const syncFullscreenLayoutMode = () => {
-    if (!drumModeEl) return;
-    const isFullscreen = document.body.classList.contains("drum-fullscreen");
-    const shouldRotate = isFullscreen && shouldUseRotatedFullscreenLayout();
-    drumModeEl.classList.toggle("use-rotated-fullscreen-layout", shouldRotate);
+  const syncResponsiveLayout = () => {
     scheduleLayoutSync();
   };
 
@@ -379,7 +367,7 @@ export function createDrumMachineMode(): ModeDefinition {
     osc.stop(time + 0.06);
   };
 
-  const schedule = () => {
+  const scheduleSteps = () => {
     if (!audioContext) return;
     const stepsPerBar = getStepsPerBar();
     const beatsPerBar = getBeatsPerBar();
@@ -441,18 +429,18 @@ export function createDrumMachineMode(): ModeDefinition {
     }
   };
 
-  const start = async () => {
+  const startTransport = async () => {
     if (isPlaying) return;
     await ensureAudio();
     if (!audioContext) return;
     isPlaying = true;
     currentStep = 0;
     nextStepTime = audioContext.currentTime + 0.05;
-    schedulerId = window.setInterval(schedule, LOOKAHEAD_MS);
+    schedulerId = window.setInterval(scheduleSteps, LOOKAHEAD_MS);
     if (playButton) playButton.textContent = "Stop";
   };
 
-  const stop = () => {
+  const stopTransport = () => {
     if (!isPlaying) return;
     isPlaying = false;
     if (schedulerId !== null) {
@@ -484,7 +472,7 @@ export function createDrumMachineMode(): ModeDefinition {
     const { signal } = uiAbort;
 
     scheduleLayoutSync();
-    syncFullscreenLayoutMode();
+    syncResponsiveLayout();
 
     if (drumGridsEl && "ResizeObserver" in window) {
       resizeObserver?.disconnect();
@@ -493,11 +481,11 @@ export function createDrumMachineMode(): ModeDefinition {
     } else {
       window.addEventListener("resize", scheduleLayoutSync, { signal });
     }
-    window.addEventListener("resize", syncFullscreenLayoutMode, { signal });
+    window.addEventListener("resize", syncResponsiveLayout, { signal });
     detachVisualViewportListeners?.();
     detachVisualViewportListeners = null;
     if (window.visualViewport) {
-      const onViewportChange = () => syncFullscreenLayoutMode();
+      const onViewportChange = () => syncResponsiveLayout();
       window.visualViewport.addEventListener("resize", onViewportChange);
       window.visualViewport.addEventListener("scroll", onViewportChange);
       detachVisualViewportListeners = () => {
@@ -509,7 +497,7 @@ export function createDrumMachineMode(): ModeDefinition {
     if ("MutationObserver" in window) {
       bodyClassObserver?.disconnect();
       bodyClassObserver = new MutationObserver(() => {
-        syncFullscreenLayoutMode();
+        syncResponsiveLayout();
       });
       bodyClassObserver.observe(document.body, {
         attributes: true,
@@ -543,8 +531,8 @@ export function createDrumMachineMode(): ModeDefinition {
       playButton.addEventListener(
         "click",
         () => {
-          if (isPlaying) stop();
-          else void start();
+          if (isPlaying) stopTransport();
+          else void startTransport();
         },
         { signal }
       );
@@ -630,12 +618,12 @@ export function createDrumMachineMode(): ModeDefinition {
 
   };
 
-  const enter = async () => {
+  const enterMode = async () => {
     setSignature(signature);
     setBpm(bpm);
     setKitLabel();
     attachUi();
-    syncFullscreenLayoutMode();
+    syncResponsiveLayout();
     scheduleLayoutSync();
     if (!hasSeedPattern) {
       applyStandardRock();
@@ -643,8 +631,8 @@ export function createDrumMachineMode(): ModeDefinition {
     }
   };
 
-  const exit = () => {
-    stop();
+  const exitMode = () => {
+    stopTransport();
     uiAbort?.abort();
     uiAbort = null;
     resizeObserver?.disconnect();
@@ -653,7 +641,6 @@ export function createDrumMachineMode(): ModeDefinition {
     detachVisualViewportListeners = null;
     bodyClassObserver?.disconnect();
     bodyClassObserver = null;
-    drumModeEl?.classList.remove("use-rotated-fullscreen-layout");
   };
 
   return {
@@ -662,7 +649,7 @@ export function createDrumMachineMode(): ModeDefinition {
     icon: "DR",
     preserveState: true,
     canFullscreen: true,
-    onEnter: enter,
-    onExit: exit,
+    onEnter: enterMode,
+    onExit: exitMode,
   };
 }

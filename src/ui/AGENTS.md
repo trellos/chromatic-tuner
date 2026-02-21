@@ -26,7 +26,7 @@ Primary implementation:
 - `src/ui/seigaihaBackground.ts`
 
 Integration points:
-- `src/main.ts` (debug randomness slider and state wiring)
+- `src/main.ts` (mode callbacks, debug controls, and state wiring)
 - `public/style.css` (`body::before` pattern layer + gradient mood layer)
 
 ### Artistic Intent
@@ -65,8 +65,15 @@ At high randomness, pattern should feel organic but still recognizably seigaiha.
 ### Seigaiha State / Debug Rules
 
 - Background randomness source of truth is state in `seigaihaBackground.ts`.
-- Debug slider is a temporary control surface only; it mutates state and triggers re-render.
-- Keep debug control gated behind `?debug=1`.
+- Mode priority:
+  - debug override (if enabled),
+  - mode-driven randomness (metronome),
+  - tuner detune mapping/smoothing.
+- Tuner randomness is mapped from absolute cents with interpolation and decays to `0` when no note is detected.
+- Tuner visual randomness smoothing runs on RAF for smoother motion between pitch updates.
+- Debug UI is gated behind `?debug=1` and mode-scoped:
+  - tuner: override toggle/slider, effective FPS, smoothing input, detune mapping table.
+  - metronome: compact parameter table (`NA`, `I44`, `I34`, `I68`, `UP`, `DN`).
 
 ### Seigaiha Change Checklist
 
@@ -75,6 +82,7 @@ When editing this system:
 2. Manually check `randomness` at `0`, `~0.3`, `~0.7`, and `1.0`.
 3. Confirm no obvious seam artifacts at tile boundaries.
 4. Confirm the pattern still reads as traditional seigaiha from a distance.
+5. Confirm debug sections switch correctly per active mode.
 
 ### Seigaiha Anti-Patterns
 
