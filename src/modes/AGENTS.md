@@ -39,7 +39,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Metronome sound menu click handling must resolve from nested click targets (use closest menu-item button semantics) so selection always works.
   - Switching metronome sound while transport is running must apply to newly scheduled clicks immediately; any click source already started may finish naturally.
   - Keep per-sound sample loading/caching resilient to rapid switching so stale async fetch completion cannot overwrite a newer sound choice.
-  - Keep freely-usable sample sources configured for all metronome sound profiles (`electro`, `drum`, `conga`) with both regular and accent URLs, and preserve per-profile fallback tones so sound changes remain audible if sample fetching fails.
+  - Keep freely-usable sample sources configured for all metronome sound profiles (`woodblock`, `electro`, `drum`, `conga`) with both regular and accent URLs, and preserve per-profile fallback tones so sound changes remain audible if sample fetching fails.
   - Preserve regression coverage in `tests/ui.spec.ts` for the metronome sound menu overflow + no-scrollbar behavior.
 
 ### Drum Machine (`src/modes/drum-machine.ts`)
@@ -58,6 +58,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Drum kit menu click handling must resolve from nested click targets (use closest menu-item button semantics) so kit selection always works.
   - Switching drum kit while transport is running must apply to newly scheduled steps immediately; any already-started sample source may finish naturally.
   - Keep kit sample loading/caching resilient to rapid switching so stale async fetch completion cannot overwrite the currently selected kit.
+  - Prefer text-only embedded sample sources for new audio assets when possible to avoid binary-diff PR tooling failures.
 
 ## Guardrails
 
