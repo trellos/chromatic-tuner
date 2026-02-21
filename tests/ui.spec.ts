@@ -11,6 +11,22 @@ type PageIssueTracker = {
   failedRequests: string[];
 };
 
+test("seigaiha background: single static traditional layer", async ({ page }) => {
+  await page.goto("/");
+
+  const bg = await page.evaluate(() => {
+    const style = getComputedStyle(document.body, "::before");
+    return {
+      image: style.backgroundImage,
+      pos: style.backgroundPosition,
+    };
+  });
+
+  const urlCount = (bg.image.match(/url\(/g) ?? []).length;
+  expect(urlCount).toBe(1);
+  expect(bg.pos).toContain("0px 0px");
+});
+
 function trackPageIssues(page: Page): PageIssueTracker {
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];

@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --ink: #0b1020;
   --ink-soft: #1f2a44;
   --tuna-pink: #ff6bd6;
@@ -6,19 +6,21 @@
   --tuna-aqua: #00f5d4;
   --tuna-sunset: #ff3d81;
   --tuna-gold: #ff9e00;
-  --panel: rgba(255, 255, 255, 0.88);
-  --panel-strong: rgba(255, 255, 255, 0.96);
+  --panel: #f2f4ff;
+  --panel-strong: #ffffff;
   --stroke: rgba(12, 16, 32, 0.12);
+
+  --seigaiha-url: none;
+  --seigaiha-size-x: 384px;
+  --seigaiha-size-y: 384px;
+  --seigaiha-pos: 0px 0px;
 }
 
 body {
   font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
   margin: 0;
   padding: 24px;
-  background:
-    radial-gradient(circle at top, rgba(0, 245, 212, 0.16), transparent 55%),
-    radial-gradient(circle at 20% 20%, rgba(255, 107, 214, 0.18), transparent 40%),
-    linear-gradient(140deg, #0b1020 0%, #111c2f 45%, #182238 100%);
+  background: #12398f;
   color: #f8fafc;
   min-height: 100vh;
   display: flex;
@@ -30,6 +32,33 @@ body {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+
+  background-image: var(--seigaiha-url);
+  background-repeat: repeat;
+  background-size: var(--seigaiha-size-x) var(--seigaiha-size-y);
+  background-position: var(--seigaiha-pos);
+  opacity: 0.50;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+  background:
+    radial-gradient(92% 70% at 50% 110%, rgba(156, 232, 255, 1) 0%, rgba(126, 206, 255, 0.72) 28%, rgba(72, 138, 244, 0.34) 52%, transparent 74%),
+    radial-gradient(70% 58% at 8% 10%, rgba(184, 126, 255, 0.82) 0%, rgba(132, 92, 240, 0.42) 36%, transparent 74%),
+    radial-gradient(72% 56% at 6% 100%, rgba(206, 178, 255, 0.82) 0%, rgba(150, 132, 255, 0.38) 44%, transparent 76%),
+    linear-gradient(180deg, #061343 0%, #174abf 44%, #1b57cb 66%, #0e327f 100%);
 }
 
 main {
@@ -150,9 +179,12 @@ body.drum-fullscreen .mode-stage {
   color: var(--ink);
   box-shadow: 0 30px 60px rgba(4, 8, 16, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
   position: relative;
   overflow: auto;
+
+  background-color: var(--panel);
+
 }
 
 .mode-screen.is-active {
