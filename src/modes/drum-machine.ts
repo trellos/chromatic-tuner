@@ -1,6 +1,32 @@
 import { DRUM_MACHINE_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import type { ModeDefinition } from "./types.js";
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function getDrumSoundingBeatIndicesFromFlags(
+  beatHasSoundByBeat: boolean[]
+): number[] {
+  return beatHasSoundByBeat.reduce<number[]>((indices, hasSound, beatIndex) => {
+    if (hasSound) indices.push(beatIndex);
+    return indices;
+  }, []);
+}
+
+export function getDrumRandomnessForBeat(options: {
+  beatIndex: number;
+  soundingBeatIndices: number[];
+  target: number;
+}): number | null {
+  const { beatIndex, soundingBeatIndices, target } = options;
+  const soundingRank = soundingBeatIndices.indexOf(beatIndex);
+  if (soundingRank < 0) return null;
+  if (soundingRank === 0 || soundingBeatIndices.length <= 1) return 0;
+  const progress = clamp(soundingRank / (soundingBeatIndices.length - 1), 0, 1);
+  return clamp(target, 0, 1) * progress;
+}
+
 type DrumMachineModeOptions = {
   onRandomnessChange?: (randomness: number | null) => void;
   getRandomnessTarget?: () => number;
@@ -116,9 +142,6 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   let bodyClassObserver: MutationObserver | null = null;
   let detachVisualViewportListeners: (() => void) | null = null;
   let hasSeedPattern = false;
-
-  const clamp = (value: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, value));
 
   const getRandomnessTarget = () =>
     clamp(options.getRandomnessTarget?.() ?? DEFAULT_RANDOMNESS_TARGET, 0, 1);
@@ -276,16 +299,18 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     stepsPerBeat: number
   ): number[] => {
     if (!grid) return [];
-    const sounding: number[] = [];
+    const beatHasSoundByBeat = new Array<boolean>(beatsPerBar).fill(false);
     // Build an ordered list of beats that contain any event so progression
     // is based on musical activity, not fixed beat index.
     for (let beat = 0; beat < beatsPerBar; beat++) {
       const beatStartStep = beat * stepsPerBeat;
-      if (beatContainsAnySound(grid, beatStartStep, stepsPerBeat)) {
-        sounding.push(beat);
-      }
+      beatHasSoundByBeat[beat] = beatContainsAnySound(
+        grid,
+        beatStartStep,
+        stepsPerBeat
+      );
     }
-    return sounding;
+    return getDrumSoundingBeatIndicesFromFlags(beatHasSoundByBeat);
   };
 
   const applyBeat = (beat: string) => {
@@ -520,19 +545,13 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
             beatsPerBar,
             stepsPerBeat
           );
-          const soundingRank = soundingBeatIndices.indexOf(beatIndex);
-          if (soundingRank <= 0 || soundingBeatIndices.length <= 1) {
-            // First sounding beat starts at zero.
-            emitRandomness(0, true);
-          } else {
-            // Later sounding beats linearly rise so the final sounding beat
-            // lands exactly on the configured target.
-            const progress = clamp(
-              soundingRank / (soundingBeatIndices.length - 1),
-              0,
-              1
-            );
-            emitRandomness(getRandomnessTarget() * progress);
+          const nextRandomness = getDrumRandomnessForBeat({
+            beatIndex,
+            soundingBeatIndices,
+            target: getRandomnessTarget(),
+          });
+          if (nextRandomness !== null) {
+            emitRandomness(nextRandomness, nextRandomness <= 0.0005);
           }
         }
       }
