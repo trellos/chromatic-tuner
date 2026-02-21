@@ -6,8 +6,11 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:e2e": "playwright test",
-    "test:e2e:mobile": "playwright test tests/ui.spec.ts --project=chromium --project=\"Mobile Safari\""
+    "test:e2e:mobile": "playwright test tests/ui.spec.ts --project=chromium --project=\"Mobile Safari\"",
+    "test": "npm run typecheck && npm run test:e2e",
+    "ci": "npm run build && npm test"
   },
   "keywords": [],
   "author": "",
