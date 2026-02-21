@@ -3,7 +3,11 @@ import { createTunerMode } from "./modes/tuner.js";
 import { createMetronomeMode } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { runModeTransition } from "./mode-transition.js";
-import { installSeigaihaBackground } from "./ui/seigaihaBackground.js";
+import {
+  getSeigaihaRandomness,
+  installSeigaihaBackground,
+  setSeigaihaRandomness,
+} from "./ui/seigaihaBackground.js";
 
 const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
@@ -30,6 +34,47 @@ let swipeActiveScreen: HTMLElement | null = null;
 let swipeTargetScreen: HTMLElement | null = null;
 let swipeTargetMode: ModeId | null = null;
 let isSwipeDragging = false;
+let seigaihaRandomness = getSeigaihaRandomness();
+
+function bindSeigaihaDebugControl(): void {
+  const shouldShowDebugControl = new URLSearchParams(window.location.search).has(
+    "debug"
+  );
+  if (!shouldShowDebugControl) return;
+
+  const panel = document.createElement("div");
+  panel.className = "seigaiha-debug-control";
+
+  const label = document.createElement("label");
+  label.setAttribute("for", "seigaiha-randomness-slider");
+  label.textContent = "Seigaiha randomness";
+
+  const value = document.createElement("span");
+  value.className = "seigaiha-debug-value";
+  value.textContent = seigaihaRandomness.toFixed(2);
+
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.id = "seigaiha-randomness-slider";
+  slider.min = "0";
+  slider.max = "1";
+  slider.step = "0.01";
+  slider.value = String(seigaihaRandomness);
+  slider.setAttribute("aria-label", "Seigaiha randomness");
+
+  slider.addEventListener("input", () => {
+    const nextValue = Number.parseFloat(slider.value);
+    if (!Number.isFinite(nextValue)) return;
+    seigaihaRandomness = Math.max(0, Math.min(1, nextValue));
+    setSeigaihaRandomness(seigaihaRandomness);
+    value.textContent = seigaihaRandomness.toFixed(2);
+  });
+
+  panel.appendChild(label);
+  panel.appendChild(slider);
+  panel.appendChild(value);
+  document.body.appendChild(panel);
+}
 
 function getModeById(id: ModeId): ModeDefinition | undefined {
   return MODE_REGISTRY.find((mode) => mode.id === id);
@@ -335,6 +380,7 @@ function initializeCarouselUi(): void {
 window.addEventListener("DOMContentLoaded", async () => {
   initializeCarouselUi();
   installSeigaihaBackground();
+  bindSeigaihaDebugControl();
 
   const tunerMode = MODE_REGISTRY.find((mode) => mode.id === "tuner");
   if (tunerMode?.onEnter) {

@@ -61,6 +61,32 @@ body::after {
     linear-gradient(180deg, #061343 0%, #174abf 44%, #1b57cb 66%, #0e327f 100%);
 }
 
+.seigaiha-debug-control {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(6, 12, 28, 0.82);
+  border: 1px solid rgba(226, 232, 240, 0.3);
+  color: #e2e8f0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  width: 220px;
+}
+
+.seigaiha-debug-control input[type="range"] {
+  width: 100%;
+}
+
+.seigaiha-debug-value {
+  justify-self: end;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+}
+
 main {
   max-width: 760px;
   width: 100%;
