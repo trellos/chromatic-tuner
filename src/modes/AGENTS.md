@@ -58,7 +58,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Drum kit menu click handling must resolve from nested click targets (use closest menu-item button semantics) so kit selection always works.
   - Switching drum kit while transport is running must apply to newly scheduled steps immediately; any already-started sample source may finish naturally.
   - Keep kit sample loading/caching resilient to rapid switching so stale async fetch completion cannot overwrite the currently selected kit.
-  - Prefer text-only embedded sample sources for new audio assets when possible to avoid binary-diff PR tooling failures.
+  - Keep sample URLs in mode code pointed at bundled project assets so kit/sound switching remains deterministic offline.
 - Share URL track format (`?track=<base64url(JSON)>`):
   - Include `mode=drum-machine` in generated share URLs so links open directly in drum mode.
   - JSON payload is versioned with `version` (currently `1`) and must remain backward-compatible when evolving.
