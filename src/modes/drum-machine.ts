@@ -277,6 +277,8 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   ): number[] => {
     if (!grid) return [];
     const sounding: number[] = [];
+    // Build an ordered list of beats that contain any event so progression
+    // is based on musical activity, not fixed beat index.
     for (let beat = 0; beat < beatsPerBar; beat++) {
       const beatStartStep = beat * stepsPerBeat;
       if (beatContainsAnySound(grid, beatStartStep, stepsPerBeat)) {
@@ -523,6 +525,8 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
             // First sounding beat starts at zero.
             emitRandomness(0, true);
           } else {
+            // Later sounding beats linearly rise so the final sounding beat
+            // lands exactly on the configured target.
             const progress = clamp(
               soundingRank / (soundingBeatIndices.length - 1),
               0,

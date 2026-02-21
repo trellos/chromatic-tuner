@@ -15,7 +15,7 @@ The app runs as a static frontend served by an Express dev server.
 - `src/mode-transition.ts`: shared transition sequence (`exit -> apply UI -> enter`) with error callback.
 - `src/modes/tuner.ts`: tuner mode lifecycle, audio startup/teardown, strobe UI.
 - `src/modes/metronome.ts`: metronome UI, scheduling, and cleanup.
-- `src/modes/drum-machine.ts`: drum sequencer UI/audio/scheduling and cleanup.
+- `src/modes/drum-machine.ts`: drum sequencer UI/audio/scheduling and cleanup, plus beat-driven seigaiha randomness control.
 - `src/audio/worklet.ts`: tuner AudioWorklet pitch detection in audio thread.
 - `public/index.html` + `public/style.css`: static UI structure/styles.
 
@@ -34,6 +34,19 @@ Modes are represented by `ModeDefinition` (`src/modes/types.ts`):
 - Drum Machine is the only fullscreen-capable mode.
 - Drum Machine grid is fixed at 16 steps (4/4 layout only).
 - Mode panel sizing should stay consistent across modes.
+- Seigaiha debug panel is mode-scoped when `?debug=1`:
+  - tuner controls
+  - metronome params
+  - drum target (`TG`, default `0.9`)
+
+## Background Randomness Contracts (Current)
+
+- Tuner: mapped from detune with smoothing/decay behavior.
+- Metronome: frame-updated time/beat curve behavior.
+- Drum Machine: beat-boundary jump behavior only.
+  - Only beats that contain at least one active step can update randomness.
+  - First sounding beat of each bar is always `0`.
+  - Later sounding beats linearly progress by sounding-beat rank to the configured target.
 
 ## Testing Strategy
 

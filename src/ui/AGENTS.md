@@ -67,13 +67,14 @@ At high randomness, pattern should feel organic but still recognizably seigaiha.
 - Background randomness source of truth is state in `seigaihaBackground.ts`.
 - Mode priority:
   - debug override (if enabled),
-  - mode-driven randomness (metronome),
+  - mode-driven randomness (metronome or drum machine),
   - tuner detune mapping/smoothing.
 - Tuner randomness is mapped from absolute cents with interpolation and decays to `0` when no note is detected.
 - Tuner visual randomness smoothing runs on RAF for smoother motion between pitch updates.
 - Debug UI is gated behind `?debug=1` and mode-scoped:
   - tuner: override toggle/slider, effective FPS, smoothing input, detune mapping table.
   - metronome: compact parameter table (`NA`, `I44`, `I34`, `I68`, `UP`, `DN`).
+  - drum machine: target input (`TG`) for beat-progression ceiling (`0..1`, default `0.9`).
 
 ### Seigaiha Change Checklist
 

@@ -48,8 +48,9 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Background effect contract:
   - Drives seigaiha randomness while in drum mode.
   - Randomness updates in beat-sized jumps (no per-frame interpolation).
-  - At each beat boundary, randomness rises toward a per-bar target only if that beat window contains at least one active step.
-  - Bar start resets randomness to `0`; by the last beat, full progression reaches the configured target.
+  - At each beat boundary, randomness can update only if that beat window contains at least one active step.
+  - The first sounding beat in each bar is always `0`.
+  - Later sounding beats linearly interpolate toward target by sounding-beat rank; the last sounding beat reaches target.
   - Target is debug-tunable in the shared seigaiha debug panel (`TG` field, default `0.9`).
 
 ## Guardrails
