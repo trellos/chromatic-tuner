@@ -36,12 +36,16 @@ test("seigaiha debug override starts disabled and shows editable detune mapping"
   const metronomeSection = page.locator(
     '.seigaiha-debug-section[data-debug-section="metronome"]'
   );
+  const drumSection = page.locator(
+    '.seigaiha-debug-section[data-debug-section="drum-machine"]'
+  );
   const overrideToggle = page.locator("#seigaiha-override-toggle");
   const slider = page.locator("#seigaiha-randomness-slider");
   const fps = page.locator(".seigaiha-debug-fps");
   const smoothingMs = page.locator("#seigaiha-smoothing-ms");
   await expect(tunerSection).toBeVisible();
   await expect(metronomeSection).toBeHidden();
+  await expect(drumSection).toBeHidden();
   await expect(overrideToggle).toBeVisible();
   await expect(overrideToggle).not.toBeChecked();
   await expect(slider).toBeDisabled();
@@ -75,15 +79,44 @@ test("seigaiha debug shows metronome params only in metronome mode", async ({
   const metronomeSection = page.locator(
     '.seigaiha-debug-section[data-debug-section="metronome"]'
   );
+  const drumSection = page.locator(
+    '.seigaiha-debug-section[data-debug-section="drum-machine"]'
+  );
 
   await expect(tunerSection).toBeHidden();
   await expect(metronomeSection).toBeVisible();
+  await expect(drumSection).toBeHidden();
   await expect(metronomeSection.getByText("NA")).toBeVisible();
   await expect(metronomeSection.getByText("I44")).toBeVisible();
   await expect(metronomeSection.getByText("I34")).toBeVisible();
   await expect(metronomeSection.getByText("I68")).toBeVisible();
   await expect(metronomeSection.getByText("UP")).toBeVisible();
   await expect(metronomeSection.getByText("DN")).toBeVisible();
+});
+
+test("seigaiha debug shows drum target only in drum machine mode", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Drum Machine" }).click();
+
+  const tunerSection = page.locator('.seigaiha-debug-section[data-debug-section="tuner"]');
+  const metronomeSection = page.locator(
+    '.seigaiha-debug-section[data-debug-section="metronome"]'
+  );
+  const drumSection = page.locator(
+    '.seigaiha-debug-section[data-debug-section="drum-machine"]'
+  );
+  const drumTargetInput = page.locator("#seigaiha-drum-target");
+
+  await expect(tunerSection).toBeHidden();
+  await expect(metronomeSection).toBeHidden();
+  await expect(drumSection).toBeVisible();
+  await expect(drumTargetInput).toHaveValue("0.90");
+
+  await drumTargetInput.fill("0.77");
+  await drumTargetInput.blur();
+  await expect(drumTargetInput).toHaveValue("0.77");
 });
 
 function trackPageIssues(page: Page): PageIssueTracker {

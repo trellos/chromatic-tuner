@@ -38,10 +38,16 @@ const DEFAULT_METRONOME_RANDOMNESS_PARAMS: MetronomeRandomnessParams = {
   upCurve: 1.8,
   downCurve: 3.2,
 };
+const DEFAULT_DRUM_RANDOMNESS_TARGET = 0.9;
 
 let metronomeRandomnessParams: MetronomeRandomnessParams = {
   ...DEFAULT_METRONOME_RANDOMNESS_PARAMS,
 };
+let drumRandomnessTarget = DEFAULT_DRUM_RANDOMNESS_TARGET;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 const MODE_REGISTRY: ModeDefinition[] = [
   createTunerMode({
@@ -55,7 +61,12 @@ const MODE_REGISTRY: ModeDefinition[] = [
     },
     getRandomnessParams: () => metronomeRandomnessParams,
   }),
-  createDrumMachineMode(),
+  createDrumMachineMode({
+    onRandomnessChange: (randomness) => {
+      setSeigaihaModeRandomness(randomness);
+    },
+    getRandomnessTarget: () => drumRandomnessTarget,
+  }),
 ];
 
 let activeModeId: ModeId = "tuner";
@@ -90,6 +101,10 @@ function bindSeigaihaDebugControl(): void {
   const metronomeSection = document.createElement("section");
   metronomeSection.className = "seigaiha-debug-section";
   metronomeSection.setAttribute("data-debug-section", "metronome");
+
+  const drumSection = document.createElement("section");
+  drumSection.className = "seigaiha-debug-section";
+  drumSection.setAttribute("data-debug-section", "drum-machine");
 
   const overrideRow = document.createElement("label");
   overrideRow.className = "seigaiha-debug-switch";
@@ -167,6 +182,31 @@ function bindSeigaihaDebugControl(): void {
   metronomeTable.className = "seigaiha-debug-table seigaiha-debug-table--compact";
   const metronomeBody = document.createElement("tbody");
   metronomeTable.appendChild(metronomeBody);
+
+  const drumLabel = document.createElement("p");
+  drumLabel.className = "seigaiha-debug-subtitle";
+  drumLabel.textContent = "Drum params";
+
+  const drumTargetRow = document.createElement("label");
+  drumTargetRow.className = "seigaiha-debug-switch";
+  drumTargetRow.setAttribute("for", "seigaiha-drum-target");
+  drumTargetRow.append("TG");
+
+  const drumTargetInput = document.createElement("input");
+  drumTargetInput.type = "number";
+  drumTargetInput.id = "seigaiha-drum-target";
+  drumTargetInput.min = "0";
+  drumTargetInput.max = "1";
+  drumTargetInput.step = "0.01";
+  drumTargetInput.value = drumRandomnessTarget.toFixed(2);
+  drumTargetInput.setAttribute("aria-label", "Drum randomness target");
+  drumTargetInput.addEventListener("change", () => {
+    const parsed = Number.parseFloat(drumTargetInput.value);
+    if (!Number.isFinite(parsed)) return;
+    drumRandomnessTarget = clamp(parsed, 0, 1);
+    drumTargetInput.value = drumRandomnessTarget.toFixed(2);
+  });
+  drumTargetRow.appendChild(drumTargetInput);
 
   type MetronomeDebugField = {
     key: keyof MetronomeRandomnessParams;
@@ -316,14 +356,19 @@ function bindSeigaihaDebugControl(): void {
   metronomeSection.appendChild(metronomeLabel);
   metronomeSection.appendChild(metronomeTable);
 
+  drumSection.appendChild(drumLabel);
+  drumSection.appendChild(drumTargetRow);
+
   panel.appendChild(title);
   panel.appendChild(tunerSection);
   panel.appendChild(metronomeSection);
+  panel.appendChild(drumSection);
   document.body.appendChild(panel);
 
   syncSeigaihaDebugModeVisibility = () => {
     tunerSection.style.display = activeModeId === "tuner" ? "" : "none";
     metronomeSection.style.display = activeModeId === "metronome" ? "" : "none";
+    drumSection.style.display = activeModeId === "drum-machine" ? "" : "none";
   };
 
   renderMappingTable();

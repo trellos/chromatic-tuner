@@ -1,9 +1,15 @@
 import { DRUM_MACHINE_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import type { ModeDefinition } from "./types.js";
 
+type DrumMachineModeOptions = {
+  onRandomnessChange?: (randomness: number | null) => void;
+  getRandomnessTarget?: () => number;
+};
+
 // Mode factory for the drum machine screen: pattern editing, kit loading,
 // step scheduling/playhead animation, and lifecycle-managed UI wiring.
-export function createDrumMachineMode(): ModeDefinition {
+export function createDrumMachineMode(options: DrumMachineModeOptions = {}): ModeDefinition {
+  let randomness = 0;
   // Lifecycle overview:
   // 1) `enterMode` syncs UI state, wires listeners, and seeds the initial pattern.
   // 2) UI interactions mutate pattern/tempo/kit and can start/stop transport.
@@ -29,6 +35,7 @@ export function createDrumMachineMode(): ModeDefinition {
   const BPM_MAX = 180;
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
+  const DEFAULT_RANDOMNESS_TARGET = 0.9;
   type KitId = "rock" | "electro" | "house" | "lofi" | "latin";
   type VoiceId = "kick" | "snare" | "hat" | "perc";
 
@@ -109,6 +116,23 @@ export function createDrumMachineMode(): ModeDefinition {
   let bodyClassObserver: MutationObserver | null = null;
   let detachVisualViewportListeners: (() => void) | null = null;
   let hasSeedPattern = false;
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
+
+  const getRandomnessTarget = () =>
+    clamp(options.getRandomnessTarget?.() ?? DEFAULT_RANDOMNESS_TARGET, 0, 1);
+
+  const emitRandomness = (next: number | null, force = false) => {
+    if (next === null || !Number.isFinite(next)) {
+      options.onRandomnessChange?.(null);
+      return;
+    }
+    const clamped = clamp(next, 0, 1);
+    if (!force && Math.abs(clamped - randomness) <= 0.0005) return;
+    randomness = clamped;
+    options.onRandomnessChange?.(randomness);
+  };
 
   const setKitLabel = () => {
     if (kitLabel) {
@@ -226,6 +250,40 @@ export function createDrumMachineMode(): ModeDefinition {
     const step = steps[index];
     if (!step) return;
     step.classList.toggle("is-on", on);
+  };
+
+  const beatContainsAnySound = (
+    grid: HTMLElement | null,
+    beatStartStep: number,
+    stepsPerBeat: number
+  ) => {
+    if (!grid) return false;
+    const rows = grid.querySelectorAll<HTMLElement>(".drum-row");
+    for (const row of rows) {
+      const steps = row.querySelectorAll<HTMLButtonElement>(".step");
+      for (let offset = 0; offset < stepsPerBeat; offset++) {
+        if (steps[beatStartStep + offset]?.classList.contains("is-on")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const getSoundingBeatIndices = (
+    grid: HTMLElement | null,
+    beatsPerBar: number,
+    stepsPerBeat: number
+  ): number[] => {
+    if (!grid) return [];
+    const sounding: number[] = [];
+    for (let beat = 0; beat < beatsPerBar; beat++) {
+      const beatStartStep = beat * stepsPerBeat;
+      if (beatContainsAnySound(grid, beatStartStep, stepsPerBeat)) {
+        sounding.push(beat);
+      }
+    }
+    return sounding;
   };
 
   const applyBeat = (beat: string) => {
@@ -386,8 +444,8 @@ export function createDrumMachineMode(): ModeDefinition {
   const scheduleSteps = () => {
     if (!audioContext) return;
     const stepsPerBar = getStepsPerBar();
-    const beatsPerBar = getBeatsPerBar();
-    const stepsPerBeat = stepsPerBar / beatsPerBar;
+    const beatsPerBar = Math.max(1, getBeatsPerBar());
+    const stepsPerBeat = Math.max(1, Math.floor(stepsPerBar / beatsPerBar));
     const stepDuration = (60 / bpm) / stepsPerBeat;
     if (drumGridsEl) {
       drumGridsEl.style.setProperty(
@@ -400,6 +458,7 @@ export function createDrumMachineMode(): ModeDefinition {
         `.drum-grid[data-signature="${signature}"]`
       );
       const stepToHighlight = currentStep;
+      const isBeatBoundary = stepToHighlight % stepsPerBeat === 0;
       if (activeGrid) {
         const delay = Math.max(
           0,
@@ -440,6 +499,39 @@ export function createDrumMachineMode(): ModeDefinition {
           }
         });
       }
+
+      if (isBeatBoundary) {
+        const beatIndex = Math.floor(stepToHighlight / stepsPerBeat);
+        if (beatIndex === 0) {
+          // Reset each bar, then rise in beat-sized jumps toward target.
+          emitRandomness(0, true);
+        }
+        const beatStartStep = beatIndex * stepsPerBeat;
+        const beatHasSound = beatContainsAnySound(
+          activeGrid,
+          beatStartStep,
+          stepsPerBeat
+        );
+        if (beatHasSound) {
+          const soundingBeatIndices = getSoundingBeatIndices(
+            activeGrid,
+            beatsPerBar,
+            stepsPerBeat
+          );
+          const soundingRank = soundingBeatIndices.indexOf(beatIndex);
+          if (soundingRank <= 0 || soundingBeatIndices.length <= 1) {
+            // First sounding beat starts at zero.
+            emitRandomness(0, true);
+          } else {
+            const progress = clamp(
+              soundingRank / (soundingBeatIndices.length - 1),
+              0,
+              1
+            );
+            emitRandomness(getRandomnessTarget() * progress);
+          }
+        }
+      }
       currentStep = (currentStep + 1) % stepsPerBar;
       nextStepTime += stepDuration;
     }
@@ -451,6 +543,7 @@ export function createDrumMachineMode(): ModeDefinition {
     if (!audioContext) return;
     isPlaying = true;
     currentStep = 0;
+    emitRandomness(0, true);
     nextStepTime = audioContext.currentTime + 0.05;
     schedulerId = window.setInterval(scheduleSteps, LOOKAHEAD_MS);
     if (playButton) playButton.textContent = "Stop";
@@ -478,6 +571,7 @@ export function createDrumMachineMode(): ModeDefinition {
       lastStepIndex = null;
     }
     playheadEl?.classList.remove("is-active");
+    emitRandomness(0, true);
     if (playButton) playButton.textContent = "Play";
   };
 
@@ -635,6 +729,7 @@ export function createDrumMachineMode(): ModeDefinition {
   };
 
   const enterMode = async () => {
+    emitRandomness(0, true);
     setSignature(signature);
     setBpm(bpm);
     setBeatLabel();
@@ -658,6 +753,7 @@ export function createDrumMachineMode(): ModeDefinition {
     detachVisualViewportListeners = null;
     bodyClassObserver?.disconnect();
     bodyClassObserver = null;
+    emitRandomness(null);
   };
 
   return {

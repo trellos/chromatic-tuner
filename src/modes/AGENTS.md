@@ -46,8 +46,11 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - `onExit`: stop scheduler and detach listeners/observers.
 - Fullscreen layout behavior is controlled by existing responsive CSS/media rules; do not add no-op class toggles without matching styles.
 - Background effect contract:
-  - Does not currently drive seigaiha randomness directly.
-  - Background follows global/default state unless another mode-specific source is active.
+  - Drives seigaiha randomness while in drum mode.
+  - Randomness updates in beat-sized jumps (no per-frame interpolation).
+  - At each beat boundary, randomness rises toward a per-bar target only if that beat window contains at least one active step.
+  - Bar start resets randomness to `0`; by the last beat, full progression reaches the configured target.
+  - Target is debug-tunable in the shared seigaiha debug panel (`TG` field, default `0.9`).
 
 ## Guardrails
 
