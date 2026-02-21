@@ -81,6 +81,18 @@ let swipeTargetMode: ModeId | null = null;
 let isSwipeDragging = false;
 let syncSeigaihaDebugModeVisibility: (() => void) | null = null;
 
+function parseModeId(value: string | null): ModeId | null {
+  if (!value) return null;
+  return MODE_REGISTRY.some((mode) => mode.id === value) ? (value as ModeId) : null;
+}
+
+function resolveInitialModeId(): ModeId {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("track")) return "drum-machine";
+  return parseModeId(params.get("mode")) ?? "tuner";
+}
+
+
 function bindSeigaihaDebugControl(): void {
   const shouldShowDebugControl = new URLSearchParams(window.location.search).has(
     "debug"
@@ -697,8 +709,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   installSeigaihaBackground();
   bindSeigaihaDebugControl();
 
-  const tunerMode = MODE_REGISTRY.find((mode) => mode.id === "tuner");
-  if (tunerMode?.onEnter) {
-    await tunerMode.onEnter();
+  activeModeId = resolveInitialModeId();
+  updateCarouselState();
+  setActiveScreen(activeModeId);
+
+  const initialMode = MODE_REGISTRY.find((mode) => mode.id === activeModeId);
+  if (initialMode?.onEnter) {
+    await initialMode.onEnter();
   }
 });
