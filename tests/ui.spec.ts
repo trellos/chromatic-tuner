@@ -149,6 +149,35 @@ async function assertNoOffscreenText(page: Page): Promise<void> {
   expect(offenders, `Found text clipping:\n${offenders.join('\n')}`).toEqual([]);
 }
 
+
+
+test('seigaiha background covers the full viewport height to the bottom edge', async ({ page }) => {
+  await page.goto('/');
+
+  const coverage = await page.evaluate(() => {
+    const viewport = window.visualViewport;
+    const visualBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
+
+    const bodyBottom = document.body.getBoundingClientRect().bottom;
+    const htmlBottom = document.documentElement.getBoundingClientRect().bottom;
+    const before = getComputedStyle(document.body, '::before');
+
+    return {
+      bodyGap: visualBottom - bodyBottom,
+      htmlGap: visualBottom - htmlBottom,
+      beforePosition: before.position,
+      beforeInset: before.inset,
+      beforeImage: before.backgroundImage,
+    };
+  });
+
+  expect(coverage.beforePosition).toBe('fixed');
+  expect(coverage.beforeInset).toBe('0px');
+  expect(coverage.beforeImage).toContain('url(');
+  expect(coverage.bodyGap).toBeLessThanOrEqual(1.5);
+  expect(coverage.htmlGap).toBeLessThanOrEqual(1.5);
+});
+
 test('app loads and key UI is visible with no runtime/network failures', async ({ page }) => {
   const issues = trackPageIssues(page);
 
@@ -460,6 +489,51 @@ test('metronome sound menu opens without creating a scrollbar on the metronome c
   expect(overflowState.overflowY).toBe('visible');
   expect(overflowState.hasVerticalOverflow).toBeFalsy();
   expect(overflowState.menuBottom).toBeGreaterThan(overflowState.cardBottom);
+});
+
+test('metronome sound button keeps the most recent sound selection visible', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Metronome' }).click();
+
+  const soundButton = page.locator('#metro-sound-button');
+  const soundMenu = page.locator('#metro-sound-menu');
+
+  await expect(soundButton).toHaveText('Sound Electro');
+
+  await soundButton.click();
+  await expect(soundMenu).toHaveClass(/is-open/);
+  await page.locator('#metro-sound-menu [data-sound="drum"]').click();
+  await expect(soundMenu).not.toHaveClass(/is-open/);
+  await expect(soundButton).toHaveText('Sound Drum');
+
+  await soundButton.click();
+  await page.locator('#metro-sound-menu [data-sound="conga"]').click();
+  await expect(soundButton).toHaveText('Sound Conga');
+});
+
+test('drum machine beat and kit buttons keep their most recent selections visible', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+
+  const beatButton = page.locator('#drum-beat-button');
+  const beatMenu = page.locator('#drum-beat-menu');
+  const kitButton = page.locator('#drum-kit-button');
+  const kitMenu = page.locator('#drum-kit-menu');
+
+  await expect(beatButton).toHaveText('Beat: Rock');
+  await expect(kitButton).toContainText('Kit: Rock Drums');
+
+  await beatButton.click();
+  await expect(beatMenu).toHaveClass(/is-open/);
+  await page.locator('#drum-beat-menu [data-beat="half-time"]').click();
+  await expect(beatMenu).not.toHaveClass(/is-open/);
+  await expect(beatButton).toHaveText('Beat: Half-Time');
+
+  await kitButton.click();
+  await expect(kitMenu).toHaveClass(/is-open/);
+  await page.locator('#drum-kit-menu [data-kit="latin"]').click();
+  await expect(kitMenu).not.toHaveClass(/is-open/);
+  await expect(kitButton).toContainText('Kit: Latin Percussion');
 });
 
 test('mode switching remains responsive after a runtime hook error', async ({ page }) => {

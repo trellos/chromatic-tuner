@@ -89,6 +89,7 @@ export function createDrumMachineMode(): ModeDefinition {
 
   let signature = "4/4";
   let bpm = 120;
+  let currentBeat = "rock";
   let isPlaying = false;
   let currentKit: KitId = "rock";
   let audioContext: AudioContext | null = null;
@@ -113,6 +114,19 @@ export function createDrumMachineMode(): ModeDefinition {
     if (kitLabel) {
       kitLabel.textContent = DRUM_KITS[currentKit].name;
     }
+  };
+
+  const formatBeatLabel = (beat: string) =>
+    beat
+      .split("-")
+      .map((segment) =>
+        segment ? segment[0].toUpperCase() + segment.slice(1).toLowerCase() : ""
+      )
+      .join("-");
+
+  const setBeatLabel = () => {
+    if (!beatButton) return;
+    beatButton.textContent = `Beat: ${formatBeatLabel(currentBeat)}`;
   };
 
   const loadKit = async (kitId: KitId) => {
@@ -215,6 +229,8 @@ export function createDrumMachineMode(): ModeDefinition {
   };
 
   const applyBeat = (beat: string) => {
+    currentBeat = beat;
+    setBeatLabel();
     setSignature("4/4");
     const grid = drumMockEl?.querySelector<HTMLElement>(
       '.drum-grid[data-signature="4/4"]'
@@ -621,6 +637,7 @@ export function createDrumMachineMode(): ModeDefinition {
   const enterMode = async () => {
     setSignature(signature);
     setBpm(bpm);
+    setBeatLabel();
     setKitLabel();
     attachUi();
     syncResponsiveLayout();
