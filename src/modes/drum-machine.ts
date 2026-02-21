@@ -1,4 +1,5 @@
 import { DRUM_MACHINE_SAMPLE_URLS } from "../audio/embedded-samples.js";
+import { WOODBLOCK_SAMPLE_URLS } from "../audio/woodblock-samples.js";
 import type { ModeDefinition } from "./types.js";
 
 type DrumMachineModeOptions = {
@@ -36,7 +37,7 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
   const DEFAULT_RANDOMNESS_TARGET = 0.9;
-  type KitId = "rock" | "electro" | "house" | "lofi" | "latin";
+  type KitId = "rock" | "electro" | "house" | "lofi" | "latin" | "woodblock";
   type VoiceId = "kick" | "snare" | "hat" | "perc";
 
   type DrumKit = {
@@ -92,6 +93,15 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
         perc: DRUM_MACHINE_SAMPLE_URLS.latin.perc,
       },
     },
+    woodblock: {
+      name: "Woodblock Ensemble",
+      urls: {
+        kick: WOODBLOCK_SAMPLE_URLS.drumMachine.kick,
+        snare: WOODBLOCK_SAMPLE_URLS.drumMachine.snare,
+        hat: WOODBLOCK_SAMPLE_URLS.drumMachine.hat,
+        perc: WOODBLOCK_SAMPLE_URLS.drumMachine.perc,
+      },
+    },
   };
 
   let signature = "4/4";
@@ -106,6 +116,8 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     hat: null,
     perc: null,
   };
+  const kitBufferCache: Partial<Record<KitId, Record<VoiceId, AudioBuffer | null>>> = {};
+  let kitLoadPromise: Promise<void> | null = null;
   let schedulerId: number | null = null;
   let nextStepTime = 0;
   let currentStep = 0;
@@ -155,6 +167,7 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
 
   const loadKit = async (kitId: KitId) => {
     if (!audioContext) return;
+    if (kitBufferCache[kitId]) return;
     const kit = DRUM_KITS[kitId];
 
     const loadSample = async (url: string) => {
@@ -175,14 +188,47 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
       loadSample(kit.urls.perc),
     ]);
 
-    buffers = { kick, snare, hat, perc: perc ?? snare ?? hat };
+    kitBufferCache[kitId] = { kick, snare, hat, perc: perc ?? snare ?? hat };
   };
 
-  const setKit = async (kitId: KitId) => {
+  const applyKitBuffers = (kitId: KitId) => {
+    const cached = kitBufferCache[kitId];
+    buffers = cached ?? {
+      kick: null,
+      snare: null,
+      hat: null,
+      perc: null,
+    };
+  };
+
+  const ensureAllKitsLoaded = async () => {
+    if (!audioContext) return;
+    if (kitLoadPromise) {
+      await kitLoadPromise;
+      return;
+    }
+    const kitIds = Object.keys(DRUM_KITS) as KitId[];
+    kitLoadPromise = Promise.all(kitIds.map((kitId) => loadKit(kitId))).then(
+      () => undefined
+    );
+    try {
+      await kitLoadPromise;
+    } finally {
+      kitLoadPromise = null;
+    }
+    applyKitBuffers(currentKit);
+  };
+
+  const setKit = (kitId: KitId) => {
     currentKit = kitId;
     setKitLabel();
-    if (audioContext) {
-      await loadKit(kitId);
+    applyKitBuffers(kitId);
+    if (audioContext && !kitBufferCache[kitId]) {
+      void loadKit(kitId).then(() => {
+        if (currentKit === kitId) {
+          applyKitBuffers(kitId);
+        }
+      });
     }
   };
 
@@ -402,7 +448,8 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     audioContext = new AudioCtx({ latencyHint: "interactive" });
     await audioContext.resume();
 
-    await loadKit(currentKit);
+    void ensureAllKitsLoaded();
+    applyKitBuffers(currentKit);
   };
 
   const playBuffer = (
@@ -711,9 +758,10 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
         "click",
         (event) => {
           const target = event.target as HTMLElement | null;
-          const kit = target?.getAttribute("data-kit");
+          const button = target?.closest<HTMLButtonElement>("button[data-kit]");
+          const kit = button?.dataset.kit;
           if (!kit || !(kit in DRUM_KITS)) return;
-          void setKit(kit as KitId);
+          setKit(kit as KitId);
           toggleKitMenu(false);
         },
         { signal }

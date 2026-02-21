@@ -1,4 +1,5 @@
 import { METRONOME_SAMPLE_URLS } from "../audio/embedded-samples.js";
+import { WOODBLOCK_SAMPLE_URLS } from "../audio/woodblock-samples.js";
 import type { ModeDefinition } from "./types.js";
 
 let sessionBpm = 120;
@@ -46,7 +47,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
   const METRO_BPM_STORAGE_KEY = "tuna.metronome.bpm";
-  type MetronomeSoundId = "electro" | "drum" | "conga";
+  type MetronomeSoundId = "woodblock" | "electro" | "drum" | "conga";
   type ToneProfile = {
     type: OscillatorType;
     frequency: number;
@@ -61,6 +62,13 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     accentTone: ToneProfile;
   };
   const SOUND_PROFILES: Record<MetronomeSoundId, SoundProfile> = {
+    woodblock: {
+      label: "Woodblock",
+      regularUrl: WOODBLOCK_SAMPLE_URLS.metronomeRegular,
+      accentUrl: WOODBLOCK_SAMPLE_URLS.metronomeAccent,
+      regularTone: { type: "triangle", frequency: 860, gain: 0.18, duration: 0.045 },
+      accentTone: { type: "triangle", frequency: 1240, gain: 0.26, duration: 0.06 },
+    },
     electro: {
       label: "Electro",
       regularUrl: METRONOME_SAMPLE_URLS.electroRegular,
@@ -87,13 +95,14 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   let bpm = 120;
   let timeSignature = "4/4";
   let accentEnabled = true;
-  let soundId: MetronomeSoundId = "electro";
+  let soundId: MetronomeSoundId = "woodblock";
   let isPlaying = false;
   let audioContext: AudioContext | null = null;
   let regularBuffer: AudioBuffer | null = null;
   let accentBuffer: AudioBuffer | null = null;
+  type SoundBuffers = { regular: AudioBuffer | null; accent: AudioBuffer | null };
+  const sampleCache: Partial<Record<MetronomeSoundId, SoundBuffers>> = {};
   let samplesLoadingPromise: Promise<void> | null = null;
-  let samplesRequestId = 0;
   let schedulerId: number | null = null;
   let nextNoteTime = 0;
   let currentBeat = 0;
@@ -224,13 +233,12 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   const setSound = (nextSoundId: MetronomeSoundId) => {
     if (nextSoundId === soundId) return;
     soundId = nextSoundId;
-    regularBuffer = null;
-    accentBuffer = null;
-    samplesLoadingPromise = null;
-    samplesRequestId += 1;
+    const cached = sampleCache[soundId] ?? null;
+    regularBuffer = cached?.regular ?? null;
+    accentBuffer = cached?.accent ?? null;
     setSoundLabel();
     if (audioContext) {
-      void ensureSamples();
+      void ensureSamplesForSound(soundId);
     }
   };
 
@@ -271,42 +279,55 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     await audioContext.resume();
   };
 
-  const ensureSamples = async () => {
+  const loadSample = async (url: string) => {
+    if (!audioContext) return null;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const data = await response.arrayBuffer();
+      return await audioContext.decodeAudioData(data);
+    } catch {
+      return null;
+    }
+  };
+
+  const ensureSamplesForSound = async (requestedSoundId: MetronomeSoundId) => {
     if (!audioContext) return;
-    if (regularBuffer && accentBuffer) return;
+    if (sampleCache[requestedSoundId]) {
+      if (requestedSoundId === soundId) {
+        const cached = sampleCache[requestedSoundId]!;
+        regularBuffer = cached.regular;
+        accentBuffer = cached.accent;
+      }
+      return;
+    }
+
+    const profile = SOUND_PROFILES[requestedSoundId];
+    const [nextRegularBuffer, nextAccentBuffer] = await Promise.all([
+      loadSample(profile.regularUrl),
+      loadSample(profile.accentUrl),
+    ]);
+    sampleCache[requestedSoundId] = {
+      regular: nextRegularBuffer,
+      accent: nextAccentBuffer,
+    };
+
+    if (requestedSoundId === soundId) {
+      regularBuffer = nextRegularBuffer;
+      accentBuffer = nextAccentBuffer;
+    }
+  };
+
+  const ensureAllSamples = async () => {
+    if (!audioContext) return;
     if (samplesLoadingPromise) {
       await samplesLoadingPromise;
       return;
     }
-
-    samplesLoadingPromise = (async () => {
-      const requestedSoundId = soundId;
-      const requestId = ++samplesRequestId;
-      const loadSample = async (url: string) => {
-        try {
-          const response = await fetch(url);
-          if (!response.ok) return null;
-          const data = await response.arrayBuffer();
-          return await audioContext!.decodeAudioData(data);
-        } catch {
-          return null;
-        }
-      };
-
-      const profile = SOUND_PROFILES[requestedSoundId];
-      const [nextRegularBuffer, nextAccentBuffer] = await Promise.all([
-        loadSample(profile.regularUrl),
-        loadSample(profile.accentUrl),
-      ]);
-
-      if (requestId !== samplesRequestId || requestedSoundId !== soundId) {
-        return;
-      }
-
-      regularBuffer = nextRegularBuffer;
-      accentBuffer = nextAccentBuffer;
-    })();
-
+    const soundIds = Object.keys(SOUND_PROFILES) as MetronomeSoundId[];
+    samplesLoadingPromise = Promise.all(
+      soundIds.map((id) => ensureSamplesForSound(id))
+    ).then(() => undefined);
     try {
       await samplesLoadingPromise;
     } finally {
@@ -381,7 +402,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   const startTransport = async () => {
     if (isPlaying) return;
     await ensureAudioContext();
-    void ensureSamples();
+    void ensureAllSamples();
     if (!audioContext) return;
     isPlaying = true;
     currentBeat = 0;
@@ -438,7 +459,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
         "pointerdown",
         () => {
           void ensureAudioContext();
-          void ensureSamples();
+          void ensureAllSamples();
         },
         { signal }
       );
@@ -576,7 +597,8 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
         "click",
         (event) => {
           const target = event.target as HTMLElement | null;
-          const value = target?.getAttribute("data-sound");
+          const button = target?.closest<HTMLButtonElement>("button[data-sound]");
+          const value = button?.dataset.sound;
           if (!value || !(value in SOUND_PROFILES)) return;
           setSound(value as MetronomeSoundId);
           soundMenuEl.classList.remove("is-open");

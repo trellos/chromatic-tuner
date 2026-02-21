@@ -36,6 +36,9 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - The metronome sound dropdown must be able to render beyond the bottom of the metronome card (no clipping at `.mode-screen` or `.mode-stage`).
   - Opening the metronome sound selector must not create a scrollbar in the metronome card.
   - Sound selection must audibly change playback immediately.
+  - Metronome sound menu click handling must resolve from nested click targets (use closest menu-item button semantics) so selection always works.
+  - Switching metronome sound while transport is running must apply to newly scheduled clicks immediately; any click source already started may finish naturally.
+  - Keep per-sound sample loading/caching resilient to rapid switching so stale async fetch completion cannot overwrite a newer sound choice.
   - Keep freely-usable sample sources configured for all metronome sound profiles (`electro`, `drum`, `conga`) with both regular and accent URLs, and preserve per-profile fallback tones so sound changes remain audible if sample fetching fails.
   - Preserve regression coverage in `tests/ui.spec.ts` for the metronome sound menu overflow + no-scrollbar behavior.
 
@@ -52,6 +55,9 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - The first sounding beat in each bar is always `0`.
   - Later sounding beats linearly interpolate toward target by sounding-beat rank; the last sounding beat reaches target.
   - Target is debug-tunable in the shared seigaiha debug panel (`TG` field, default `0.9`).
+  - Drum kit menu click handling must resolve from nested click targets (use closest menu-item button semantics) so kit selection always works.
+  - Switching drum kit while transport is running must apply to newly scheduled steps immediately; any already-started sample source may finish naturally.
+  - Keep kit sample loading/caching resilient to rapid switching so stale async fetch completion cannot overwrite the currently selected kit.
 
 ## Guardrails
 
@@ -68,3 +74,8 @@ When changing a mode, remove vestigial pieces in the same PR:
 4. Update related tests/comments to match final behavior.
 
 Do not preserve dead paths "for later" unless explicitly requested.
+
+## PR Notes for Codex Sessions
+
+- Keep PR title/body plain ASCII and concise when possible.
+- If PR creation returns a 400 from host integration, retry with a shorter title and a minimal body first, then expand only if accepted.
