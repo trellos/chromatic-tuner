@@ -121,8 +121,8 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   const getRandomnessParams = (): MetronomeRandomnessParams =>
     options.getRandomnessParams?.() ?? {
       naMax: 0.2,
-      inc44: 0.17,
-      inc34: 0.2,
+      inc44: 0.27,
+      inc34: 0.3,
       inc68: 0.14,
       upCurve: 1.8,
       downCurve: 3.2,
@@ -234,15 +234,29 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
     }
   };
 
+  const updateTimeButtonLabel = () => {
+    if (!timeButtonEl) return;
+    timeButtonEl.textContent = accentEnabled ? `Time ${timeSignature}` : "Time No Accent";
+  };
+
+  const resetTransportPhase = () => {
+    if (!audioContext || !isPlaying) return;
+    currentBeat = 0;
+    nextNoteTime = audioContext.currentTime + 0.05;
+    playbackStartTime = nextNoteTime;
+    options.onRandomnessChange?.(0);
+  };
+
   const setTimeSignature = (value: string) => {
     timeSignature = value;
-    if (timeButtonEl) {
-      timeButtonEl.textContent = `Time ${value}`;
-    }
+    updateTimeButtonLabel();
+    resetTransportPhase();
   };
 
   const setAccentEnabled = (enabled: boolean) => {
     accentEnabled = enabled;
+    updateTimeButtonLabel();
+    resetTransportPhase();
   };
 
   const ensureAudioContext = async () => {

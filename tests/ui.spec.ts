@@ -491,6 +491,18 @@ test('metronome sound menu opens without creating a scrollbar on the metronome c
   expect(overflowState.menuBottom).toBeGreaterThan(overflowState.cardBottom);
 });
 
+test('metronome time button shows "No Accent" after selecting no-accent mode', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Metronome' }).click();
+
+  const timeButton = page.locator('#metro-time-button');
+  await timeButton.click();
+  await page.locator('#metro-time-menu [data-value="no-accent"]').click();
+  await expect(timeButton).toHaveText('Time No Accent');
+});
+
 test('metronome sound button keeps the most recent sound selection visible', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Metronome' }).click();
