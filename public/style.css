@@ -891,6 +891,54 @@ body.status-hidden #status {
   transform: translateX(-50%);
 }
 
+.drum-kit-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 162px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+}
+
+#drum-kit-label {
+  display: inline-block;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.drum-share-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.drum-share-button svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.drum-share-button:hover,
+.drum-share-button:focus-visible {
+  color: #111827;
+}
+
+.drum-share-button:focus-visible {
+  outline: 2px solid rgba(15, 23, 42, 0.35);
+  outline-offset: 1px;
+}
+
 .drum-rotator {
   width: min(700px, 100%);
   height: auto;
@@ -1195,19 +1243,17 @@ body.drum-fullscreen .drum-ui {
     white-space: nowrap;
   }
 
-  #drum-kit-button {
-    max-width: 124px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .drum-kit-trigger {
+    width: 124px;
   }
 
   #drum-kit-label {
-    display: inline-block;
-    max-width: 72px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: bottom;
+    max-width: 62px;
+  }
+
+  .drum-share-button {
+    min-width: 34px;
+    min-height: 34px;
   }
 
   .drum-tempo .ghost-btn {

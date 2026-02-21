@@ -211,6 +211,43 @@ test('seigaiha background covers the full viewport height to the bottom edge', a
   expect(coverage.htmlGap).toBeLessThanOrEqual(1.5);
 });
 
+
+
+test('drum machine share URL opens directly in drum mode and restores pattern', async ({ page }) => {
+  const payload = {
+    version: 1,
+    bpm: 133,
+    kit: 'latin',
+    beat: 'minimal',
+    steps: '1000000010000000000000000001000000000000000000000000000000001000',
+  };
+  const encoded = Buffer.from(JSON.stringify(payload), 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+
+  await page.goto(`/?track=${encoded}`);
+
+  const drumScreen = page.locator('.mode-screen[data-mode="drum-machine"]');
+  await expect(drumScreen).toHaveClass(/is-active/);
+  await expect(page.locator('#drum-tempo-value')).toHaveText('133');
+  await expect(page.locator('#drum-kit-label')).toHaveText('Latin Percussion');
+  await expect(page.locator('#drum-beat-button')).toContainText('Minimal');
+
+  const selectedSteps = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.mode-screen[data-mode="drum-machine"] .drum-row .step.is-on')).map(
+      (step) => {
+        const row = step.closest('.drum-row');
+        const steps = Array.from(row?.querySelectorAll('.step') ?? []);
+        return `${row?.getAttribute('data-voice')}:${steps.indexOf(step as HTMLButtonElement)}`;
+      }
+    )
+  );
+
+  expect(selectedSteps).toEqual(['kick:0', 'kick:8', 'snare:12', 'perc:15']);
+});
+
 test('app loads and key UI is visible with no runtime/network failures', async ({ page }) => {
   const issues = trackPageIssues(page);
 

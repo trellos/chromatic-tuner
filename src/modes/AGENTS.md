@@ -52,6 +52,16 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - The first sounding beat in each bar is always `0`.
   - Later sounding beats linearly interpolate toward target by sounding-beat rank; the last sounding beat reaches target.
   - Target is debug-tunable in the shared seigaiha debug panel (`TG` field, default `0.9`).
+- Share URL track format (`?track=<base64url(JSON)>`):
+  - Include `mode=drum-machine` in generated share URLs so links open directly in drum mode.
+  - JSON payload is versioned with `version` (currently `1`) and must remain backward-compatible when evolving.
+  - Current `version: 1` payload fields:
+    - `version`: number (`1`)
+    - `bpm`: number (`60..180`)
+    - `kit`: kit id (`rock|electro|house|lofi|latin`)
+    - `beat`: beat preset id (`rock|shuffle|disco|half-time|breakbeat|afrobeat|minimal`)
+    - `steps`: 64-char bitstring (`0|1`), row-major order over 4 rows × 16 steps.
+  - Parser should continue accepting legacy `v` (number) as version fallback for already-shared links, but new links should emit `version`.
 
 ## Guardrails
 
