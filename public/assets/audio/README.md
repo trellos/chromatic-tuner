@@ -1,14 +1,15 @@
-# Audio assets (text-only)
+# Audio assets
 
-All metronome and drum-machine sounds are bundled as base64-encoded WAV one-shots in source files:
+Metronome and drum-machine samples are now stored as `.wav` files under this directory and loaded via URL constants in:
 
 - [`src/audio/embedded-samples.ts`](../../src/audio/embedded-samples.ts)
 - [`src/audio/woodblock-samples.ts`](../../src/audio/woodblock-samples.ts)
 
-This keeps audio diffs text-only, which avoids binary patch limitations in PR tooling.
+## Layout
 
-## Source links / provenance
+- `metronome/*.wav`: one-shots for metronome sound profiles (`woodblock`, `electro`, `drum`, `conga`) with regular/accent hits.
+- `drum-machine/*.wav`: one-shots for kit voices (`kick`, `snare`, `hat`, `perc`) across kits.
 
-Current bundled sounds are project-generated one-shots.
+## Provenance
 
-Woodblock one-shots were generated in-repo for offline use with a short percussive synthesis script (no third-party redistribution dependency required).
+Current assets were decoded from the prior in-repo embedded WAV data URLs generated for this project.
