@@ -128,6 +128,9 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
     steps: string;
   };
 
+  // Shared URL format: ?mode=drum-machine&track=<base64url(JSON)>
+  // JSON payload (v1): { version: 1, bpm: number, kit: KitId, steps: string }
+  // `steps` is a 64-char row-major bitstring for the 4x16 grid; parser also accepts legacy `v`.
   const TRACK_PARAM_KEY = "track";
   const TRACK_FORMAT_VERSION = 1;
 
