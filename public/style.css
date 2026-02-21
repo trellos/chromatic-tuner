@@ -78,12 +78,88 @@ body::after {
   width: 220px;
 }
 
+.seigaiha-debug-title,
+.seigaiha-debug-subtitle {
+  margin: 0;
+}
+
+.seigaiha-debug-title {
+  font-weight: 700;
+}
+
+.seigaiha-debug-subtitle {
+  margin-top: 4px;
+  opacity: 0.92;
+}
+
+.seigaiha-debug-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seigaiha-debug-switch input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.seigaiha-debug-switch input[type="number"] {
+  width: 70px;
+  box-sizing: border-box;
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 6px;
+  background: rgba(9, 16, 36, 0.75);
+  color: #e2e8f0;
+  padding: 4px 6px;
+  margin-left: auto;
+}
+
+.seigaiha-debug-section {
+  display: grid;
+  gap: 6px;
+}
+
 .seigaiha-debug-control input[type="range"] {
   width: 100%;
 }
 
 .seigaiha-debug-value {
   justify-self: end;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+}
+
+.seigaiha-debug-fps {
+  justify-self: end;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  opacity: 0.9;
+}
+
+.seigaiha-debug-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.seigaiha-debug-table th,
+.seigaiha-debug-table td {
+  padding: 4px 0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.seigaiha-debug-table input[type="number"] {
+  width: 94px;
+  box-sizing: border-box;
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 6px;
+  background: rgba(9, 16, 36, 0.75);
+  color: #e2e8f0;
+  padding: 4px 6px;
+}
+
+.seigaiha-debug-table--compact td:first-child {
+  width: 38px;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
 }
 

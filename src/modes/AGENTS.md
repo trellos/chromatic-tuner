@@ -17,11 +17,21 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Real-time pitch detection with strobe-style feedback.
 - `onEnter`: attach tuner UI behavior and start audio path.
 - `onExit`: stop audio and remove listener/timer resources.
+- Background effect contract:
+  - Emits absolute cents detune magnitude to seigaiha background state.
+  - Uses piecewise interpolation mapping (`abs cents -> randomness`) configured in UI debug controls.
+  - When no note is detected, background randomness decays toward zero over ~1 second.
+  - Debug slider override (when enabled) supersedes tuner-driven mapping.
 
 ### Metronome (`src/modes/metronome.ts`)
 - Tempo dial, start/stop scheduling, time-menu accents.
 - `onEnter`: attach controls and sync UI state.
 - `onExit`: stop scheduler and detach listeners.
+- Background effect contract:
+  - While playing, emits time-based seigaiha randomness each animation frame.
+  - `no-accent` mode uses a beat-centered sawtooth-like ramp (`0` on beat, `NA` at half-beat).
+  - Accented signatures use per-beat growth increments by signature (`I44`, `I34`, `I68`) with curve controls (`UP`, `DN`) and reset to `0` at bar start.
+  - On stop/exit, mode randomness is reset/cleared so non-metronome modes can drive background state.
 - **Hard UI/audio invariants (do not remove without explicit product sign-off):**
   - The metronome sound dropdown must be able to render beyond the bottom of the metronome card (no clipping at `.mode-screen` or `.mode-stage`).
   - Opening the metronome sound selector must not create a scrollbar in the metronome card.
@@ -34,6 +44,9 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Fullscreen is supported only in this mode.
 - `onEnter`: bind controls, sync layout, seed initial pattern once.
 - `onExit`: stop scheduler and detach listeners/observers.
+- Background effect contract:
+  - Does not currently drive seigaiha randomness directly.
+  - Background follows global/default state unless another mode-specific source is active.
 
 ## Guardrails
 

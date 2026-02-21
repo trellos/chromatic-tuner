@@ -1,11 +1,23 @@
 ﻿import type { ModeDefinition, ModeId } from "./modes/types.js";
 import { createTunerMode } from "./modes/tuner.js";
-import { createMetronomeMode } from "./modes/metronome.js";
+import {
+  createMetronomeMode,
+  type MetronomeRandomnessParams,
+} from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { runModeTransition } from "./mode-transition.js";
 import {
+  getSeigaihaDetuneMapping,
   getSeigaihaRandomness,
+  getSeigaihaRenderStats,
+  getSeigaihaTunerSmoothingTimeConstantMs,
+  isSeigaihaDebugOverrideEnabled,
   installSeigaihaBackground,
+  setSeigaihaDebugOverrideEnabled,
+  setSeigaihaDetuneMagnitude,
+  setSeigaihaDetuneMapping,
+  setSeigaihaModeRandomness,
+  setSeigaihaTunerSmoothingTimeConstantMs,
   setSeigaihaRandomness,
 } from "./ui/seigaihaBackground.js";
 
@@ -18,9 +30,31 @@ const modeStageEl = document.querySelector<HTMLElement>(".mode-stage");
 const modeScreens =
   document.querySelectorAll<HTMLElement>(".mode-screen[data-mode]") ?? [];
 
+const DEFAULT_METRONOME_RANDOMNESS_PARAMS: MetronomeRandomnessParams = {
+  naMax: 0.2,
+  inc44: 0.17,
+  inc34: 0.2,
+  inc68: 0.14,
+  upCurve: 1.8,
+  downCurve: 3.2,
+};
+
+let metronomeRandomnessParams: MetronomeRandomnessParams = {
+  ...DEFAULT_METRONOME_RANDOMNESS_PARAMS,
+};
+
 const MODE_REGISTRY: ModeDefinition[] = [
-  createTunerMode(),
-  createMetronomeMode(),
+  createTunerMode({
+    onDetuneMagnitudeChange: (absCents) => {
+      setSeigaihaDetuneMagnitude(absCents);
+    },
+  }),
+  createMetronomeMode({
+    onRandomnessChange: (randomness) => {
+      setSeigaihaModeRandomness(randomness);
+    },
+    getRandomnessParams: () => metronomeRandomnessParams,
+  }),
   createDrumMachineMode(),
 ];
 
@@ -34,7 +68,7 @@ let swipeActiveScreen: HTMLElement | null = null;
 let swipeTargetScreen: HTMLElement | null = null;
 let swipeTargetMode: ModeId | null = null;
 let isSwipeDragging = false;
-let seigaihaRandomness = getSeigaihaRandomness();
+let syncSeigaihaDebugModeVisibility: (() => void) | null = null;
 
 function bindSeigaihaDebugControl(): void {
   const shouldShowDebugControl = new URLSearchParams(window.location.search).has(
@@ -45,13 +79,62 @@ function bindSeigaihaDebugControl(): void {
   const panel = document.createElement("div");
   panel.className = "seigaiha-debug-control";
 
-  const label = document.createElement("label");
-  label.setAttribute("for", "seigaiha-randomness-slider");
-  label.textContent = "Seigaiha randomness";
+  const title = document.createElement("p");
+  title.className = "seigaiha-debug-title";
+  title.textContent = "Seigaiha randomness";
+
+  const tunerSection = document.createElement("section");
+  tunerSection.className = "seigaiha-debug-section";
+  tunerSection.setAttribute("data-debug-section", "tuner");
+
+  const metronomeSection = document.createElement("section");
+  metronomeSection.className = "seigaiha-debug-section";
+  metronomeSection.setAttribute("data-debug-section", "metronome");
+
+  const overrideRow = document.createElement("label");
+  overrideRow.className = "seigaiha-debug-switch";
+  overrideRow.setAttribute("for", "seigaiha-override-toggle");
+
+  const overrideToggle = document.createElement("input");
+  overrideToggle.type = "checkbox";
+  overrideToggle.id = "seigaiha-override-toggle";
+  overrideToggle.checked = isSeigaihaDebugOverrideEnabled();
+  overrideToggle.setAttribute("aria-label", "Enable seigaiha slider override");
+  overrideRow.appendChild(overrideToggle);
+  overrideRow.append("OVR");
 
   const value = document.createElement("span");
   value.className = "seigaiha-debug-value";
-  value.textContent = seigaihaRandomness.toFixed(2);
+  value.textContent = getSeigaihaRandomness().toFixed(2);
+
+  const fps = document.createElement("span");
+  fps.className = "seigaiha-debug-fps";
+  fps.textContent = "FPS --";
+
+  const smoothingRow = document.createElement("label");
+  smoothingRow.className = "seigaiha-debug-switch";
+  smoothingRow.setAttribute("for", "seigaiha-smoothing-ms");
+  smoothingRow.append("SM");
+
+  const smoothingInput = document.createElement("input");
+  smoothingInput.type = "number";
+  smoothingInput.id = "seigaiha-smoothing-ms";
+  smoothingInput.min = "16";
+  smoothingInput.max = "1000";
+  smoothingInput.step = "1";
+  smoothingInput.value = String(
+    Math.round(getSeigaihaTunerSmoothingTimeConstantMs())
+  );
+  smoothingInput.setAttribute("aria-label", "Seigaiha tuner smoothing ms");
+  smoothingInput.addEventListener("change", () => {
+    const parsed = Number.parseFloat(smoothingInput.value);
+    if (!Number.isFinite(parsed)) return;
+    setSeigaihaTunerSmoothingTimeConstantMs(parsed);
+    smoothingInput.value = String(
+      Math.round(getSeigaihaTunerSmoothingTimeConstantMs())
+    );
+  });
+  smoothingRow.appendChild(smoothingInput);
 
   const slider = document.createElement("input");
   slider.type = "range";
@@ -59,21 +142,206 @@ function bindSeigaihaDebugControl(): void {
   slider.min = "0";
   slider.max = "1";
   slider.step = "0.01";
-  slider.value = String(seigaihaRandomness);
+  slider.value = String(getSeigaihaRandomness());
+  slider.disabled = !overrideToggle.checked;
   slider.setAttribute("aria-label", "Seigaiha randomness");
 
-  slider.addEventListener("input", () => {
-    const nextValue = Number.parseFloat(slider.value);
-    if (!Number.isFinite(nextValue)) return;
-    seigaihaRandomness = Math.max(0, Math.min(1, nextValue));
-    setSeigaihaRandomness(seigaihaRandomness);
-    value.textContent = seigaihaRandomness.toFixed(2);
+  const tableLabel = document.createElement("p");
+  tableLabel.className = "seigaiha-debug-subtitle";
+  tableLabel.textContent = "Detune mapping (abs cents)";
+
+  const table = document.createElement("table");
+  table.className = "seigaiha-debug-table";
+  const tableHead = document.createElement("thead");
+  tableHead.innerHTML =
+    "<tr><th>Abs cents</th><th>Randomness</th></tr>";
+  const tableBody = document.createElement("tbody");
+  table.appendChild(tableHead);
+  table.appendChild(tableBody);
+
+  const metronomeLabel = document.createElement("p");
+  metronomeLabel.className = "seigaiha-debug-subtitle";
+  metronomeLabel.textContent = "Metronome params";
+
+  const metronomeTable = document.createElement("table");
+  metronomeTable.className = "seigaiha-debug-table seigaiha-debug-table--compact";
+  const metronomeBody = document.createElement("tbody");
+  metronomeTable.appendChild(metronomeBody);
+
+  type MetronomeDebugField = {
+    key: keyof MetronomeRandomnessParams;
+    label: string;
+    min?: number;
+    max?: number;
+    step?: number;
+  };
+
+  const metronomeFields: MetronomeDebugField[] = [
+    { key: "naMax", label: "NA", min: 0, max: 1, step: 0.01 },
+    { key: "inc44", label: "I44", min: 0, max: 1, step: 0.01 },
+    { key: "inc34", label: "I34", min: 0, max: 1, step: 0.01 },
+    { key: "inc68", label: "I68", min: 0, max: 1, step: 0.01 },
+    { key: "upCurve", label: "UP", min: 1, max: 6, step: 0.05 },
+    { key: "downCurve", label: "DN", min: 1, max: 8, step: 0.05 },
+  ];
+
+  function setMetronomeParam(
+    key: keyof MetronomeRandomnessParams,
+    value: number
+  ): void {
+    const current = metronomeRandomnessParams[key];
+    let next = Number.isFinite(value) ? value : current;
+    const field = metronomeFields.find((item) => item.key === key);
+    if (field?.min !== undefined) next = Math.max(field.min, next);
+    if (field?.max !== undefined) next = Math.min(field.max, next);
+    metronomeRandomnessParams = {
+      ...metronomeRandomnessParams,
+      [key]: next,
+    };
+  }
+
+  function renderMetronomeTable(): void {
+    metronomeBody.replaceChildren();
+    metronomeFields.forEach((field) => {
+      const row = document.createElement("tr");
+
+      const keyCell = document.createElement("td");
+      keyCell.textContent = field.label;
+
+      const valueCell = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "number";
+      if (field.min !== undefined) input.min = String(field.min);
+      if (field.max !== undefined) input.max = String(field.max);
+      if (field.step !== undefined) input.step = String(field.step);
+      input.value = String(metronomeRandomnessParams[field.key]);
+      input.setAttribute("aria-label", `Metronome randomness ${field.label}`);
+      input.addEventListener("change", () => {
+        const parsed = Number.parseFloat(input.value);
+        if (!Number.isFinite(parsed)) return;
+        setMetronomeParam(field.key, parsed);
+        renderMetronomeTable();
+      });
+      valueCell.appendChild(input);
+
+      row.appendChild(keyCell);
+      row.appendChild(valueCell);
+      metronomeBody.appendChild(row);
+    });
+  }
+
+  function renderMappingTable(): void {
+    const mapping = getSeigaihaDetuneMapping();
+    tableBody.replaceChildren();
+    mapping.forEach((point, index) => {
+      const row = document.createElement("tr");
+
+      const centsCell = document.createElement("td");
+      const centsInput = document.createElement("input");
+      centsInput.type = "number";
+      centsInput.step = "0.1";
+      centsInput.min = "0";
+      centsInput.value = point.cents.toString();
+      centsInput.setAttribute("aria-label", `Mapping abs cents row ${index + 1}`);
+      centsInput.addEventListener("change", () => {
+        const next = Number.parseFloat(centsInput.value);
+        if (!Number.isFinite(next)) return;
+        const current = getSeigaihaDetuneMapping();
+        const updated = current[index];
+        if (!updated) return;
+        updated.cents = Math.max(0, next);
+        setSeigaihaDetuneMapping(current);
+        renderMappingTable();
+      });
+      centsCell.appendChild(centsInput);
+
+      const randomnessCell = document.createElement("td");
+      const randomnessInput = document.createElement("input");
+      randomnessInput.type = "number";
+      randomnessInput.step = "0.01";
+      randomnessInput.min = "0";
+      randomnessInput.max = "1";
+      randomnessInput.value = point.randomness.toString();
+      randomnessInput.setAttribute(
+        "aria-label",
+        `Mapping randomness row ${index + 1}`
+      );
+      randomnessInput.addEventListener("change", () => {
+        const next = Number.parseFloat(randomnessInput.value);
+        if (!Number.isFinite(next)) return;
+        const current = getSeigaihaDetuneMapping();
+        const updated = current[index];
+        if (!updated) return;
+        updated.randomness = Math.max(0, Math.min(1, next));
+        setSeigaihaDetuneMapping(current);
+        renderMappingTable();
+      });
+      randomnessCell.appendChild(randomnessInput);
+
+      row.appendChild(centsCell);
+      row.appendChild(randomnessCell);
+      tableBody.appendChild(row);
+    });
+  }
+
+  overrideToggle.addEventListener("change", () => {
+    const enabled = overrideToggle.checked;
+    setSeigaihaDebugOverrideEnabled(enabled);
+    slider.disabled = !enabled;
+    if (enabled) {
+      const nextValue = Number.parseFloat(slider.value);
+      if (Number.isFinite(nextValue)) {
+        setSeigaihaRandomness(nextValue);
+      }
+    }
+    value.textContent = getSeigaihaRandomness().toFixed(2);
   });
 
-  panel.appendChild(label);
-  panel.appendChild(slider);
-  panel.appendChild(value);
+  slider.addEventListener("input", () => {
+    if (!overrideToggle.checked) return;
+    const nextValue = Number.parseFloat(slider.value);
+    if (!Number.isFinite(nextValue)) return;
+    setSeigaihaRandomness(nextValue);
+    value.textContent = getSeigaihaRandomness().toFixed(2);
+  });
+
+  tunerSection.appendChild(overrideRow);
+  tunerSection.appendChild(slider);
+  tunerSection.appendChild(value);
+  tunerSection.appendChild(fps);
+  tunerSection.appendChild(smoothingRow);
+  tunerSection.appendChild(tableLabel);
+  tunerSection.appendChild(table);
+
+  metronomeSection.appendChild(metronomeLabel);
+  metronomeSection.appendChild(metronomeTable);
+
+  panel.appendChild(title);
+  panel.appendChild(tunerSection);
+  panel.appendChild(metronomeSection);
   document.body.appendChild(panel);
+
+  syncSeigaihaDebugModeVisibility = () => {
+    tunerSection.style.display = activeModeId === "tuner" ? "" : "none";
+    metronomeSection.style.display = activeModeId === "metronome" ? "" : "none";
+  };
+
+  renderMappingTable();
+  renderMetronomeTable();
+  syncSeigaihaDebugModeVisibility();
+  let lastSampleAt = performance.now();
+  let lastRenderCount = getSeigaihaRenderStats().renderCount;
+  window.setInterval(() => {
+    value.textContent = getSeigaihaRandomness().toFixed(2);
+    const now = performance.now();
+    const stats = getSeigaihaRenderStats();
+    const dt = Math.max(1, now - lastSampleAt);
+    const deltaRenders = Math.max(0, stats.renderCount - lastRenderCount);
+    const effectiveFps = (deltaRenders * 1000) / dt;
+    fps.textContent = `FPS ${effectiveFps.toFixed(1)}`;
+    lastSampleAt = now;
+    lastRenderCount = stats.renderCount;
+  }, 120);
 }
 
 function getModeById(id: ModeId): ModeDefinition | undefined {
@@ -109,6 +377,8 @@ function setActiveScreen(id: ModeId): void {
     screen.classList.toggle("is-active", isActive);
     screen.setAttribute("aria-hidden", String(!isActive));
   });
+  document.body.setAttribute("data-active-mode", id);
+  syncSeigaihaDebugModeVisibility?.();
 }
 
 function getModeByOffset(offset: number): ModeId | null {

@@ -27,6 +27,65 @@ test("seigaiha background: single static traditional layer", async ({ page }) =>
   expect(bg.pos).toContain("0px 0px");
 });
 
+test("seigaiha debug override starts disabled and shows editable detune mapping", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+
+  const tunerSection = page.locator('.seigaiha-debug-section[data-debug-section="tuner"]');
+  const metronomeSection = page.locator(
+    '.seigaiha-debug-section[data-debug-section="metronome"]'
+  );
+  const overrideToggle = page.locator("#seigaiha-override-toggle");
+  const slider = page.locator("#seigaiha-randomness-slider");
+  const fps = page.locator(".seigaiha-debug-fps");
+  const smoothingMs = page.locator("#seigaiha-smoothing-ms");
+  await expect(tunerSection).toBeVisible();
+  await expect(metronomeSection).toBeHidden();
+  await expect(overrideToggle).toBeVisible();
+  await expect(overrideToggle).not.toBeChecked();
+  await expect(slider).toBeDisabled();
+  await expect(fps).toBeVisible();
+  await expect(fps).toContainText("FPS");
+  await expect(smoothingMs).toBeVisible();
+
+  const centsInputs = page.locator(
+    '.seigaiha-debug-section[data-debug-section="tuner"] .seigaiha-debug-table:not(.seigaiha-debug-table--compact) tbody tr td:first-child input[type="number"]'
+  );
+  const randomnessInputs = page.locator(
+    '.seigaiha-debug-section[data-debug-section="tuner"] .seigaiha-debug-table:not(.seigaiha-debug-table--compact) tbody tr td:nth-child(2) input[type="number"]'
+  );
+  await expect(centsInputs).toHaveCount(3);
+  await expect(randomnessInputs).toHaveCount(3);
+  await expect(centsInputs.nth(0)).toHaveValue("2");
+  await expect(centsInputs.nth(1)).toHaveValue("4");
+  await expect(centsInputs.nth(2)).toHaveValue("10");
+  await expect(randomnessInputs.nth(0)).toHaveValue("0");
+  await expect(randomnessInputs.nth(1)).toHaveValue("0.2");
+  await expect(randomnessInputs.nth(2)).toHaveValue("0.5");
+});
+
+test("seigaiha debug shows metronome params only in metronome mode", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Metronome" }).click();
+
+  const tunerSection = page.locator('.seigaiha-debug-section[data-debug-section="tuner"]');
+  const metronomeSection = page.locator(
+    '.seigaiha-debug-section[data-debug-section="metronome"]'
+  );
+
+  await expect(tunerSection).toBeHidden();
+  await expect(metronomeSection).toBeVisible();
+  await expect(metronomeSection.getByText("NA")).toBeVisible();
+  await expect(metronomeSection.getByText("I44")).toBeVisible();
+  await expect(metronomeSection.getByText("I34")).toBeVisible();
+  await expect(metronomeSection.getByText("I68")).toBeVisible();
+  await expect(metronomeSection.getByText("UP")).toBeVisible();
+  await expect(metronomeSection.getByText("DN")).toBeVisible();
+});
+
 function trackPageIssues(page: Page): PageIssueTracker {
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];

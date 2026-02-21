@@ -14,6 +14,12 @@ const A4 = 440;
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 const SHOW_STATUS = new URLSearchParams(window.location.search).has("debug");
 
+type TunerModeOptions = {
+  onDetuneMagnitudeChange?: (absCents: number | null) => void;
+};
+
+let onDetuneMagnitudeChange: ((absCents: number | null) => void) | null = null;
+
 class AudioInteractionRequiredError extends Error {
   constructor(message = "Audio requires a user interaction to start.") {
     super(message);
@@ -730,6 +736,7 @@ async function startAudio() {
         candidateMidi = null;
         candidateCount = 0;
         centsEma = null;
+        onDetuneMagnitudeChange?.(null);
 
         updateStrobeVisualizer(null, false);
         setReading(null, null);
@@ -778,6 +785,7 @@ async function startAudio() {
       centsEma = centsEma == null ? centsForLocked : (centsEma + alpha * (centsForLocked - centsEma));
 
       const note = midiToNoteName(lockedMidi);
+      onDetuneMagnitudeChange?.(Math.abs(centsEma));
       updateStrobeVisualizer(centsEma, true);
       setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
       const debugParts: string[] = [];
@@ -952,10 +960,12 @@ function exitTunerMode(): void {
   cleanupAudio();
   setReading(null, null);
   updateStrobeVisualizer(null, false);
+  onDetuneMagnitudeChange?.(null);
 }
 
 // Mode factory for the Chromatic Tuner screen and lifecycle hooks.
-export function createTunerMode(): ModeDefinition {
+export function createTunerMode(options: TunerModeOptions = {}): ModeDefinition {
+  onDetuneMagnitudeChange = options.onDetuneMagnitudeChange ?? null;
   return {
     id: "tuner",
     title: "Chromatic Tuner",

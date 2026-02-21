@@ -3,9 +3,23 @@ import type { ModeDefinition } from "./types.js";
 
 let sessionBpm = 120;
 
+export type MetronomeRandomnessParams = {
+  naMax: number;
+  inc44: number;
+  inc34: number;
+  inc68: number;
+  upCurve: number;
+  downCurve: number;
+};
+
+type MetronomeModeOptions = {
+  onRandomnessChange?: (randomness: number | null) => void;
+  getRandomnessParams?: () => MetronomeRandomnessParams;
+};
+
 // Mode factory for the metronome screen: tempo/time-signature controls,
 // click scheduling, and lifecycle-managed event wiring.
-export function createMetronomeMode(): ModeDefinition {
+export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDefinition {
   const metronomeEl = document.querySelector<HTMLElement>(
     '.mode-screen[data-mode="metronome"]'
   );
@@ -80,6 +94,8 @@ export function createMetronomeMode(): ModeDefinition {
   let currentBeat = 0;
   let uiAbort: AbortController | null = null;
   let pulseTimeouts: number[] = [];
+  let randomnessAnimationId: number | null = null;
+  let playbackStartTime = 0;
 
   const readStoredBpm = () => {
     let raw: string | null = null;
@@ -97,8 +113,80 @@ export function createMetronomeMode(): ModeDefinition {
   const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
+  const getRandomnessParams = (): MetronomeRandomnessParams =>
+    options.getRandomnessParams?.() ?? {
+      naMax: 0.2,
+      inc44: 0.17,
+      inc34: 0.2,
+      inc68: 0.14,
+      upCurve: 1.8,
+      downCurve: 3.2,
+    };
+
   const getBeatsPerBar = () =>
     Number.parseInt(timeSignature.split("/")[0] ?? "4", 10);
+
+  const getSignatureIncrement = (params: MetronomeRandomnessParams) => {
+    if (timeSignature === "3/4") return params.inc34;
+    if (timeSignature === "6/8") return params.inc68;
+    return params.inc44;
+  };
+
+  const computeRandomness = (now: number): number => {
+    if (!isPlaying || !audioContext) return 0;
+    const beatDuration = 60 / bpm;
+    if (beatDuration <= 0) return 0;
+
+    const elapsed = now - playbackStartTime;
+    if (elapsed <= 0) return 0;
+
+    const params = getRandomnessParams();
+    const beatPhase = (elapsed / beatDuration) % 1;
+    const phase = beatPhase < 0 ? beatPhase + 1 : beatPhase;
+    if (!accentEnabled) {
+      const normalized = phase <= 0.5 ? phase / 0.5 : (1 - phase) / 0.5;
+      return clamp(params.naMax * Math.max(0, normalized), 0, 1);
+    }
+
+    const beatsPerBar = Math.max(1, getBeatsPerBar());
+    const barPhaseRaw = (elapsed / beatDuration) % beatsPerBar;
+    const barPhase = barPhaseRaw < 0 ? barPhaseRaw + beatsPerBar : barPhaseRaw;
+    const beatIndex = Math.floor(barPhase);
+    const inBeat = barPhase - beatIndex;
+    const increment = getSignatureIncrement(params);
+
+    if (beatIndex >= beatsPerBar - 1) {
+      const start = increment * beatIndex;
+      const descent = 1 - Math.pow(clamp(inBeat, 0, 1), Math.max(1.05, params.downCurve));
+      return clamp(start * descent, 0, 1);
+    }
+
+    const start = increment * beatIndex;
+    const end = increment * (beatIndex + 1);
+    const rise = Math.pow(clamp(inBeat, 0, 1), Math.max(1.05, params.upCurve));
+    return clamp(start + (end - start) * rise, 0, 1);
+  };
+
+  const stopRandomnessLoop = () => {
+    if (randomnessAnimationId !== null) {
+      cancelAnimationFrame(randomnessAnimationId);
+      randomnessAnimationId = null;
+    }
+  };
+
+  const tickRandomness = () => {
+    if (!isPlaying || !audioContext) {
+      stopRandomnessLoop();
+      return;
+    }
+    options.onRandomnessChange?.(computeRandomness(audioContext.currentTime));
+    randomnessAnimationId = requestAnimationFrame(tickRandomness);
+  };
+
+  const startRandomnessLoop = () => {
+    if (randomnessAnimationId !== null) return;
+    randomnessAnimationId = requestAnimationFrame(tickRandomness);
+  };
 
   const setDialRotation = (value: number) => {
     if (!tempoDialEl) return;
@@ -279,6 +367,9 @@ export function createMetronomeMode(): ModeDefinition {
     isPlaying = true;
     currentBeat = 0;
     nextNoteTime = audioContext.currentTime + 0.05;
+    playbackStartTime = nextNoteTime;
+    options.onRandomnessChange?.(0);
+    startRandomnessLoop();
     schedulerId = window.setInterval(schedule, LOOKAHEAD_MS);
     const toggleButton =
       controlsEl?.querySelector<HTMLButtonElement>('[data-action="toggle"]');
@@ -288,6 +379,8 @@ export function createMetronomeMode(): ModeDefinition {
   const stop = () => {
     if (!isPlaying) return;
     isPlaying = false;
+    stopRandomnessLoop();
+    options.onRandomnessChange?.(0);
     if (schedulerId !== null) {
       window.clearInterval(schedulerId);
       schedulerId = null;
@@ -495,6 +588,7 @@ export function createMetronomeMode(): ModeDefinition {
     setAccentEnabled(accentEnabled);
     setSoundLabel();
     attachUi();
+    options.onRandomnessChange?.(0);
   };
 
   const exit = () => {
@@ -502,6 +596,7 @@ export function createMetronomeMode(): ModeDefinition {
     modeStageEl?.classList.remove("metronome-overflow-visible");
     uiAbort?.abort();
     uiAbort = null;
+    options.onRandomnessChange?.(null);
   };
 
   return {
