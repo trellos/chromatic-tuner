@@ -5,6 +5,7 @@ import {
   type MetronomeRandomnessParams,
 } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
+import { createFretboardMode } from "./modes/fretboard.js";
 import { runModeTransition } from "./mode-transition.js";
 import {
   getSeigaihaDetuneMapping,
@@ -62,6 +63,7 @@ const MODE_REGISTRY: ModeDefinition[] = [
     },
     getRandomnessParams: () => metronomeRandomnessParams,
   }),
+  createFretboardMode(),
   createDrumMachineMode({
     onRandomnessChange: (randomness) => {
       setSeigaihaModeRandomness(randomness);
