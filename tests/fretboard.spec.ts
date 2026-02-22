@@ -1,5 +1,161 @@
 import { expect, test } from "@playwright/test";
 
+async function assertElementFullyInViewport(
+  page: import("@playwright/test").Page,
+  selector: string
+): Promise<void> {
+  const metrics = await page.evaluate((targetSelector) => {
+    const element = document.querySelector<HTMLElement>(targetSelector);
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height,
+      top: rect.top,
+      left: rect.left,
+      right: rect.right,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  }, selector);
+
+  expect(metrics, `Missing element: ${selector}`).not.toBeNull();
+  expect(metrics?.width ?? 0, `${selector} has zero width`).toBeGreaterThan(0);
+  expect(metrics?.height ?? 0, `${selector} has zero height`).toBeGreaterThan(0);
+  expect(metrics?.top ?? 0, `${selector} top clipped`).toBeGreaterThanOrEqual(-1);
+  expect(metrics?.left ?? 0, `${selector} left clipped`).toBeGreaterThanOrEqual(-1);
+  expect(
+    metrics?.right ?? Number.POSITIVE_INFINITY,
+    `${selector} right clipped`
+  ).toBeLessThanOrEqual((metrics?.viewportWidth ?? 0) + 1);
+  expect(
+    metrics?.bottom ?? Number.POSITIVE_INFINITY,
+    `${selector} bottom clipped`
+  ).toBeLessThanOrEqual((metrics?.viewportHeight ?? 0) + 1);
+}
+
+async function installFretboardAudioCounters(
+  page: import("@playwright/test").Page
+): Promise<void> {
+  await page.addInitScript(() => {
+    const win = window as Window & {
+      __fretboardAudioPatchInstalled?: boolean;
+      __fretboardBufferSourceCount?: number;
+      __fretboardOscillatorCount?: number;
+    };
+    if (win.__fretboardAudioPatchInstalled) return;
+
+    win.__fretboardAudioPatchInstalled = true;
+    win.__fretboardBufferSourceCount = 0;
+    win.__fretboardOscillatorCount = 0;
+
+    const patchCtor = (Ctor: typeof AudioContext | undefined) => {
+      if (!Ctor?.prototype) return;
+      const proto = Ctor.prototype as AudioContext & {
+        __fretboardAudioCountersPatched?: boolean;
+      };
+      if (proto.__fretboardAudioCountersPatched) return;
+
+      const originalCreateBufferSource = proto.createBufferSource;
+      const originalCreateOscillator = proto.createOscillator;
+
+      proto.createBufferSource = function (...args) {
+        win.__fretboardBufferSourceCount = (win.__fretboardBufferSourceCount ?? 0) + 1;
+        return originalCreateBufferSource.apply(this, args);
+      };
+
+      proto.createOscillator = function (...args) {
+        win.__fretboardOscillatorCount = (win.__fretboardOscillatorCount ?? 0) + 1;
+        return originalCreateOscillator.apply(this, args);
+      };
+
+      proto.__fretboardAudioCountersPatched = true;
+    };
+
+    patchCtor((window as any).AudioContext);
+    patchCtor((window as any).webkitAudioContext);
+  });
+}
+
+async function installFretboardAudioAttemptTracker(
+  page: import("@playwright/test").Page
+): Promise<void> {
+  await page.addInitScript(() => {
+    const win = window as Window & {
+      __fretboardAttemptPatchInstalled?: boolean;
+      __fretboardSampleFetchCount?: number;
+      __fretboardAnyAudioNodeCount?: number;
+      __fretboardAudioContextCreateCount?: number;
+    };
+    if (win.__fretboardAttemptPatchInstalled) return;
+
+    win.__fretboardAttemptPatchInstalled = true;
+    win.__fretboardSampleFetchCount = 0;
+    win.__fretboardAnyAudioNodeCount = 0;
+    win.__fretboardAudioContextCreateCount = 0;
+
+    const wrapAudioContextCtor = (key: "AudioContext" | "webkitAudioContext") => {
+      const OriginalCtor = (window as any)[key];
+      if (!OriginalCtor) return;
+      if ((OriginalCtor as any).__fretboardCtorWrapped) return;
+
+      const WrappedCtor = class extends OriginalCtor {
+        constructor(...args: any[]) {
+          super(...args);
+          win.__fretboardAudioContextCreateCount =
+            (win.__fretboardAudioContextCreateCount ?? 0) + 1;
+        }
+      };
+      (WrappedCtor as any).__fretboardCtorWrapped = true;
+      (window as any)[key] = WrappedCtor;
+    };
+
+    wrapAudioContextCtor("AudioContext");
+    wrapAudioContextCtor("webkitAudioContext");
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url.includes("assets/audio/fretboard/guitar-acoustic-c4.mp3")) {
+        win.__fretboardSampleFetchCount = (win.__fretboardSampleFetchCount ?? 0) + 1;
+      }
+      return originalFetch(input, init);
+    };
+
+    const patchCtor = (Ctor: typeof AudioContext | undefined) => {
+      if (!Ctor?.prototype) return;
+      const proto = Ctor.prototype as AudioContext & {
+        __fretboardAttemptPatched?: boolean;
+      };
+      if (proto.__fretboardAttemptPatched) return;
+
+      const originalCreateBufferSource = proto.createBufferSource;
+      const originalCreateOscillator = proto.createOscillator;
+
+      proto.createBufferSource = function (...args) {
+        win.__fretboardAnyAudioNodeCount = (win.__fretboardAnyAudioNodeCount ?? 0) + 1;
+        return originalCreateBufferSource.apply(this, args);
+      };
+
+      proto.createOscillator = function (...args) {
+        win.__fretboardAnyAudioNodeCount = (win.__fretboardAnyAudioNodeCount ?? 0) + 1;
+        return originalCreateOscillator.apply(this, args);
+      };
+
+      proto.__fretboardAttemptPatched = true;
+    };
+
+    patchCtor((window as any).AudioContext);
+    patchCtor((window as any).webkitAudioContext);
+  });
+}
+
 test("fretboard mode defaults to C major scale with note labels", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "Fretboard" }).click();
@@ -138,4 +294,159 @@ test("fretboard mobile portrait fits all controls and reaches fret 12", async ({
   await expect(twelfthInlays).toHaveCount(2);
   await expect(twelfthInlays.nth(0)).toBeVisible();
   await expect(twelfthInlays.nth(1)).toBeVisible();
+});
+
+test("fretboard UI stays fully visible across desktop and portrait aspect ratios", async ({
+  page,
+  browserName,
+}) => {
+  const viewports =
+    browserName === "Mobile Safari"
+      ? [
+          { width: 412, height: 915 },
+          { width: 390, height: 844 },
+          { width: 320, height: 900 },
+        ]
+      : [
+          { width: 1366, height: 768 },
+          { width: 1024, height: 1366 },
+          { width: 412, height: 915 },
+          { width: 390, height: 844 },
+          { width: 320, height: 900 },
+        ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.getByRole("tab", { name: "Fretboard" }).click();
+
+    const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
+    await expect(fretboardScreen).toHaveClass(/is-active/);
+    await expect(page.locator(".fretboard-layout")).toBeVisible();
+    await expect(page.locator(".fretboard-board")).toBeVisible();
+    await expect(page.locator(".fretboard-controls")).toBeVisible();
+    await expect(page.locator(".fretboard-dot[data-fret='12']").first()).toBeVisible();
+
+    const twelfthInlays = page.locator('.fretboard-inlay[data-fret="12"]');
+    await expect(twelfthInlays).toHaveCount(2);
+    await expect(twelfthInlays.nth(0)).toBeVisible();
+    await expect(twelfthInlays.nth(1)).toBeVisible();
+
+    const selectors = [
+      ".fretboard-board",
+      ".fretboard-controls",
+      ".fretboard-note-selector",
+      '[data-fretboard-display="chord"]',
+      '[data-fretboard-display="scale"]',
+      "#fretboard-characteristic",
+      '[data-fretboard-annotation="notes"]',
+      '[data-fretboard-annotation="degrees"]',
+      "[data-fretboard-play]",
+    ];
+    for (const selector of selectors) {
+      await assertElementFullyInViewport(page, selector);
+    }
+  }
+});
+
+test("fretboard taps play guitar sample across browser engines", async ({ page, browserName }) => {
+  test.skip(
+    browserName === "webkit" || browserName === "Mobile Safari",
+    "WebKit headless audio is not reliable for sample-playback assertions"
+  );
+
+  await installFretboardAudioCounters(page);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+
+  const firstDot = page.locator(".fretboard-dot").first();
+  await expect(firstDot).toBeVisible();
+
+  await firstDot.click();
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0),
+      { timeout: 6000 }
+    )
+    .toBeGreaterThan(0);
+
+  const oscillatorCount = await page.evaluate(
+    () => (window as any).__fretboardOscillatorCount ?? 0
+  );
+  expect(
+    oscillatorCount,
+    `Fallback oscillator should not be used in ${browserName}`
+  ).toBe(0);
+  expect(pageErrors).toEqual([]);
+});
+
+test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName !== "webkit" && browserName !== "Mobile Safari",
+    "Safari-family smoke coverage only"
+  );
+
+  await installFretboardAudioAttemptTracker(page);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  const hasAudioApi = await page.evaluate(
+    () => Boolean((window as any).AudioContext || (window as any).webkitAudioContext)
+  );
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+
+  const firstDot = page.locator(".fretboard-dot").first();
+  await expect(firstDot).toBeVisible();
+  await firstDot.click();
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => ({
+          fetchCount: (window as any).__fretboardSampleFetchCount ?? 0,
+          audioNodeCount: (window as any).__fretboardAnyAudioNodeCount ?? 0,
+          contextCreateCount: (window as any).__fretboardAudioContextCreateCount ?? 0,
+        })),
+      { timeout: 6000 }
+    )
+    .toEqual(
+      expect.objectContaining({
+        fetchCount: expect.any(Number),
+        audioNodeCount: expect.any(Number),
+        contextCreateCount: expect.any(Number),
+      })
+    );
+
+  const attempt = await page.evaluate(() => ({
+    fetchCount: (window as any).__fretboardSampleFetchCount ?? 0,
+    audioNodeCount: (window as any).__fretboardAnyAudioNodeCount ?? 0,
+    contextCreateCount: (window as any).__fretboardAudioContextCreateCount ?? 0,
+  }));
+
+  if (hasAudioApi) {
+    expect(
+      attempt.fetchCount > 0 ||
+        attempt.audioNodeCount > 0 ||
+        attempt.contextCreateCount > 0,
+      `Expected audio playback attempt on ${browserName}`
+    ).toBeTruthy();
+  } else {
+    expect(attempt.fetchCount).toBe(0);
+    expect(attempt.audioNodeCount).toBe(0);
+    expect(attempt.contextCreateCount).toBe(0);
+  }
+
+  expect(pageErrors).toEqual([]);
 });
