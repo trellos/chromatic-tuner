@@ -1466,8 +1466,8 @@ body.drum-fullscreen .drum-ui {
   left: 0;
   right: 0;
   top: 0;
-  height: 16px;
-  transform: translateY(-44px);
+  height: var(--fretboard-playfield-top);
+  transform: none;
   z-index: 6;
 }
 
@@ -1522,6 +1522,7 @@ body.drum-fullscreen .drum-ui {
 
 .fretboard-inlays {
   z-index: 3;
+  pointer-events: none;
 }
 
 .fretboard-dots {
@@ -1533,14 +1534,19 @@ body.drum-fullscreen .drum-ui {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  border: 2px solid rgba(203, 244, 255, 0.98);
-  background: rgba(13, 31, 57, 0.8);
+  border: 2px solid rgba(15, 23, 42, 0.95);
+  background: transparent;
   left: calc((var(--string-index) / 5) * 100%);
   top: 50%;
-  box-shadow:
-    0 0 0 1px rgba(10, 20, 39, 0.72),
-    0 0 8px rgba(106, 224, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(214, 229, 246, 0.86);
+  cursor: pointer;
+  touch-action: manipulation;
   transform: translate(-50%, -50%);
+}
+
+.fretboard-open-indicator.is-root {
+  border-color: rgba(255, 107, 214, 0.92);
+  box-shadow: 0 0 0 1px rgba(255, 224, 247, 0.95);
 }
 
 .fretboard-dot {
@@ -1559,6 +1565,8 @@ body.drum-fullscreen .drum-ui {
   left: calc((var(--string-index) / 5) * 100%);
   top: calc(((var(--fret-index) - 0.5) / 12) * 100%);
   box-shadow: 0 0 0 1px rgba(8, 21, 42, 0.35);
+  cursor: pointer;
+  touch-action: manipulation;
   transform: translate(-50%, -50%);
 }
 
@@ -1570,21 +1578,25 @@ body.drum-fullscreen .drum-ui {
 
 .fretboard-inlay {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(240, 248, 255, 0.96);
+  border: 1px solid rgba(61, 77, 106, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(14, 25, 43, 0.2),
+    0 1px 3px rgba(8, 16, 28, 0.32);
   left: 50%;
   top: calc(((var(--fret-index) - 0.5) / 12) * 100%);
   transform: translate(-50%, -50%);
 }
 
 .fretboard-inlay--double-left {
-  left: 42%;
+  left: 33%;
 }
 
 .fretboard-inlay--double-right {
-  left: 58%;
+  left: 67%;
 }
 
 .fretboard-controls {
@@ -1619,12 +1631,36 @@ body.drum-fullscreen .drum-ui {
   background: #ffffff;
   color: var(--ink);
   border-color: rgba(12, 16, 32, 0.28);
-  box-shadow: inset 0 0 0 2px rgba(0, 245, 212, 0.32);
+  box-shadow:
+    inset 0 0 0 3px rgba(0, 245, 212, 0.48),
+    0 0 0 1px rgba(0, 245, 212, 0.72);
 }
 
 .fretboard-segmented {
   display: inline-flex;
   gap: 6px;
+}
+
+.fretboard-play-action {
+  border: 1px solid rgba(12, 16, 32, 0.2);
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--tuna-pink), var(--tuna-aqua));
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  padding: 10px 14px;
+  min-width: 92px;
+  justify-self: start;
+  cursor: pointer;
+}
+
+.fretboard-play-action.is-playing {
+  box-shadow:
+    0 0 0 2px rgba(0, 245, 212, 0.5),
+    0 0 12px rgba(0, 245, 212, 0.35);
 }
 
 .fretboard-characteristic-label {
@@ -1698,8 +1734,8 @@ body.drum-fullscreen .drum-ui {
   }
 
   .fretboard-open-indicators {
-    height: 14px;
-    transform: translateY(-36px);
+    height: var(--fretboard-playfield-top);
+    transform: none;
   }
 
   .fretboard-open-indicator {
@@ -1728,6 +1764,13 @@ body.drum-fullscreen .drum-ui {
     min-width: 32px;
     padding: 6px 7px;
     border-radius: 8px;
+    font-size: 11px;
+  }
+
+  .fretboard-play-action {
+    min-width: 78px;
+    padding: 8px 10px;
+    border-radius: 10px;
     font-size: 11px;
   }
 

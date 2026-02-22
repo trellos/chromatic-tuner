@@ -913,6 +913,20 @@ test('mode switching remains responsive after a runtime hook error', async ({ pa
   await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);
 });
 
+test('app restores the last selected mode on reload', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Fretboard' }).click();
+  await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
+
+  await page.reload();
+
+  await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
+  await expect(page.getByRole('tab', { name: 'Fretboard' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+});
+
 test('tuner status toggle is not duplicated after mode re-entry', async ({ page }) => {
   await page.goto('/?debug=1');
 

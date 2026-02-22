@@ -48,6 +48,7 @@ export type FretboardDot = {
   fret: number;
   note: NoteName;
   degree: string;
+  midi: number;
 };
 
 const CHROMATIC_BY_SEMITONE = [
@@ -117,6 +118,7 @@ const DEGREE_BY_INTERVAL: Record<number, string> = {
 
 // Standard tuning low E -> high E, rendered left-to-right in this UI.
 const OPEN_STRING_SEMITONES = [4, 9, 2, 7, 11, 4] as const;
+const OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64] as const;
 
 export const MAX_FRET = 12;
 
@@ -160,6 +162,12 @@ export function getIntervals(display: DisplayType, characteristic: Characteristi
   return isChordType(characteristic) ? CHORD_INTERVALS[characteristic] : CHORD_INTERVALS.minor;
 }
 
+export function getFretboardMidiAtPosition(stringIndex: number, fret: number): number {
+  const clampedStringIndex = Math.max(0, Math.min(OPEN_STRING_MIDI.length - 1, stringIndex));
+  const openMidi = OPEN_STRING_MIDI[clampedStringIndex] ?? OPEN_STRING_MIDI[0] ?? 40;
+  return Math.max(0, openMidi + fret);
+}
+
 export function getFretboardDots(state: FretboardState): FretboardDot[] {
   const rootSemitone = NOTE_TO_SEMITONE[state.root];
   const intervals = getIntervals(state.display, state.characteristic);
@@ -177,6 +185,7 @@ export function getFretboardDots(state: FretboardState): FretboardDot[] {
         fret,
         note: CHROMATIC_BY_SEMITONE[noteSemitone] ?? "C",
         degree: DEGREE_BY_INTERVAL[intervalFromRoot] ?? "",
+        midi: getFretboardMidiAtPosition(stringIndex, fret),
       });
     }
   }

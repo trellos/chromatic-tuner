@@ -42,6 +42,7 @@ const DEFAULT_METRONOME_RANDOMNESS_PARAMS: MetronomeRandomnessParams = {
   downCurve: 3.2,
 };
 const DEFAULT_DRUM_RANDOMNESS_TARGET = 0.9;
+const LAST_MODE_STORAGE_KEY = "tuna.lastMode";
 
 let metronomeRandomnessParams: MetronomeRandomnessParams = {
   ...DEFAULT_METRONOME_RANDOMNESS_PARAMS,
@@ -64,7 +65,11 @@ const MODE_REGISTRY: ModeDefinition[] = [
     },
     getRandomnessParams: () => metronomeRandomnessParams,
   }),
-  createFretboardMode(),
+  createFretboardMode({
+    onRandomnessChange: (randomness) => {
+      setSeigaihaModeRandomness(randomness);
+    },
+  }),
   createDrumMachineMode({
     onRandomnessChange: (randomness) => {
       setSeigaihaModeRandomness(randomness);
@@ -90,10 +95,26 @@ function parseModeId(value: string | null): ModeId | null {
   return MODE_REGISTRY.some((mode) => mode.id === value) ? (value as ModeId) : null;
 }
 
+function readLastModeId(): ModeId | null {
+  try {
+    return parseModeId(window.localStorage.getItem(LAST_MODE_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function writeLastModeId(modeId: ModeId): void {
+  try {
+    window.localStorage.setItem(LAST_MODE_STORAGE_KEY, modeId);
+  } catch {
+    // Ignore storage failures (private mode / restricted environments).
+  }
+}
+
 function resolveInitialModeId(): ModeId {
   const params = new URLSearchParams(window.location.search);
   if (params.has("track")) return "drum-machine";
-  return parseModeId(params.get("mode")) ?? "tuner";
+  return parseModeId(params.get("mode")) ?? readLastModeId() ?? "tuner";
 }
 
 
@@ -689,6 +710,7 @@ async function switchMode(id: ModeId): Promise<void> {
     const transitionPlan = {
       applyUiState: () => {
         activeModeId = id;
+        writeLastModeId(activeModeId);
         updateCarouselState();
         setActiveScreen(id);
         document.body.classList.toggle(
@@ -756,6 +778,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   bindSeigaihaDebugControl();
 
   activeModeId = resolveInitialModeId();
+  writeLastModeId(activeModeId);
   updateCarouselState();
   setActiveScreen(activeModeId);
 

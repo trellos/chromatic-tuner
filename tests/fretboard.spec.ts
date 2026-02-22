@@ -61,6 +61,60 @@ test("fretboard interaction updates characteristic options and degree labels", a
   expect(noteLabels).not.toContain("C#");
 });
 
+test("fretboard note dots expose midi metadata and are tappable", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  const firstDot = page.locator(".fretboard-dot").first();
+  await expect(firstDot).toHaveAttribute("data-midi", /^\d+$/);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+  await firstDot.click();
+  await page.waitForTimeout(150);
+  expect(pageErrors).toEqual([]);
+});
+
+test("fretboard open-string indicators expose midi metadata and are tappable", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  const firstOpen = page.locator(".fretboard-open-indicator").first();
+  await expect(firstOpen).toHaveAttribute("data-midi", /^\d+$/);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+  });
+  await firstOpen.click();
+  await page.waitForTimeout(150);
+  expect(pageErrors).toEqual([]);
+});
+
+test("fretboard play button ramps seigaiha randomness and returns to zero", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "debug randomness assertion is Chromium-only");
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.locator('[data-fretboard-display="chord"]').click();
+
+  const playButton = page.locator("[data-fretboard-play]");
+  await expect(playButton).toBeVisible();
+  await expect(playButton).toHaveText("Play");
+
+  const readRandomness = async () => {
+    const text = await page.locator(".seigaiha-debug-value").first().textContent();
+    const parsed = Number.parseFloat((text ?? "0").trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  await playButton.click();
+  await expect.poll(readRandomness, { timeout: 1200 }).toBeGreaterThan(0.6);
+  await expect.poll(readRandomness, { timeout: 2600 }).toBeLessThan(0.08);
+  await expect(playButton).toHaveText("Play");
+});
+
 
 test("fretboard mobile portrait fits all controls and reaches fret 12", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "Mobile Safari", "mobile portrait coverage only");
