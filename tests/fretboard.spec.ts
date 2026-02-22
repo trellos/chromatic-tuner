@@ -31,7 +31,7 @@ test("fretboard interaction updates characteristic options and degree labels", a
   await page.getByRole("tab", { name: "Fretboard" }).click();
 
   await page.locator('[data-fretboard-display="chord"]').click();
-  await expect(page.locator('#fretboard-characteristic option[value="suspended-fourth"]')).toBeVisible();
+  await expect(page.locator('#fretboard-characteristic option[value="suspended-fourth"]')).toHaveCount(1);
 
   await page.locator("#fretboard-characteristic").selectOption("suspended-fourth");
   await page.locator('[data-fretboard-annotation="degrees"]').click();
@@ -80,4 +80,8 @@ test("fretboard mobile portrait fits all controls and reaches fret 12", async ({
 
   await expect(page.locator('.fretboard-controls')).toBeVisible();
   await expect(page.locator('.fretboard-dot[data-fret="12"]').first()).toBeVisible();
+  const twelfthInlays = page.locator('.fretboard-inlay[data-fret="12"]');
+  await expect(twelfthInlays).toHaveCount(2);
+  await expect(twelfthInlays.nth(0)).toBeVisible();
+  await expect(twelfthInlays.nth(1)).toBeVisible();
 });

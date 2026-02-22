@@ -1430,33 +1430,24 @@ body.drum-fullscreen .drum-ui {
 }
 
 .fretboard-board {
+  --fretboard-playfield-top: 30px;
+  --fretboard-playfield-bottom: 12px;
   position: relative;
   width: 100%;
   min-height: 520px;
-  border: 1px solid rgba(0, 245, 212, 0.45);
+  border: 1px solid rgba(209, 223, 246, 0.72);
   border-radius: 16px;
-  background-color: rgba(15, 23, 42, 0.46);
-  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.12);
-  background-image:
-    repeating-linear-gradient(
-      to right,
-      rgba(148, 163, 184, 0.45) 0,
-      rgba(148, 163, 184, 0.45) 2px,
-      transparent 2px,
-      transparent calc((100% - 2px) / 5)
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      rgba(148, 163, 184, 0.22) 0,
-      rgba(148, 163, 184, 0.22) 2px,
-      transparent 2px,
-      transparent calc((100% - 2px) / 12)
-    );
+  background:
+    linear-gradient(180deg, rgba(169, 175, 192, 0.86), rgba(141, 148, 166, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(36, 45, 67, 0.24);
+  overflow: visible;
 }
 
 .fretboard-string-labels {
   position: absolute;
-  top: 6px;
+  top: -20px;
   left: 0;
   right: 0;
   display: grid;
@@ -1464,29 +1455,91 @@ body.drum-fullscreen .drum-ui {
   text-align: center;
   font-size: 12px;
   letter-spacing: 0.06em;
-  color: #cbd5e1;
+  color: #e5edf9;
   font-family: "Inter", "Segoe UI", sans-serif;
+  text-shadow: 0 1px 1px rgba(6, 12, 24, 0.52);
+  z-index: 5;
 }
 
-.fretboard-open-indicators,
+.fretboard-open-indicators {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 16px;
+  transform: translateY(-44px);
+  z-index: 6;
+}
+
+.fretboard-frets,
+.fretboard-strings,
 .fretboard-dots,
 .fretboard-inlays {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  top: 28px;
+  top: var(--fretboard-playfield-top);
+  bottom: var(--fretboard-playfield-bottom);
+}
+
+.fretboard-frets {
+  z-index: 1;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(223, 231, 247, 0.82) 0,
+    rgba(223, 231, 247, 0.82) 2px,
+    transparent 2px,
+    transparent calc(100% / 12)
+  );
+}
+
+.fretboard-strings {
+  z-index: 2;
+  background-image:
+    linear-gradient(to right, rgba(181, 234, 255, 0.94), rgba(181, 234, 255, 0.94)),
+    linear-gradient(to right, rgba(181, 234, 255, 0.94), rgba(181, 234, 255, 0.94)),
+    linear-gradient(to right, rgba(181, 234, 255, 0.94), rgba(181, 234, 255, 0.94)),
+    linear-gradient(to right, rgba(181, 234, 255, 0.94), rgba(181, 234, 255, 0.94)),
+    linear-gradient(to right, rgba(181, 234, 255, 0.94), rgba(181, 234, 255, 0.94)),
+    linear-gradient(to right, rgba(181, 234, 255, 0.94), rgba(181, 234, 255, 0.94));
+  background-repeat: no-repeat;
+  background-size:
+    2px 100%,
+    2px 100%,
+    2px 100%,
+    2px 100%,
+    2px 100%,
+    2px 100%;
+  background-position:
+    0% 0,
+    20% 0,
+    40% 0,
+    60% 0,
+    80% 0,
+    100% 0;
+  filter: drop-shadow(0 0 1px rgba(9, 24, 48, 0.58));
+}
+
+.fretboard-inlays {
+  z-index: 3;
+}
+
+.fretboard-dots {
+  z-index: 4;
 }
 
 .fretboard-open-indicator {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 245, 212, 0.9);
-  background: transparent;
+  border: 2px solid rgba(203, 244, 255, 0.98);
+  background: rgba(13, 31, 57, 0.8);
   left: calc((var(--string-index) / 5) * 100%);
-  top: 6px;
+  top: 50%;
+  box-shadow:
+    0 0 0 1px rgba(10, 20, 39, 0.72),
+    0 0 8px rgba(106, 224, 255, 0.45);
   transform: translate(-50%, -50%);
 }
 
@@ -1495,7 +1548,7 @@ body.drum-fullscreen .drum-ui {
   width: clamp(24px, 3vw, 32px);
   aspect-ratio: 1;
   border-radius: 999px;
-  border: 1px solid rgba(0, 245, 212, 0.5);
+  border: 1px solid rgba(0, 245, 212, 0.8);
   background: rgba(15, 23, 42, 0.95);
   color: #e2e8f0;
   font-size: clamp(10px, 1.15vw, 12px);
@@ -1504,8 +1557,15 @@ body.drum-fullscreen .drum-ui {
   justify-content: center;
   font-weight: 600;
   left: calc((var(--string-index) / 5) * 100%);
-  top: calc((var(--fret-index) / 12) * 100%);
+  top: calc(((var(--fret-index) - 0.5) / 12) * 100%);
+  box-shadow: 0 0 0 1px rgba(8, 21, 42, 0.35);
   transform: translate(-50%, -50%);
+}
+
+.fretboard-dot.is-root {
+  background: rgba(255, 107, 214, 0.92);
+  border-color: rgba(255, 224, 247, 0.95);
+  color: #ffffff;
 }
 
 .fretboard-inlay {
@@ -1515,19 +1575,16 @@ body.drum-fullscreen .drum-ui {
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.45);
   left: 50%;
-  top: calc((var(--fret-index) / 12) * 100%);
+  top: calc(((var(--fret-index) - 0.5) / 12) * 100%);
   transform: translate(-50%, -50%);
 }
 
-.fretboard-inlay--double::after {
-  content: "";
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.45);
-  left: 0;
-  top: 20px;
+.fretboard-inlay--double-left {
+  left: 42%;
+}
+
+.fretboard-inlay--double-right {
+  left: 58%;
 }
 
 .fretboard-controls {
@@ -1544,11 +1601,14 @@ body.drum-fullscreen .drum-ui {
 
 .fretboard-note-selector button,
 .fretboard-segmented button {
-  border: 1px solid rgba(0, 245, 212, 0.5);
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #cbd5e1;
+  border: 1px solid rgba(12, 16, 32, 0.15);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
   font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   padding: 8px 12px;
   min-width: 44px;
   cursor: pointer;
@@ -1556,9 +1616,10 @@ body.drum-fullscreen .drum-ui {
 
 .fretboard-note-selector button.is-active,
 .fretboard-segmented button.is-active {
-  background: rgba(0, 245, 212, 0.2);
-  color: #d1faf4;
-  border-color: rgba(0, 245, 212, 0.9);
+  background: #ffffff;
+  color: var(--ink);
+  border-color: rgba(12, 16, 32, 0.28);
+  box-shadow: inset 0 0 0 2px rgba(0, 245, 212, 0.32);
 }
 
 .fretboard-segmented {
@@ -1595,6 +1656,22 @@ body.drum-fullscreen .drum-ui {
   }
 }
 
+@media (max-width: 600px) {
+  .fretboard-layout {
+    grid-template-columns: minmax(140px, 40%) minmax(0, 1fr);
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .fretboard-board {
+    --fretboard-playfield-top: 24px;
+    --fretboard-playfield-bottom: 14px;
+    min-height: 372px;
+    max-width: 182px;
+    justify-self: center;
+  }
+}
+
 
 @media (max-width: 600px) and (orientation: portrait) {
   .mode-screen[data-mode="fretboard"] {
@@ -1614,25 +1691,21 @@ body.drum-fullscreen .drum-ui {
     letter-spacing: 0.12em;
   }
 
-  .fretboard-layout {
-    grid-template-columns: minmax(156px, 43%) minmax(0, 1fr);
-    gap: 10px;
-    align-items: stretch;
-  }
-
-  .fretboard-board {
-    min-height: min(488px, calc(var(--mode-panel-height) - 92px));
-    max-width: none;
-  }
-
   .fretboard-string-labels {
+    top: -18px;
     font-size: 10px;
     letter-spacing: 0.04em;
+  }
+
+  .fretboard-open-indicators {
+    height: 14px;
+    transform: translateY(-36px);
   }
 
   .fretboard-open-indicator {
     width: 8px;
     height: 8px;
+    border-width: 1.5px;
   }
 
   .fretboard-dot {

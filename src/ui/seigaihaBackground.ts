@@ -138,6 +138,11 @@ export function resolveSeigaihaInterpolationForTest(
 
 type SeigaihaState = {
   randomness: number;
+  interactionPulseRandomness: number;
+  interactionPulsePeak: number;
+  interactionPulseStartAtMs: number;
+  interactionPulseDurationMs: number;
+  interactionPulseRaf: number | null;
   seed: number;
   mapping: SeigaihaMappingPoint[];
   lastDetuneAbsCents: number | null;
@@ -224,6 +229,9 @@ const FRAME_TIME_SAMPLE_CAPACITY = 240;
 const PREWARM_RADIUS = 3;
 const PREWARM_BATCH_SIZE = 2;
 const PREWARM_DELAY_MS = 8;
+const BUTTON_PULSE_MIN_RANDOMNESS = 0.2;
+const BUTTON_PULSE_MAX_RANDOMNESS = 0.4;
+const BUTTON_PULSE_DURATION_MS = 500;
 const DEFAULT_MAPPING: SeigaihaMappingPoint[] = [
   { cents: 2, randomness: 0 },
   { cents: 4, randomness: 0.2 },
@@ -232,6 +240,11 @@ const DEFAULT_MAPPING: SeigaihaMappingPoint[] = [
 
 const seigaihaState: SeigaihaState = {
   randomness: 0,
+  interactionPulseRandomness: 0,
+  interactionPulsePeak: 0,
+  interactionPulseStartAtMs: 0,
+  interactionPulseDurationMs: BUTTON_PULSE_DURATION_MS,
+  interactionPulseRaf: null,
   seed: 1337,
   mapping: DEFAULT_MAPPING.map((point) => ({ ...point })),
   lastDetuneAbsCents: null,
@@ -638,6 +651,64 @@ function applyRandomness(randomness: number): void {
   installSeigaihaBackground();
 }
 
+function getEffectiveRandomness(): number {
+  return clamp(
+    Math.max(seigaihaState.randomness, seigaihaState.interactionPulseRandomness),
+    0,
+    1
+  );
+}
+
+function stopInteractionPulseLoop(): void {
+  if (seigaihaState.interactionPulseRaf !== null) {
+    cancelAnimationFrame(seigaihaState.interactionPulseRaf);
+    seigaihaState.interactionPulseRaf = null;
+  }
+}
+
+function tickInteractionPulse(now: number): void {
+  const durationMs = Math.max(1, seigaihaState.interactionPulseDurationMs);
+  const elapsedMs = Math.max(0, now - seigaihaState.interactionPulseStartAtMs);
+  const t = clamp(elapsedMs / durationMs, 0, 1);
+  seigaihaState.interactionPulseRandomness = seigaihaState.interactionPulsePeak * (1 - t);
+  installSeigaihaBackground();
+
+  if (t >= 1 || seigaihaState.interactionPulseRandomness <= 0.0005) {
+    seigaihaState.interactionPulseRandomness = 0;
+    installSeigaihaBackground();
+    stopInteractionPulseLoop();
+    return;
+  }
+
+  seigaihaState.interactionPulseRaf = requestAnimationFrame(tickInteractionPulse);
+}
+
+export function pulseSeigaihaRandomness(options?: {
+  minRandomness?: number;
+  maxRandomness?: number;
+  durationMs?: number;
+}): void {
+  const rawMin = options?.minRandomness ?? BUTTON_PULSE_MIN_RANDOMNESS;
+  const rawMax = options?.maxRandomness ?? BUTTON_PULSE_MAX_RANDOMNESS;
+  const minRandomness = clamp(Math.min(rawMin, rawMax), 0, 1);
+  const maxRandomness = clamp(Math.max(rawMin, rawMax), minRandomness, 1);
+  const durationMs = clamp(options?.durationMs ?? BUTTON_PULSE_DURATION_MS, 1, 6000);
+  const range = Math.max(0, maxRandomness - minRandomness);
+  const peak = minRandomness + Math.random() * range;
+
+  seigaihaState.interactionPulsePeak = peak;
+  seigaihaState.interactionPulseRandomness = peak;
+  seigaihaState.interactionPulseDurationMs = durationMs;
+  seigaihaState.interactionPulseStartAtMs = performance.now();
+  installSeigaihaBackground();
+
+  if (typeof window === "undefined") {
+    return;
+  }
+  stopInteractionPulseLoop();
+  seigaihaState.interactionPulseRaf = requestAnimationFrame(tickInteractionPulse);
+}
+
 function stopNoNoteDecayLoop(): void {
   if (seigaihaState.noNoteDecayRaf !== null) {
     cancelAnimationFrame(seigaihaState.noNoteDecayRaf);
@@ -760,7 +831,7 @@ export function installSeigaihaBackground(): void {
   if (!renderer || renderer.backend === "none") {
     return;
   }
-  const frame = resolveInterpolatedFrames(seigaihaState.randomness);
+  const frame = resolveInterpolatedFrames(getEffectiveRandomness());
   const now = performance.now();
   const hasPatternSwap =
     seigaihaState.installedPatternKeyA !== frame.keyA ||
@@ -819,7 +890,7 @@ export function setSeigaihaRandomness(value: number): void {
 }
 
 export function getSeigaihaRandomness(): number {
-  return seigaihaState.randomness;
+  return getEffectiveRandomness();
 }
 
 export function getSeigaihaRenderStats(): SeigaihaRenderStats {

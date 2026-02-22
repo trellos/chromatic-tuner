@@ -105,11 +105,14 @@ export function createFretboardMode(): ModeDefinition {
 
       const marker = document.createElement("span");
       marker.className = "fretboard-dot";
+      const isRoot = dot.degree === "1";
+      marker.classList.toggle("is-root", isRoot);
       marker.style.setProperty("--string-index", String(dot.stringIndex));
       marker.style.setProperty("--fret-index", String(dot.fret));
       marker.dataset.note = dot.note;
       marker.dataset.degree = dot.degree;
       marker.dataset.fret = String(dot.fret);
+      marker.dataset.root = isRoot ? "1" : "0";
       marker.textContent = state.annotation === "notes" ? dot.note : dot.degree;
       dotsLayer.append(marker);
     }

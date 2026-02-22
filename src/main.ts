@@ -20,6 +20,7 @@ import {
   setSeigaihaDetuneMapping,
   setSeigaihaModeRandomness,
   setSeigaihaTunerSmoothingTimeConstantMs,
+  pulseSeigaihaRandomness,
   setSeigaihaRandomness,
 } from "./ui/seigaihaBackground.js";
 
@@ -449,6 +450,16 @@ function setCarouselHidden(hidden: boolean): void {
   );
 }
 
+function bindSeigaihaInteractionPulse(): void {
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const button = target.closest<HTMLButtonElement>("button");
+    if (!button) return;
+    pulseSeigaihaRandomness();
+  });
+}
+
 function updateCarouselState(): void {
   const activeMode = getModeById(activeModeId);
   modeDots.forEach((dot) => {
@@ -739,6 +750,7 @@ function initializeCarouselUi(): void {
 
 // Auto-start tuner mode on page load until the carousel is wired up.
 window.addEventListener("DOMContentLoaded", async () => {
+  bindSeigaihaInteractionPulse();
   initializeCarouselUi();
   installSeigaihaBackground();
   bindSeigaihaDebugControl();

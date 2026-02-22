@@ -109,7 +109,7 @@ const DEGREE_BY_INTERVAL: Record<number, string> = {
   5: "4",
   6: "b5",
   7: "5",
-  8: "#5",
+  8: "b6",
   9: "6",
   10: "b7",
   11: "7",
