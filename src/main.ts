@@ -8,8 +8,9 @@ import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { runModeTransition } from "./mode-transition.js";
 import {
   getSeigaihaDetuneMapping,
+  getSeigaihaPerformanceStats,
   getSeigaihaRandomness,
-  getSeigaihaRenderStats,
+  getSeigaihaRendererBackend,
   getSeigaihaTunerSmoothingTimeConstantMs,
   isSeigaihaDebugOverrideEnabled,
   installSeigaihaBackground,
@@ -110,6 +111,10 @@ function bindSeigaihaDebugControl(): void {
   tunerSection.className = "seigaiha-debug-section";
   tunerSection.setAttribute("data-debug-section", "tuner");
 
+  const telemetrySection = document.createElement("section");
+  telemetrySection.className = "seigaiha-debug-section";
+  telemetrySection.setAttribute("data-debug-section", "telemetry");
+
   const metronomeSection = document.createElement("section");
   metronomeSection.className = "seigaiha-debug-section";
   metronomeSection.setAttribute("data-debug-section", "metronome");
@@ -137,6 +142,11 @@ function bindSeigaihaDebugControl(): void {
   const fps = document.createElement("span");
   fps.className = "seigaiha-debug-fps";
   fps.textContent = "FPS --";
+
+  const perf = document.createElement("pre");
+  perf.className = "seigaiha-debug-metrics";
+  perf.textContent =
+    "displayFPS --\nseigaihaFPS --\nuploads/s --\np95 --ms\nmax --ms\nswaps/s --\ncache --/--";
 
   const smoothingRow = document.createElement("label");
   smoothingRow.className = "seigaiha-debug-switch";
@@ -357,10 +367,16 @@ function bindSeigaihaDebugControl(): void {
     value.textContent = getSeigaihaRandomness().toFixed(2);
   });
 
+  const telemetryLabel = document.createElement("p");
+  telemetryLabel.className = "seigaiha-debug-subtitle";
+  telemetryLabel.textContent = "Telemetry";
+  telemetrySection.appendChild(telemetryLabel);
+  telemetrySection.appendChild(fps);
+  telemetrySection.appendChild(perf);
+
   tunerSection.appendChild(overrideRow);
   tunerSection.appendChild(slider);
   tunerSection.appendChild(value);
-  tunerSection.appendChild(fps);
   tunerSection.appendChild(smoothingRow);
   tunerSection.appendChild(tableLabel);
   tunerSection.appendChild(table);
@@ -372,6 +388,7 @@ function bindSeigaihaDebugControl(): void {
   drumSection.appendChild(drumTargetRow);
 
   panel.appendChild(title);
+  panel.appendChild(telemetrySection);
   panel.appendChild(tunerSection);
   panel.appendChild(metronomeSection);
   panel.appendChild(drumSection);
@@ -386,18 +403,32 @@ function bindSeigaihaDebugControl(): void {
   renderMappingTable();
   renderMetronomeTable();
   syncSeigaihaDebugModeVisibility();
-  let lastSampleAt = performance.now();
-  let lastRenderCount = getSeigaihaRenderStats().renderCount;
+  let rafFrames = 0;
+  let rafWindowStartAt = performance.now();
+  const tickFps = (): void => {
+    rafFrames += 1;
+    requestAnimationFrame(tickFps);
+  };
+  requestAnimationFrame(tickFps);
   window.setInterval(() => {
     value.textContent = getSeigaihaRandomness().toFixed(2);
     const now = performance.now();
-    const stats = getSeigaihaRenderStats();
-    const dt = Math.max(1, now - lastSampleAt);
-    const deltaRenders = Math.max(0, stats.renderCount - lastRenderCount);
-    const effectiveFps = (deltaRenders * 1000) / dt;
-    fps.textContent = `FPS ${effectiveFps.toFixed(1)}`;
-    lastSampleAt = now;
-    lastRenderCount = stats.renderCount;
+    const dt = Math.max(1, now - rafWindowStartAt);
+    const avgFps = (rafFrames * 1000) / dt;
+    rafFrames = 0;
+    rafWindowStartAt = now;
+    const stats = getSeigaihaPerformanceStats();
+    fps.textContent = `FPS ${avgFps.toFixed(1)}`;
+    perf.textContent = [
+      `backend ${getSeigaihaRendererBackend()}`,
+      `displayFPS ${avgFps.toFixed(1)}`,
+      `seigaihaFPS ${stats.renderDrawsPerSec.toFixed(1)}`,
+      `uploads/s ${stats.textureUploadsPerSec.toFixed(1)}`,
+      `p95 ${stats.p95FrameTimeMs.toFixed(1)}ms`,
+      `max ${stats.maxFrameTimeMs.toFixed(1)}ms`,
+      `swaps/s ${stats.renderSwapsPerSec.toFixed(1)}`,
+      `cache ${stats.cacheHits}/${stats.cacheMisses} (${(stats.cacheHitRate * 100).toFixed(0)}%)`,
+    ].join("\n");
   }, 120);
 }
 

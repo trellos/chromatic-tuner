@@ -17,20 +17,76 @@ async function readDebugRandomness(page: Page): Promise<number> {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+async function readTelemetryStats(page: Page): Promise<{
+  fps: number;
+  avgFps: number;
+  seigaihaFps: number;
+  uploadsPerSec: number;
+  p95Ms: number;
+  maxMs: number;
+  swapsPerSec: number;
+}> {
+  const fpsText = await page.locator(".seigaiha-debug-fps").first().textContent();
+  const metricsText = await page.locator(".seigaiha-debug-metrics").first().textContent();
+  const fps = Number.parseFloat((fpsText ?? "").replace("FPS", "").trim());
+  const lines = (metricsText ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const displayLine =
+    lines.find((line) => line.startsWith("displayFPS")) ??
+    lines.find((line) => line.startsWith("avgFPS")) ??
+    "";
+  const seigaihaLine = lines.find((line) => line.startsWith("seigaihaFPS")) ?? "";
+  const uploadsLine = lines.find((line) => line.startsWith("uploads/s")) ?? "";
+  const p95Line = lines.find((line) => line.startsWith("p95")) ?? "";
+  const maxLine = lines.find((line) => line.startsWith("max")) ?? "";
+  const swapsLine = lines.find((line) => line.startsWith("swaps/s")) ?? "";
+  return {
+    fps,
+    avgFps: Number.parseFloat(
+      displayLine.replace("displayFPS", "").replace("avgFPS", "").trim()
+    ),
+    seigaihaFps: Number.parseFloat(seigaihaLine.replace("seigaihaFPS", "").trim()),
+    uploadsPerSec: Number.parseFloat(uploadsLine.replace("uploads/s", "").trim()),
+    p95Ms: Number.parseFloat(p95Line.replace("p95", "").replace("ms", "").trim()),
+    maxMs: Number.parseFloat(maxLine.replace("max", "").replace("ms", "").trim()),
+    swapsPerSec: Number.parseFloat(swapsLine.replace("swaps/s", "").trim()),
+  };
+}
+
 test("seigaiha background: single static traditional layer", async ({ page }) => {
   await page.goto("/");
 
   const bg = await page.evaluate(() => {
-    const style = getComputedStyle(document.body, "::before");
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      "canvas[data-seigaiha-surface='1']"
+    );
+    const style = canvas ? getComputedStyle(canvas) : null;
     return {
-      image: style.backgroundImage,
-      pos: style.backgroundPosition,
+      backend: document.body.getAttribute("data-seigaiha-backend"),
+      ready: document.body.getAttribute("data-seigaiha-render-ready"),
+      surfaceCount: document.querySelectorAll("canvas[data-seigaiha-surface='1']").length,
+      position: style?.position ?? null,
+      inset: style?.inset ?? null,
+      pointerEvents: style?.pointerEvents ?? null,
     };
   });
 
-  const urlCount = (bg.image.match(/url\(/g) ?? []).length;
-  expect(urlCount).toBe(1);
-  expect(bg.pos).toContain("0px 0px");
+  expect(["webgl", "none"]).toContain(bg.backend);
+  if (bg.backend === "webgl") {
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => document.body.getAttribute("data-seigaiha-render-ready")),
+        { timeout: 3000 }
+      )
+      .toBe("1");
+    expect(bg.surfaceCount).toBe(1);
+    expect(bg.position).toBe("fixed");
+    expect(bg.inset).toBe("0px");
+    expect(bg.pointerEvents).toBe("none");
+  }
 });
 
 test("seigaiha debug override starts disabled and shows editable detune mapping", async ({
@@ -123,6 +179,70 @@ test("seigaiha debug shows drum target only in drum machine mode", async ({
   await drumTargetInput.fill("0.77");
   await drumTargetInput.blur();
   await expect(drumTargetInput).toHaveValue("0.77");
+});
+
+test("seigaiha debug telemetry stays visible with finite values across all modes", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+
+  const telemetry = page.locator(
+    '.seigaiha-debug-section[data-debug-section="telemetry"]'
+  );
+  await expect(telemetry).toBeVisible();
+  await expect(telemetry.locator(".seigaiha-debug-fps")).toBeVisible();
+  await expect(telemetry.locator(".seigaiha-debug-metrics")).toBeVisible();
+
+  const modeTabs = ["Chromatic Tuner", "Metronome", "Drum Machine"] as const;
+  for (const tab of modeTabs) {
+    await page.getByRole("tab", { name: tab }).click();
+    await expect.poll(async () => readTelemetryStats(page), { timeout: 2000 }).toMatchObject({
+      fps: expect.any(Number),
+      avgFps: expect.any(Number),
+      seigaihaFps: expect.any(Number),
+      uploadsPerSec: expect.any(Number),
+      p95Ms: expect.any(Number),
+      maxMs: expect.any(Number),
+      swapsPerSec: expect.any(Number),
+    });
+    const resolved = await readTelemetryStats(page);
+    expect(Number.isFinite(resolved.fps)).toBeTruthy();
+    expect(Number.isFinite(resolved.avgFps)).toBeTruthy();
+    expect(Number.isFinite(resolved.seigaihaFps)).toBeTruthy();
+    expect(Number.isFinite(resolved.uploadsPerSec)).toBeTruthy();
+    expect(Number.isFinite(resolved.p95Ms)).toBeTruthy();
+    expect(Number.isFinite(resolved.maxMs)).toBeTruthy();
+    expect(Number.isFinite(resolved.swapsPerSec)).toBeTruthy();
+  }
+});
+
+test("seigaiha telemetry remains finite while metronome drives continuous randomness", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Metronome" }).click();
+
+  const playButton = page.locator(
+    '.mode-screen[data-mode="metronome"] [data-action="toggle"]'
+  );
+  await playButton.click();
+  await page.waitForTimeout(250);
+  const started = ((await playButton.textContent()) ?? "").trim() === "Stop";
+  if (!started) {
+    return;
+  }
+
+  await page.waitForTimeout(900);
+  const stats = await readTelemetryStats(page);
+  expect(Number.isFinite(stats.fps)).toBeTruthy();
+  expect(Number.isFinite(stats.avgFps)).toBeTruthy();
+  expect(Number.isFinite(stats.seigaihaFps)).toBeTruthy();
+  expect(Number.isFinite(stats.uploadsPerSec)).toBeTruthy();
+  expect(Number.isFinite(stats.p95Ms)).toBeTruthy();
+  expect(Number.isFinite(stats.maxMs)).toBeTruthy();
+  expect(Number.isFinite(stats.swapsPerSec)).toBeTruthy();
+  expect(stats.avgFps).toBeGreaterThan(0);
+  expect(stats.maxMs).toBeGreaterThan(0);
 });
 
 test("seigaiha arbitration: debug override supersedes drum mode updates", async ({
@@ -260,20 +380,29 @@ test('seigaiha background covers the full viewport height to the bottom edge', a
 
     const bodyBottom = document.body.getBoundingClientRect().bottom;
     const htmlBottom = document.documentElement.getBoundingClientRect().bottom;
-    const before = getComputedStyle(document.body, '::before');
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      "canvas[data-seigaiha-surface='1']"
+    );
+    const canvasRect = canvas?.getBoundingClientRect();
+    const canvasStyle = canvas ? getComputedStyle(canvas) : null;
 
     return {
+      backend: document.body.getAttribute("data-seigaiha-backend"),
       bodyGap: visualBottom - bodyBottom,
       htmlGap: visualBottom - htmlBottom,
-      beforePosition: before.position,
-      beforeInset: before.inset,
-      beforeImage: before.backgroundImage,
+      canvasPosition: canvasStyle?.position ?? null,
+      canvasInset: canvasStyle?.inset ?? null,
+      canvasHeight: canvasRect?.height ?? 0,
+      viewportHeight: window.innerHeight,
     };
   });
 
-  expect(coverage.beforePosition).toBe('fixed');
-  expect(coverage.beforeInset).toBe('0px');
-  expect(coverage.beforeImage).toContain('url(');
+  expect(["webgl", "none"]).toContain(coverage.backend);
+  if (coverage.backend === "webgl") {
+    expect(coverage.canvasPosition).toBe('fixed');
+    expect(coverage.canvasInset).toBe('0px');
+    expect(Math.abs(coverage.canvasHeight - coverage.viewportHeight)).toBeLessThanOrEqual(2);
+  }
   expect(coverage.bodyGap).toBeLessThanOrEqual(1.5);
   expect(coverage.htmlGap).toBeLessThanOrEqual(1.5);
 });
