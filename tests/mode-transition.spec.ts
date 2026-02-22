@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { runModeTransition } from "../src/mode-transition.ts";
+import { runModeTransition } from "../src/mode-transition.js";
 
 test("runModeTransition executes exit -> apply -> enter order", async () => {
   const steps: string[] = [];
@@ -34,7 +34,7 @@ test("runModeTransition stops before UI apply when exit fails", async () => {
     enterNext: async () => {
       steps.push("enter");
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
       errors.push(error instanceof Error ? error.message : String(error));
     },
   });
@@ -55,7 +55,7 @@ test("runModeTransition keeps applied UI state when enter fails", async () => {
       steps.push("enter");
       throw new Error("enter failed");
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
       errors.push(error instanceof Error ? error.message : String(error));
     },
   });

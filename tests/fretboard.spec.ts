@@ -299,9 +299,10 @@ test("fretboard mobile portrait fits all controls and reaches fret 12", async ({
 test("fretboard UI stays fully visible across desktop and portrait aspect ratios", async ({
   page,
   browserName,
-}) => {
+}, testInfo) => {
+  const isMobileSafariProject = testInfo.project.name === "Mobile Safari";
   const viewports =
-    browserName === "Mobile Safari"
+    isMobileSafariProject
       ? [
           { width: 412, height: 915 },
           { width: 390, height: 844 },
@@ -349,9 +350,10 @@ test("fretboard UI stays fully visible across desktop and portrait aspect ratios
   }
 });
 
-test("fretboard taps play guitar sample across browser engines", async ({ page, browserName }) => {
+test("fretboard taps play guitar sample across browser engines", async ({ page, browserName }, testInfo) => {
+  const isMobileSafariProject = testInfo.project.name === "Mobile Safari";
   test.skip(
-    browserName === "webkit" || browserName === "Mobile Safari",
+    browserName === "webkit" || isMobileSafariProject,
     "WebKit headless audio is not reliable for sample-playback assertions"
   );
 
@@ -389,9 +391,10 @@ test("fretboard taps play guitar sample across browser engines", async ({ page, 
 test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
   page,
   browserName,
-}) => {
+}, testInfo) => {
+  const isMobileSafariProject = testInfo.project.name === "Mobile Safari";
   test.skip(
-    browserName !== "webkit" && browserName !== "Mobile Safari",
+    browserName !== "webkit" && !isMobileSafariProject,
     "Safari-family smoke coverage only"
   );
 

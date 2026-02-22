@@ -3,7 +3,7 @@ import {
   generateTraditionalSeigaihaSvg,
   quantizeSeigaihaRandomnessForCache,
   resolveSeigaihaInterpolationForTest,
-} from "../src/ui/seigaihaBackground.ts";
+} from "../src/ui/seigaihaBackground.js";
 
 test("seigaiha generator is deterministic for same seed/options", () => {
   const first = generateTraditionalSeigaihaSvg({
