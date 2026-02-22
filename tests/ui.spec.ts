@@ -3,6 +3,7 @@
 const MODE_TABS = [
   { label: 'Chromatic Tuner', id: 'tuner' },
   { label: 'Metronome', id: 'metronome' },
+  { label: 'Fretboard', id: 'fretboard' },
   { label: 'Drum Machine', id: 'drum-machine' },
 ] as const;
 
@@ -322,6 +323,7 @@ test('app loads and key UI is visible with no runtime/network failures', async (
   await expect(page.locator('h1.hero-title')).toHaveText('TUNA');
   await expect(page.getByRole('tab', { name: 'Chromatic Tuner' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Metronome' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Fretboard' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Drum Machine' })).toBeVisible();
 
   await page.waitForTimeout(150);
