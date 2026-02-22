@@ -271,8 +271,11 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   const setKit = (kitId: KitId) => {
     currentKit = kitId;
     setKitLabel();
-    applyKitBuffers(kitId);
-    if (audioContext && !kitBufferCache[kitId]) {
+    if (kitBufferCache[kitId]) {
+      applyKitBuffers(kitId);
+      return;
+    }
+    if (audioContext) {
       void loadKit(kitId).then(() => {
         if (currentKit === kitId) {
           applyKitBuffers(kitId);
@@ -582,16 +585,16 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
   const ensureAudio = async () => {
     if (audioContext) {
       await audioContext.resume();
-      return;
+    } else {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      audioContext = new AudioCtx({ latencyHint: "interactive" });
+      await audioContext.resume();
     }
 
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    audioContext = new AudioCtx({ latencyHint: "interactive" });
-    await audioContext.resume();
-
-    void ensureAllKitsLoaded();
+    await loadKit(currentKit);
     applyKitBuffers(currentKit);
+    void ensureAllKitsLoaded();
   };
 
   const playBuffer = (

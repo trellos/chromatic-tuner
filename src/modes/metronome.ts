@@ -234,9 +234,11 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   const setSound = (nextSoundId: MetronomeSoundId) => {
     if (nextSoundId === soundId) return;
     soundId = nextSoundId;
-    const cached = sampleCache[soundId] ?? null;
-    regularBuffer = cached?.regular ?? null;
-    accentBuffer = cached?.accent ?? null;
+    const cached = sampleCache[soundId];
+    if (cached) {
+      regularBuffer = cached.regular;
+      accentBuffer = cached.accent;
+    }
     setSoundLabel();
     if (audioContext) {
       void ensureSamplesForSound(soundId);
@@ -430,6 +432,7 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
   const startTransport = async () => {
     if (isPlaying) return;
     await ensureAudioContext();
+    await ensureSamplesForSound(soundId);
     void ensureAllSamples();
     if (!audioContext) return;
     isPlaying = true;
