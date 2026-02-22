@@ -70,6 +70,41 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Do not serialize the beat preset selector value in new links; share payloads must preserve the actual edited loop, plus kit and tempo.
   - Parser should continue accepting legacy `v` (number) as version fallback for already-shared links, but new links should emit `version`.
 
+### Fretboard (`src/modes/fretboard.ts` + `src/modes/fretboard-logic.ts`)
+- Interactive guitar fretboard for scales/chords with note or degree annotations.
+- Default state on first load: `C` root, `scale` display, `major` characteristic, `notes` annotation.
+- `onEnter`: bind root/display/annotation controls, characteristic select, dot taps, and play action.
+- `onExit`: detach listeners, stop scheduled playback, clear randomness animation, and close audio context.
+- Dot generation/theory contract (keep in `src/modes/fretboard-logic.ts`):
+  - Generate included notes from interval maps by `display` + `characteristic`.
+  - Render frets `0..12` across standard tuning (low E to high E).
+  - Degree labels use chromatic spellings where semitone `8` is `b6` (not `#5`).
+  - Chord aliases must normalize consistently (`sus2`, `sus4`, human labels).
+- Visual/layout invariants:
+  - Open-string indicators are hollow circles in the header lane above the nut.
+  - Open-string indicators are positioned between the string labels and nut and remain tappable.
+  - Root notes use the accent styling in both note and degree annotation modes.
+  - Note dots remain centered on their string and centered between adjacent frets.
+  - Fret inlays remain visible even when note dots overlap them (including dual 12th-fret inlays).
+  - In portrait/mobile, keep fretboard + controls visible together; do not require internal panel scrolling to reach the 12th fret and its inlays.
+- Controls contract:
+  - Root buttons (`[data-fretboard-root]`): select tonic and rerender.
+  - Display buttons (`[data-fretboard-display]`): switch `scale`/`chord` and refresh characteristic options.
+  - Characteristic select (`#fretboard-characteristic`): scale/chord quality choice for current display mode.
+  - Annotation buttons (`[data-fretboard-annotation]`): switch label text between note names and degrees.
+  - Play button (`[data-fretboard-play]`): audition current selection.
+    - Scale mode: play notes in ascending order including top octave.
+    - Chord mode: play all chord tones together for ~1 second.
+- Audio contract:
+  - Dot tap playback: tapping any fretted note or open indicator plays its pitch.
+  - Preferred source is a loaded guitar sample (`assets/audio/fretboard/guitar-acoustic-c4.mp3`) pitch-shifted by MIDI offset.
+  - Fallback source is a synthesized oscillator tone if sample fetch/decode fails.
+  - Audio should initialize lazily on user interaction and be cleaned up on mode exit.
+- Seigaiha/background contract:
+  - Global button clicks (wired in `src/main.ts`) trigger a short randomness pulse: jump into `[0.2, 0.4]`, then decay to `0` over ~500ms.
+  - Play action drives a stronger playback envelope: start near `0.8`, then decay to `0` when playback completes.
+  - Mode exit must clear/neutralize fretboard-owned randomness (`null`) so other modes can drive background state.
+
 ## Guardrails
 
 - Keep cross-mode coupling out of mode files.
