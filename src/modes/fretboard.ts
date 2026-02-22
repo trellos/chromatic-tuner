@@ -109,6 +109,7 @@ export function createFretboardMode(): ModeDefinition {
       marker.style.setProperty("--fret-index", String(dot.fret));
       marker.dataset.note = dot.note;
       marker.dataset.degree = dot.degree;
+      marker.dataset.fret = String(dot.fret);
       marker.textContent = state.annotation === "notes" ? dot.note : dot.degree;
       dotsLayer.append(marker);
     }

@@ -1593,3 +1593,77 @@ body.drum-fullscreen .drum-ui {
     max-width: 260px;
   }
 }
+
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .mode-screen[data-mode="fretboard"] {
+    padding: 14px;
+  }
+
+  .mode-screen[data-mode="fretboard"].is-active {
+    gap: 10px;
+  }
+
+  .mode-screen[data-mode="fretboard"] .mode-header {
+    gap: 2px;
+  }
+
+  .mode-screen[data-mode="fretboard"] .mode-title {
+    font-size: 16px;
+    letter-spacing: 0.12em;
+  }
+
+  .fretboard-layout {
+    grid-template-columns: minmax(156px, 43%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .fretboard-board {
+    min-height: min(488px, calc(var(--mode-panel-height) - 92px));
+    max-width: none;
+  }
+
+  .fretboard-string-labels {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .fretboard-open-indicator {
+    width: 8px;
+    height: 8px;
+  }
+
+  .fretboard-dot {
+    width: 18px;
+    font-size: 9px;
+    border-width: 1px;
+  }
+
+  .fretboard-controls {
+    gap: 8px;
+    grid-template-rows: repeat(4, min-content);
+  }
+
+  .fretboard-note-selector {
+    gap: 4px;
+  }
+
+  .fretboard-note-selector button,
+  .fretboard-segmented button {
+    min-width: 32px;
+    padding: 6px 7px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+
+  .fretboard-characteristic-label {
+    font-size: 11px;
+  }
+
+  .fretboard-characteristic {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}

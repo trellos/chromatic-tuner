@@ -60,3 +60,24 @@ test("fretboard interaction updates characteristic options and degree labels", a
   expect(noteLabels).toContain("F");
   expect(noteLabels).not.toContain("C#");
 });
+
+
+test("fretboard mobile portrait fits all controls and reaches fret 12", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "Mobile Safari", "mobile portrait coverage only");
+
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
+  await expect(fretboardScreen).toHaveClass(/is-active/);
+
+  const overflow = await fretboardScreen.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    hasOverflow: element.scrollHeight > element.clientHeight + 1,
+  }));
+  expect(overflow.hasOverflow).toBeFalsy();
+
+  await expect(page.locator('.fretboard-controls')).toBeVisible();
+  await expect(page.locator('.fretboard-dot[data-fret="12"]').first()).toBeVisible();
+});

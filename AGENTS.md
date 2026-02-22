@@ -18,6 +18,7 @@
 - UI markup and styles: `public/index.html` + `public/style.css`.
 - Default state is **C Major scale** in notes view.
 - Open-string membership is shown as small hollow indicators above strings.
+- In mobile portrait, keep fretboard + controls visible together without internal panel scrolling.
 - Chord aliases are normalized in helper logic (for example `sus4` and `Suspended Fourth`).
 
 ## Testing expectations
