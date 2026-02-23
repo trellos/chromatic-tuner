@@ -610,14 +610,45 @@ test("double-tapping inside the circle cycles instruments and shows the instrume
   const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const svg = circlePanel.locator(".cof-svg");
   const banner = circlePanel.locator(".cof-mode-banner").first();
+  const instrumentLabel = circlePanel.locator(".cof-instrument-label");
   const svgBox = await svg.boundingBox();
   expect(svgBox).not.toBeNull();
+  await expect(instrumentLabel).toContainText("ACOUSTIC GUITAR");
 
   await svg.dblclick({
     position: { x: (svgBox?.width ?? 0) / 2, y: (svgBox?.height ?? 0) / 2 },
     force: true,
   });
   await expect(banner).toContainText("ELECTRIC GUITAR");
+  await expect(instrumentLabel).toContainText("ELECTRIC GUITAR");
+});
+
+test("instrument label arc stays on bottom with no primary and moves opposite selected primary", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
+  const readArcMidpoint = async () =>
+    page.evaluate(() => {
+      const path = document.querySelector<SVGPathElement>(".cof defs path[id^='cof-instrument-label-path-']");
+      if (!path) return null;
+      const total = path.getTotalLength();
+      if (!Number.isFinite(total) || total <= 0) return null;
+      const mid = path.getPointAtLength(total / 2);
+      if (!Number.isFinite(mid.x) || !Number.isFinite(mid.y)) return null;
+      return { x: mid.x, y: mid.y };
+    });
+
+  const initialMidpoint = await readArcMidpoint();
+  expect(initialMidpoint).not.toBeNull();
+  expect(initialMidpoint?.y ?? 0).toBeGreaterThan(496);
+
+  await circle.locator('.cof-wedge[data-index="3"] .cof-wedge-path').click({ force: true });
+  const movedMidpoint = await readArcMidpoint();
+  expect(movedMidpoint).not.toBeNull();
+  expect(movedMidpoint?.x ?? 1000).toBeLessThan(504);
 });
 
 test("indicator animation triggers for primary note, chord mode, and minor/major mode transitions", async ({

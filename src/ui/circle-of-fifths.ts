@@ -48,6 +48,7 @@ export type CircleOfFifthsUi = {
   setTuningCents: (cents: number | null) => void;
   setChordMode: (enabled: boolean, options?: CircleChordModeOptions) => void;
   setMinorMode: (enabled: boolean) => void;
+  setInstrumentLabel: (text: string) => void;
   showInnerIndicator: (text: string) => void;
   pulseNote: (midi: number, durationMs?: number) => void;
   pulseChord: (midis: number[], durationMs?: number) => void;
@@ -86,6 +87,8 @@ const ZOOMED_VIEWBOX_SIZE = 700;
 const ZOOM_FOCUS_RADIUS = 165;
 const SECONDARY_WEDGE_DEG = 24;
 const DIM_WEDGE_DEG = 24;
+const INSTRUMENT_LABEL_ARC_SPAN_DEG = 148;
+const INSTRUMENT_LABEL_RADIUS = DIM_INNER_RADIUS - 18;
 const SECONDARY_CENTERS = [-30, 0, 30] as const;
 const SECONDARY_INTERVALS = [2, 4, 9] as const; // II, III, VI
 const SECONDARY_DEGREE_LABELS = ["ii", "iii", "vi"] as const;
@@ -314,6 +317,15 @@ function describeAnnularSector(
   ].join(" ");
 }
 
+function describeCircularArc(radius: number, startDeg: number, endDeg: number): string {
+  const start = polarPoint(radius, startDeg);
+  const end = polarPoint(radius, endDeg);
+  const sweep = endDeg - startDeg;
+  const largeArc = Math.abs(sweep) > 180 ? 1 : 0;
+  const sweepFlag = sweep >= 0 ? 1 : 0;
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} ${sweepFlag} ${end.x} ${end.y}`;
+}
+
 function getSelectionFromPrimary(primaryIndex: number): CircleSelection {
   const primary = OUTER_NOTES[primaryIndex] ?? OUTER_NOTES[0]!;
   const preferFlats = keyPrefersFlats(primary.label);
@@ -436,6 +448,7 @@ export function createCircleOfFifthsUi(
   const defs = createSvgEl("defs");
   const outerHintThirdId = `cof-outer-hint-third-${instanceId}`;
   const outerHintDimId = `cof-outer-hint-dim-${instanceId}`;
+  const instrumentTextPathId = `cof-instrument-label-path-${instanceId}`;
   appendRadialHintGradient(defs, outerHintThirdId, "rgb(124, 58, 237)", "0.5");
   appendRadialHintGradient(defs, outerHintDimId, "rgb(255, 158, 0)", "0.44");
 
@@ -448,6 +461,9 @@ export function createCircleOfFifthsUi(
   clipPathShape.setAttribute("r", String(OUTER_INNER_RADIUS - 6));
   clipPath.appendChild(clipPathShape);
   defs.appendChild(clipPath);
+  const instrumentTextPath = createSvgEl("path");
+  instrumentTextPath.setAttribute("id", instrumentTextPathId);
+  defs.appendChild(instrumentTextPath);
   svg.appendChild(defs);
 
   const detailGroup = createSvgEl("g", "cof-detail");
@@ -463,10 +479,19 @@ export function createCircleOfFifthsUi(
     modeBannerGroup.appendChild(text);
     return text;
   });
+  const instrumentLabelGroup = createSvgEl("g", "cof-instrument-label-layer");
+  const instrumentLabelText = createSvgEl("text", "cof-instrument-label");
+  const instrumentLabelTextPath = createSvgEl("textPath");
+  instrumentLabelTextPath.setAttribute("href", `#${instrumentTextPathId}`);
+  instrumentLabelTextPath.setAttribute("startOffset", "50%");
+  instrumentLabelTextPath.textContent = "ACOUSTIC GUITAR";
+  instrumentLabelText.appendChild(instrumentLabelTextPath);
+  instrumentLabelGroup.appendChild(instrumentLabelText);
   const outerPulseGroup = createSvgEl("g", "cof-pulse-layer");
   const detailPulseGroup = createSvgEl("g", "cof-pulse-layer cof-pulse-layer--detail");
 
   svg.appendChild(outerGroup);
+  svg.appendChild(instrumentLabelGroup);
   svg.appendChild(modeBannerGroup);
   detailGroup.appendChild(secondaryGroup);
   detailGroup.appendChild(dimGroup);
@@ -557,6 +582,7 @@ export function createCircleOfFifthsUi(
   let selection: CircleSelection | null = null;
   let chordModeEnabled = false;
   let minorModeEnabled = false;
+  let instrumentLabel = "ACOUSTIC GUITAR";
   let chordZoomPrimaryIndex: number | null = null;
   let detuneDeg = 0;
   let detailBaseDeg = 0;
@@ -616,6 +642,15 @@ export function createCircleOfFifthsUi(
     modeBannerTexts.forEach((line) => {
       line.classList.add("is-scrolling");
     });
+  };
+
+  const updateInstrumentLabelPlacement = (): void => {
+    const primaryForPlacement = primaryIndex ?? 0;
+    const oppositeDeg = primaryForPlacement * OUTER_STEP_DEG + 180;
+    const startDeg = oppositeDeg - INSTRUMENT_LABEL_ARC_SPAN_DEG / 2;
+    const endDeg = oppositeDeg + INSTRUMENT_LABEL_ARC_SPAN_DEG / 2;
+    instrumentTextPath.setAttribute("d", describeCircularArc(INSTRUMENT_LABEL_RADIUS, startDeg, endDeg));
+    instrumentLabelTextPath.textContent = instrumentLabel;
   };
 
   const applyChordZoom = (): void => {
@@ -1192,6 +1227,7 @@ export function createCircleOfFifthsUi(
   const setPrimaryIndex = (nextPrimaryIndex: number | null): void => {
     const prevPrimaryIndex = primaryIndex;
     primaryIndex = nextPrimaryIndex;
+    updateInstrumentLabelPlacement();
     selection = nextPrimaryIndex === null ? null : getSelectionFromPrimary(nextPrimaryIndex);
     setDetailBaseForPrimary(nextPrimaryIndex);
     updateNoteBarDegreeColors(nextPrimaryIndex === null ? null : (OUTER_NOTES[nextPrimaryIndex]?.semitone ?? null));
@@ -1276,6 +1312,8 @@ export function createCircleOfFifthsUi(
     if (primaryIndex !== null) setPrimaryIndex(primaryIndex);
   };
 
+  updateInstrumentLabelPlacement();
+
   return {
     setPrimaryByLabel(label: string | null) {
       if (!label) {
@@ -1320,6 +1358,10 @@ export function createCircleOfFifthsUi(
     },
     setMinorMode(enabled: boolean) {
       setMinorModeInternal(enabled);
+    },
+    setInstrumentLabel(text: string) {
+      instrumentLabel = text.trim() || "ACOUSTIC GUITAR";
+      updateInstrumentLabelPlacement();
     },
     showInnerIndicator(text: string) {
       showInnerCircleIndicator(text);

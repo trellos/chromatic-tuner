@@ -171,7 +171,7 @@ export function createCircleOfFifthsMode(
       lastTapPlaybackAt = 0;
       lastTapPlaybackSignature = "";
       circleUi?.destroy();
-      guitarPlayer.setInstrument("guitar-acoustic");
+      const initialInstrumentName = guitarPlayer.setInstrument("guitar-acoustic");
       circleUi = createCircleOfFifthsUi(mountEl, {
         // UI -> mode callback usage:
         // - interaction callbacks map to playback/state transitions.
@@ -223,6 +223,7 @@ export function createCircleOfFifthsMode(
         },
         onInnerDoubleTap: () => {
           const instrumentName = guitarPlayer.cycleInstrument();
+          circleUi?.setInstrumentLabel(instrumentName);
           circleUi?.showInnerIndicator(instrumentName);
         },
         onSecondaryTap: (chord) => {
@@ -269,6 +270,7 @@ export function createCircleOfFifthsMode(
           guitarPlayer.stopSustain();
         },
       });
+      circleUi.setInstrumentLabel(initialInstrumentName);
     },
     onExit: () => {
       clearRandomnessTimeout();

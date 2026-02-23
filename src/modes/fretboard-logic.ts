@@ -12,7 +12,15 @@ export type NoteName =
   | "G"
   | "G#";
 
-export type DisplayType = "scale" | "chord";
+export type DisplayType = "scale" | "chord" | "key";
+export type KeyModeType =
+  | "ionian-major"
+  | "dorian"
+  | "phrygian"
+  | "lydian"
+  | "mixolydian"
+  | "aeolian-minor"
+  | "locrian";
 
 export type ScaleType =
   | "major"
@@ -32,7 +40,7 @@ export type ChordType =
   | "suspended-fourth"
   | "ninth";
 
-export type CharacteristicType = ScaleType | ChordType;
+export type CharacteristicType = ScaleType | ChordType | KeyModeType;
 
 export type AnnotationType = "notes" | "degrees";
 
@@ -101,6 +109,16 @@ const CHORD_INTERVALS: Record<ChordType, readonly number[]> = {
   ninth: [0, 2, 4, 7, 10],
 };
 
+const KEY_MODE_INTERVALS: Record<KeyModeType, readonly number[]> = {
+  "ionian-major": [0, 2, 4, 5, 7, 9, 11],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  "aeolian-minor": [0, 2, 3, 5, 7, 8, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+};
+
 const TRIAD_STRING_GROUP_BY_STRING_INDEX: ReadonlyArray<readonly [number, number, number]> = [
   [0, 1, 2],
   [1, 2, 3],
@@ -164,11 +182,36 @@ function isChordType(value: string): value is ChordType {
   return value in CHORD_INTERVALS;
 }
 
+export function normalizeKeyModeType(raw: string): KeyModeType | null {
+  const normalized = raw.trim().toLowerCase();
+  const map: Record<string, KeyModeType> = {
+    ionian: "ionian-major",
+    "ionian-major": "ionian-major",
+    major: "ionian-major",
+    dorian: "dorian",
+    phrygian: "phrygian",
+    lydian: "lydian",
+    mixolydian: "mixolydian",
+    aeolian: "aeolian-minor",
+    "aeolian-minor": "aeolian-minor",
+    minor: "aeolian-minor",
+    locrian: "locrian",
+  };
+  return map[normalized] ?? null;
+}
+
+function isKeyModeType(value: string): value is KeyModeType {
+  return value in KEY_MODE_INTERVALS;
+}
+
 export function getIntervals(display: DisplayType, characteristic: CharacteristicType): readonly number[] {
   if (display === "scale") {
     return isScaleType(characteristic) ? SCALE_INTERVALS[characteristic] : SCALE_INTERVALS.minor;
   }
-  return isChordType(characteristic) ? CHORD_INTERVALS[characteristic] : CHORD_INTERVALS.minor;
+  if (display === "chord") {
+    return isChordType(characteristic) ? CHORD_INTERVALS[characteristic] : CHORD_INTERVALS.minor;
+  }
+  return isKeyModeType(characteristic) ? KEY_MODE_INTERVALS[characteristic] : KEY_MODE_INTERVALS["ionian-major"];
 }
 
 export function getFretboardMidiAtPosition(stringIndex: number, fret: number): number {
@@ -202,6 +245,12 @@ export function getFretboardDots(state: FretboardState): FretboardDot[] {
   return dots;
 }
 
+export type FretboardPlaybackTarget = {
+  midi: number;
+  stringIndex: number;
+  isRoot?: boolean;
+};
+
 function getTriadIntervals(chordType: ChordType): readonly [number, number, number] {
   const intervals = [...new Set(CHORD_INTERVALS[chordType].map((interval) => normalizeSemitone(interval)))].sort(
     (a, b) => a - b
@@ -227,30 +276,207 @@ function getMidiAtOrAbove(options: {
   return candidate + pitchOffset;
 }
 
-export function getChordTapMidiTargets(options: {
+function getMidiAtOrBelow(options: {
+  targetPitchClass: number;
+  maximumMidi: number;
+  stringIndex: number;
+}): number {
+  const upward = getMidiAtOrAbove({
+    targetPitchClass: options.targetPitchClass,
+    minimumMidi: 0,
+    stringIndex: options.stringIndex,
+  });
+  if (upward <= options.maximumMidi) return upward;
+  return upward - 12;
+}
+
+function getMidiNearest(options: {
+  targetPitchClass: number;
+  nearMidi: number;
+  stringIndex: number;
+}): number {
+  const openMidi = OPEN_STRING_MIDI[options.stringIndex] ?? OPEN_STRING_MIDI[0] ?? 40;
+  const maxVisibleMidi = openMidi + MAX_FRET;
+  const visibleCandidates: number[] = [];
+  for (let midi = openMidi; midi <= maxVisibleMidi; midi += 1) {
+    if (normalizeSemitone(midi) === normalizeSemitone(options.targetPitchClass)) {
+      visibleCandidates.push(midi);
+    }
+  }
+  if (visibleCandidates.length > 0) {
+    return visibleCandidates.reduce((best, candidate) => {
+      const bestDistance = Math.abs(best - options.nearMidi);
+      const candidateDistance = Math.abs(candidate - options.nearMidi);
+      if (candidateDistance < bestDistance) return candidate;
+      if (candidateDistance > bestDistance) return best;
+      return candidate < best ? candidate : best;
+    });
+  }
+
+  const above = getMidiAtOrAbove({
+    targetPitchClass: options.targetPitchClass,
+    minimumMidi: options.nearMidi,
+    stringIndex: options.stringIndex,
+  });
+  const below = getMidiAtOrBelow({
+    targetPitchClass: options.targetPitchClass,
+    maximumMidi: options.nearMidi,
+    stringIndex: options.stringIndex,
+  });
+  if (Math.abs(above - options.nearMidi) < Math.abs(below - options.nearMidi)) {
+    return above;
+  }
+  return below;
+}
+
+export function getChordTapPlaybackTargets(options: {
+  chordRoot: NoteName;
   characteristic: CharacteristicType;
   tappedMidi: number;
   tappedStringIndex: number;
-}): number[] {
+}): FretboardPlaybackTarget[] {
   const chordType = isChordType(options.characteristic) ? options.characteristic : "major";
   const triadIntervals = getTriadIntervals(chordType);
-  const rootPitchClass = normalizeSemitone(options.tappedMidi);
+  const chordRootSemitone = NOTE_TO_SEMITONE[options.chordRoot] ?? 0;
+  const triadPitchClasses: [number, number, number] = [
+    normalizeSemitone(chordRootSemitone + triadIntervals[0]),
+    normalizeSemitone(chordRootSemitone + triadIntervals[1]),
+    normalizeSemitone(chordRootSemitone + triadIntervals[2]),
+  ];
+  const tappedPitchClass = normalizeSemitone(options.tappedMidi);
+  const tappedDegreeIndex = triadPitchClasses.findIndex((pitchClass) => pitchClass === tappedPitchClass);
+  const degreeIndex = tappedDegreeIndex >= 0 ? tappedDegreeIndex : 0;
+
+  const useLowerNeighborStrings = options.tappedStringIndex >= 4;
+  const stringGroup: readonly [number, number, number] = useLowerNeighborStrings
+    ? options.tappedStringIndex === 4
+      ? [2, 3, 4]
+      : [3, 4, 5]
+    : ([
+        options.tappedStringIndex,
+        Math.min(5, options.tappedStringIndex + 1),
+        Math.min(5, options.tappedStringIndex + 2),
+      ] as const);
+  const tappedPosition = useLowerNeighborStrings ? 2 : 0;
+  const orderedPitchClasses: [number, number, number] =
+    tappedPosition === 0
+      ? [
+          triadPitchClasses[(degreeIndex + 0) % 3] ?? triadPitchClasses[0],
+          triadPitchClasses[(degreeIndex + 1) % 3] ?? triadPitchClasses[1],
+          triadPitchClasses[(degreeIndex + 2) % 3] ?? triadPitchClasses[2],
+        ]
+      : [
+          triadPitchClasses[(degreeIndex + 1) % 3] ?? triadPitchClasses[1],
+          triadPitchClasses[(degreeIndex + 2) % 3] ?? triadPitchClasses[2],
+          triadPitchClasses[(degreeIndex + 0) % 3] ?? triadPitchClasses[0],
+        ];
+
+  const result: FretboardPlaybackTarget[] = new Array(3);
+  if (tappedPosition === 0) {
+    const bassMidi = options.tappedMidi;
+    const secondMidi = getMidiAtOrAbove({
+      targetPitchClass: orderedPitchClasses[1],
+      minimumMidi: bassMidi + 1,
+      stringIndex: stringGroup[1] ?? 1,
+    });
+    const thirdMidi = getMidiAtOrAbove({
+      targetPitchClass: orderedPitchClasses[2],
+      minimumMidi: secondMidi + 1,
+      stringIndex: stringGroup[2] ?? 2,
+    });
+    result[0] = { midi: bassMidi, stringIndex: stringGroup[0] ?? options.tappedStringIndex, isRoot: true };
+    result[1] = { midi: secondMidi, stringIndex: stringGroup[1] ?? 1 };
+    result[2] = { midi: thirdMidi, stringIndex: stringGroup[2] ?? 2 };
+    return result;
+  }
+
+  const topMidi = options.tappedMidi;
+  const middleMidi = getMidiAtOrBelow({
+    targetPitchClass: orderedPitchClasses[1],
+    maximumMidi: topMidi - 1,
+    stringIndex: stringGroup[1] ?? 4,
+  });
+  const lowMidi = getMidiAtOrBelow({
+    targetPitchClass: orderedPitchClasses[0],
+    maximumMidi: middleMidi - 1,
+    stringIndex: stringGroup[0] ?? 3,
+  });
+  result[0] = { midi: lowMidi, stringIndex: stringGroup[0] ?? 3 };
+  result[1] = { midi: middleMidi, stringIndex: stringGroup[1] ?? 4 };
+  result[2] = { midi: topMidi, stringIndex: stringGroup[2] ?? options.tappedStringIndex, isRoot: true };
+  return result;
+}
+
+export function getKeyTapPlaybackTargets(options: {
+  keyRoot: NoteName;
+  keyMode: CharacteristicType;
+  tappedMidi: number;
+  tappedStringIndex: number;
+}): FretboardPlaybackTarget[] {
+  const mode = isKeyModeType(options.keyMode) ? options.keyMode : "ionian-major";
+  const modeIntervals = KEY_MODE_INTERVALS[mode];
+  const keyRootSemitone = NOTE_TO_SEMITONE[options.keyRoot] ?? 0;
+  const tappedPitchClass = normalizeSemitone(options.tappedMidi);
+  const tappedInterval = normalizeSemitone(tappedPitchClass - keyRootSemitone);
+  const degreeIndex = modeIntervals.findIndex((interval) => interval === tappedInterval);
+  if (degreeIndex < 0) {
+    return [{ midi: options.tappedMidi, stringIndex: options.tappedStringIndex, isRoot: true }];
+  }
+
+  const thirdInterval = modeIntervals[(degreeIndex + 2) % 7] ?? 4;
+  const fifthInterval = modeIntervals[(degreeIndex + 4) % 7] ?? 7;
+  const rootPitchClass = tappedPitchClass;
+  const thirdPitchClass = normalizeSemitone(keyRootSemitone + thirdInterval);
+  const fifthPitchClass = normalizeSemitone(keyRootSemitone + fifthInterval);
+
+  if (options.tappedStringIndex >= 4) {
+    const strings: readonly [number, number, number] = [3, 4, 5];
+    const pitchForString = new Map<number, number>();
+    if (options.tappedStringIndex === 4) {
+      pitchForString.set(3, fifthPitchClass);
+      pitchForString.set(4, rootPitchClass);
+      pitchForString.set(5, thirdPitchClass);
+    } else {
+      pitchForString.set(3, thirdPitchClass);
+      pitchForString.set(4, fifthPitchClass);
+      pitchForString.set(5, rootPitchClass);
+    }
+
+    return strings.map((stringIndex) => {
+      if (stringIndex === options.tappedStringIndex) {
+        return { midi: options.tappedMidi, stringIndex, isRoot: true };
+      }
+      const pitchClass = pitchForString.get(stringIndex) ?? rootPitchClass;
+      return {
+        midi: getMidiNearest({
+          targetPitchClass: pitchClass,
+          nearMidi: options.tappedMidi,
+          stringIndex,
+        }),
+        stringIndex,
+      };
+    });
+  }
+
   const stringGroup =
     TRIAD_STRING_GROUP_BY_STRING_INDEX[options.tappedStringIndex] ??
     TRIAD_STRING_GROUP_BY_STRING_INDEX[0] ??
     ([0, 1, 2] as const);
-
   const bassMidi = options.tappedMidi;
   const secondMidi = getMidiAtOrAbove({
-    targetPitchClass: rootPitchClass + triadIntervals[1],
+    targetPitchClass: thirdPitchClass,
     minimumMidi: bassMidi + 1,
     stringIndex: stringGroup[1] ?? 1,
   });
   const thirdMidi = getMidiAtOrAbove({
-    targetPitchClass: rootPitchClass + triadIntervals[2],
+    targetPitchClass: fifthPitchClass,
     minimumMidi: secondMidi + 1,
     stringIndex: stringGroup[2] ?? 2,
   });
 
-  return [bassMidi, secondMidi, thirdMidi];
+  return [
+    { midi: bassMidi, stringIndex: stringGroup[0] ?? options.tappedStringIndex, isRoot: true },
+    { midi: secondMidi, stringIndex: stringGroup[1] ?? 1 },
+    { midi: thirdMidi, stringIndex: stringGroup[2] ?? 2 },
+  ];
 }

@@ -1,11 +1,14 @@
 import {
   getFretboardDots,
   getFretboardMidiAtPosition,
+  normalizeKeyModeType,
   normalizeChordType,
   type AnnotationType,
   type CharacteristicType,
   type DisplayType,
+  type FretboardPlaybackTarget,
   type FretboardState,
+  type KeyModeType,
   type ScaleType,
 } from "../modes/fretboard-logic.js";
 
@@ -29,6 +32,16 @@ const CHORD_OPTIONS: Array<{ value: CharacteristicType; label: string }> = [
   { value: "ninth", label: "Ninth" },
 ];
 
+const KEY_MODE_OPTIONS: Array<{ value: KeyModeType; label: string }> = [
+  { value: "ionian-major", label: "Ionian (Major)" },
+  { value: "dorian", label: "Dorian" },
+  { value: "phrygian", label: "Phrygian" },
+  { value: "lydian", label: "Lydian (Major)" },
+  { value: "mixolydian", label: "Mixolydian" },
+  { value: "aeolian-minor", label: "Aeolian (Minor)" },
+  { value: "locrian", label: "Locrian" },
+];
+
 export type FretboardUiOptions = {
   initialState: FretboardState;
   showControls?: boolean;
@@ -41,6 +54,7 @@ export type FretboardUi = {
   enter: () => void;
   exit: () => void;
   render: (nextState: FretboardState) => void;
+  pulseTargets: (targets: FretboardPlaybackTarget[], durationMs?: number) => void;
 };
 
 export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptions): FretboardUi {
@@ -51,10 +65,15 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const dotsLayer = rootEl.querySelector<HTMLElement>(".fretboard-dots");
   const openIndicatorsLayer = rootEl.querySelector<HTMLElement>(".fretboard-open-indicators");
   const playButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-play]");
+  const hideButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-hide]");
+  const hiddenSummaryButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-summary]");
+  const hideableSections = rootEl.querySelectorAll<HTMLElement>("[data-fretboard-hideable]");
   const controls = rootEl.querySelector<HTMLElement>(".fretboard-controls");
 
   let uiAbort: AbortController | null = null;
   let state: FretboardState = { ...options.initialState };
+  let controlsHidden = false;
+  const juiceTimeouts = new WeakMap<HTMLElement, number>();
 
   const showControls = options.showControls ?? true;
   controls?.toggleAttribute("hidden", !showControls);
@@ -65,7 +84,12 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
 
   const setCharacteristicOptions = (): void => {
     if (!characteristicSelect) return;
-    const entries = state.display === "scale" ? SCALE_OPTIONS : CHORD_OPTIONS;
+    const entries =
+      state.display === "scale"
+        ? SCALE_OPTIONS
+        : state.display === "chord"
+          ? CHORD_OPTIONS
+          : KEY_MODE_OPTIONS;
     const previous = String(state.characteristic);
 
     characteristicSelect.innerHTML = "";
@@ -80,6 +104,93 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     const fallback = entries[0]?.value ?? "major";
     state.characteristic = hasPrevious ? (previous as CharacteristicType) : fallback;
     characteristicSelect.value = state.characteristic;
+  };
+
+  const getCharacteristicLabel = (value: CharacteristicType): string => {
+    const entries =
+      state.display === "scale"
+        ? SCALE_OPTIONS
+        : state.display === "chord"
+          ? CHORD_OPTIONS
+          : KEY_MODE_OPTIONS;
+    return entries.find((entry) => entry.value === value)?.label ?? "Major";
+  };
+
+  const applyControlVisibility = (): void => {
+    hideableSections.forEach((section) => {
+      section.toggleAttribute("hidden", controlsHidden);
+    });
+    hiddenSummaryButton?.toggleAttribute("hidden", !controlsHidden);
+    hideButton?.classList.toggle("is-active", controlsHidden);
+    if (hideButton) {
+      hideButton.textContent = controlsHidden ? "Show" : "Hide";
+      hideButton.setAttribute("aria-pressed", String(controlsHidden));
+    }
+    rootEl.classList.toggle("fretboard-controls-hidden", controlsHidden);
+  };
+
+  const setSummaryText = (): void => {
+    if (!hiddenSummaryButton) return;
+    hiddenSummaryButton.textContent = `${state.root} ${getCharacteristicLabel(state.characteristic)}`;
+  };
+
+  const clearMarkerJuice = (marker: HTMLElement): void => {
+    const timeoutId = juiceTimeouts.get(marker);
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      juiceTimeouts.delete(marker);
+    }
+    marker.classList.remove("is-juicing", "is-juicing-root");
+  };
+
+  const triggerMarkerJuice = (marker: HTMLElement, isRoot: boolean, durationMs: number): void => {
+    clearMarkerJuice(marker);
+    void marker.getBoundingClientRect();
+    marker.classList.add("is-juicing");
+    if (isRoot) {
+      marker.classList.add("is-juicing-root");
+    }
+
+    const pulse = document.createElement("span");
+    pulse.className = "fretboard-dot-pulse";
+    if (isRoot) pulse.classList.add("is-root");
+    marker.appendChild(pulse);
+    pulse.addEventListener(
+      "animationend",
+      () => {
+        pulse.remove();
+      },
+      { once: true }
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      marker.classList.remove("is-juicing", "is-juicing-root");
+      juiceTimeouts.delete(marker);
+    }, Math.max(180, durationMs));
+    juiceTimeouts.set(marker, timeoutId);
+  };
+
+  const resolveTargetElements = (target: FretboardPlaybackTarget): HTMLElement[] => {
+    const selector = [
+      `.fretboard-dot[data-midi="${target.midi}"][data-string-index="${target.stringIndex}"]`,
+      `.fretboard-open-indicator[data-midi="${target.midi}"][data-string-index="${target.stringIndex}"]`,
+    ].join(", ");
+    const exactMatches = rootEl.querySelectorAll<HTMLElement>(selector);
+    if (exactMatches.length > 0) return Array.from(exactMatches);
+    const fallbackSelector = [
+      `.fretboard-dot[data-midi="${target.midi}"]`,
+      `.fretboard-open-indicator[data-midi="${target.midi}"]`,
+    ].join(", ");
+    return Array.from(rootEl.querySelectorAll<HTMLElement>(fallbackSelector));
+  };
+
+  const pulseTargets = (targets: FretboardPlaybackTarget[], durationMs = 420): void => {
+    targets.forEach((target) => {
+      const elements = resolveTargetElements(target);
+      elements.forEach((marker) => {
+        triggerMarkerJuice(marker, Boolean(target.isRoot), durationMs);
+      });
+    });
   };
 
   const renderControls = () => {
@@ -146,6 +257,8 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     setCharacteristicOptions();
     renderControls();
     renderDots();
+    setSummaryText();
+    applyControlVisibility();
   };
 
   const onMarkerPress = (target: EventTarget | null) => {
@@ -197,10 +310,13 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
       "change",
       () => {
         const nextRaw = characteristicSelect.value;
-        state.characteristic =
-          state.display === "chord"
-            ? (normalizeChordType(nextRaw) ?? "major")
-            : ((nextRaw as ScaleType) ?? "major");
+        if (state.display === "chord") {
+          state.characteristic = normalizeChordType(nextRaw) ?? "major";
+        } else if (state.display === "key") {
+          state.characteristic = normalizeKeyModeType(nextRaw) ?? "ionian-major";
+        } else {
+          state.characteristic = (nextRaw as ScaleType) ?? "major";
+        }
         render(state);
         emitState();
       },
@@ -223,6 +339,22 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     });
 
     playButton?.addEventListener("click", () => options.onPlayPress?.(), { signal });
+    hideButton?.addEventListener(
+      "click",
+      () => {
+        controlsHidden = !controlsHidden;
+        applyControlVisibility();
+      },
+      { signal }
+    );
+    hiddenSummaryButton?.addEventListener(
+      "click",
+      () => {
+        controlsHidden = false;
+        applyControlVisibility();
+      },
+      { signal }
+    );
     dotsLayer?.addEventListener("click", (event) => onMarkerPress(event.target), { signal });
     openIndicatorsLayer?.addEventListener("click", (event) => onMarkerPress(event.target), { signal });
 
@@ -232,7 +364,12 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const exit = () => {
     uiAbort?.abort();
     uiAbort = null;
+    const lingering = rootEl.querySelectorAll<HTMLElement>(
+      ".fretboard-dot.is-juicing, .fretboard-open-indicator.is-juicing"
+    );
+    lingering.forEach((marker) => clearMarkerJuice(marker));
+    rootEl.querySelectorAll(".fretboard-dot-pulse").forEach((pulse) => pulse.remove());
   };
 
-  return { enter, exit, render };
+  return { enter, exit, render, pulseTargets };
 }

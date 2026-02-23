@@ -158,7 +158,7 @@ export function createUiCompositeDebugMode(): ModeDefinition {
       suppressNextTapPlayback = false;
       lastTapPlaybackAt = 0;
       lastTapPlaybackSignature = "";
-      guitarPlayer.setInstrument("guitar-acoustic");
+      const initialInstrumentName = guitarPlayer.setInstrument("guitar-acoustic");
 
       const shell = document.createElement("div");
       shell.className = "ui-composite-debug-shell";
@@ -261,6 +261,7 @@ export function createUiCompositeDebugMode(): ModeDefinition {
         onInnerDoubleTap: () => {
           log("circle.onInnerDoubleTap");
           const instrumentName = guitarPlayer.cycleInstrument();
+          circleUi?.setInstrumentLabel(instrumentName);
           circleUi?.showInnerIndicator(instrumentName);
         },
         onNoteBarTap: (note) => {
@@ -290,6 +291,7 @@ export function createUiCompositeDebugMode(): ModeDefinition {
         onBackgroundRandomnessRequest: (randomness) =>
           log("circle.onBackgroundRandomnessRequest", randomness),
       });
+      circleUi.setInstrumentLabel(initialInstrumentName);
 
       await drumUi.enter();
       log("mode.onEnter");

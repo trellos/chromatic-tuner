@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { getChordTapPlaybackTargets, getKeyTapPlaybackTargets } from "../src/modes/fretboard-logic.js";
 
 async function assertElementFullyInViewport(
   page: import("@playwright/test").Page,
@@ -182,6 +183,34 @@ test("fretboard mode defaults to C major scale with note labels", async ({ page 
   expect(labels).not.toContain("C#");
 });
 
+test("fretboard chord tap keeps tapped E on D string as bass in C major inversion", async () => {
+  const targets = getChordTapPlaybackTargets({
+    chordRoot: "C",
+    characteristic: "major",
+    tappedMidi: 52,
+    tappedStringIndex: 2,
+  });
+  expect(targets).toEqual([
+    { midi: 52, stringIndex: 2, isRoot: true },
+    { midi: 55, stringIndex: 3 },
+    { midi: 60, stringIndex: 4 },
+  ]);
+});
+
+test("fretboard key tap on C high-e plays 3 on G and 5 on B", async () => {
+  const targets = getKeyTapPlaybackTargets({
+    keyRoot: "C",
+    keyMode: "ionian-major",
+    tappedMidi: 72,
+    tappedStringIndex: 5,
+  });
+  expect(targets).toEqual([
+    { midi: 64, stringIndex: 3 },
+    { midi: 67, stringIndex: 4 },
+    { midi: 72, stringIndex: 5, isRoot: true },
+  ]);
+});
+
 test("fretboard interaction updates characteristic options and degree labels", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "Fretboard" }).click();
@@ -214,6 +243,61 @@ test("fretboard interaction updates characteristic options and degree labels", a
   );
   expect(noteLabels).toContain("C");
   expect(noteLabels).toContain("F");
+  expect(noteLabels).not.toContain("C#");
+});
+
+test("fretboard hide button replaces selectors with a tappable summary field", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  const hideButton = page.locator("[data-fretboard-hide]");
+  const summary = page.locator("[data-fretboard-summary]");
+
+  await expect(summary).toBeHidden();
+  await page.locator('[data-fretboard-root="A"]').click();
+  await page.locator('[data-fretboard-display="chord"]').click();
+  await page.locator("#fretboard-characteristic").selectOption("major");
+
+  await hideButton.click();
+  await expect(summary).toBeVisible();
+  await expect(summary).toHaveText("A Major");
+  await expect(page.locator(".fretboard-note-selector")).toHaveAttribute("hidden", "");
+  await expect(page.locator(".fretboard-characteristic")).toHaveAttribute("hidden", "");
+
+  await summary.click();
+  await expect(summary).toBeHidden();
+  await expect(page.locator(".fretboard-note-selector")).not.toHaveAttribute("hidden", "");
+  await expect(page.locator(".fretboard-characteristic")).not.toHaveAttribute("hidden", "");
+});
+
+test("fretboard key mode shows seven modes with major/minor labels and diatonic notes", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+
+  await page.locator('[data-fretboard-display="key"]').click();
+  await expect(page.locator('[data-fretboard-display="key"]')).toHaveClass(/is-active/);
+
+  const characteristic = page.locator("#fretboard-characteristic");
+  await expect(characteristic).toHaveValue("ionian-major");
+  await expect(page.locator('#fretboard-characteristic option[value="ionian-major"]')).toHaveCount(1);
+  await expect(page.locator('#fretboard-characteristic option[value="aeolian-minor"]')).toHaveCount(1);
+  await expect(page.locator("#fretboard-characteristic option")).toHaveCount(7);
+
+  const optionLabels = await characteristic.locator("option").evaluateAll((options) =>
+    options.map((option) => option.textContent?.trim() ?? "")
+  );
+  expect(optionLabels).toContain("Ionian (Major)");
+  expect(optionLabels).toContain("Aeolian (Minor)");
+
+  await expect(page.locator(".fretboard-open-indicator")).toHaveCount(6);
+  await expect(page.locator(".fretboard-dot")).toHaveCount(42);
+  const noteLabels = await page.locator(".fretboard-dot").evaluateAll((nodes) =>
+    nodes.map((node) => node.textContent?.trim())
+  );
+  expect(noteLabels).toContain("C");
+  expect(noteLabels).toContain("E");
   expect(noteLabels).not.toContain("C#");
 });
 
@@ -350,6 +434,7 @@ test("fretboard UI stays fully visible across desktop and portrait aspect ratios
       ".fretboard-note-selector",
       '[data-fretboard-display="chord"]',
       '[data-fretboard-display="scale"]',
+      '[data-fretboard-display="key"]',
       "#fretboard-characteristic",
       '[data-fretboard-annotation="notes"]',
       '[data-fretboard-annotation="degrees"]',
@@ -422,6 +507,44 @@ test("fretboard chord taps play triads rooted on tapped string", async ({ page, 
       { timeout: 6000 }
     )
     .toBeGreaterThanOrEqual(beforeCount + 3);
+});
+
+test("fretboard key taps play diatonic triads including top-string voicings", async ({
+  page,
+  browserName,
+}, testInfo) => {
+  const isMobileSafariProject = testInfo.project.name === "Mobile Safari";
+  test.skip(
+    browserName === "webkit" || isMobileSafariProject,
+    "WebKit headless audio is not reliable for sample-playback assertions"
+  );
+
+  await installFretboardAudioCounters(page);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.locator('[data-fretboard-display="key"]').click();
+
+  const lowStringDot = page.locator('.fretboard-dot[data-string-index="0"]').first();
+  await expect(lowStringDot).toBeVisible();
+  const beforeLow = await page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0);
+  await lowStringDot.click();
+  await expect
+    .poll(
+      async () => page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0),
+      { timeout: 6000 }
+    )
+    .toBeGreaterThanOrEqual(beforeLow + 3);
+
+  const highStringDot = page.locator('.fretboard-dot[data-string-index="5"]').first();
+  await expect(highStringDot).toBeVisible();
+  const beforeHigh = await page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0);
+  await highStringDot.click();
+  await expect
+    .poll(
+      async () => page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0),
+      { timeout: 6000 }
+    )
+    .toBeGreaterThanOrEqual(beforeHigh + 3);
 });
 
 test("fretboard tap attempts audio playback on WebKit-family browsers", async ({

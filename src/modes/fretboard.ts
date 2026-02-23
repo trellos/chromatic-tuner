@@ -1,9 +1,11 @@
 import { createFretboardUi } from "../ui/fretboard.js";
 import type { ModeDefinition } from "./types.js";
 import {
-  getChordTapMidiTargets,
+  getChordTapPlaybackTargets,
+  getKeyTapPlaybackTargets,
   getIntervals,
   type CharacteristicType,
+  type FretboardPlaybackTarget,
   type FretboardState,
   type NoteName,
 } from "./fretboard-logic.js";
@@ -80,17 +82,28 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
         onPlayPress: () => {
           void playCurrentPattern();
         },
-        onFretPress: ({ midi, stringIndex }) => {
+        onFretPress: ({ midi, stringIndex, fret }) => {
           if (state.display === "chord") {
-            const chordMidis = getChordTapMidiTargets({
+            const chordTargets = getChordTapPlaybackTargets({
+              chordRoot: state.root,
               characteristic: state.characteristic,
               tappedMidi: midi,
               tappedStringIndex: stringIndex,
             });
-            void playMidiGroup(chordMidis, 520);
+            void playTargets(chordTargets, 520);
             return;
           }
-          void playMidiGroup([midi], 360);
+          if (state.display === "key") {
+            const keyTargets = getKeyTapPlaybackTargets({
+              keyRoot: state.root,
+              keyMode: state.characteristic,
+              tappedMidi: midi,
+              tappedStringIndex: stringIndex,
+            });
+            void playTargets(keyTargets, 560);
+            return;
+          }
+          void playTargets([{ midi, stringIndex, isRoot: fret === 0 }], 360);
         },
       })
     : null;
@@ -101,6 +114,7 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
   let guitarSampleLoadPromise: Promise<AudioBuffer | null> | null = null;
   let playEndTimer: number | null = null;
   let playRandomnessRaf: number | null = null;
+  const visualPulseTimers = new Set<number>();
   const activeSources = new Set<AudioScheduledSourceNode>();
 
   const getAudioContextCtor = ():
@@ -230,6 +244,23 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
     activeSources.clear();
   };
 
+  const clearVisualPulseTimers = (): void => {
+    visualPulseTimers.forEach((timerId) => window.clearTimeout(timerId));
+    visualPulseTimers.clear();
+  };
+
+  const scheduleVisualPulse = (
+    targets: FretboardPlaybackTarget[],
+    delayMs: number,
+    durationMs: number
+  ): void => {
+    const timerId = window.setTimeout(() => {
+      visualPulseTimers.delete(timerId);
+      ui?.pulseTargets(targets, durationMs);
+    }, Math.max(0, delayMs));
+    visualPulseTimers.add(timerId);
+  };
+
   const playFallbackToneAt = (
     ctx: AudioContext,
     midi: number,
@@ -287,17 +318,20 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
     playFallbackToneAt(ctx, midi, startTimeSec, durationMs);
   };
 
-  const playMidiGroup = async (midis: number[], durationMs: number): Promise<void> => {
+  const playTargets = async (targets: FretboardPlaybackTarget[], durationMs: number): Promise<void> => {
+    if (!targets.length) return;
     const ctx = await ensureAudioContext();
     if (!ctx) return;
     const sample = await ensureGuitarSample(ctx);
     const startTimeSec = ctx.currentTime + 0.01;
-    midis.forEach((midi) => playMidiAt(ctx, sample, midi, startTimeSec, durationMs));
+    targets.forEach((target) => playMidiAt(ctx, sample, target.midi, startTimeSec, durationMs));
+    ui?.pulseTargets(targets, durationMs);
   };
 
   const clearScheduledPlayback = (emitFinalZero: boolean): void => {
     clearPlayEndTimer();
     stopRandomnessRamp(emitFinalZero);
+    clearVisualPulseTimers();
     stopActiveSources();
     setPlayButtonState(false);
   };
@@ -320,19 +354,33 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
 
     let totalDurationMs = PLAY_CHORD_DURATION_MS;
     const startTimeSec = ctx.currentTime + 0.02;
-    if (state.display === "scale") {
+    if (state.display !== "chord") {
       const scaleMidis = intervals.map((interval) => rootMidi + interval);
       scaleMidis.push(rootMidi + 12);
       scaleMidis.forEach((midi, index) => {
         const at = startTimeSec + (index * PLAY_SCALE_STEP_MS) / 1000;
         playMidiAt(ctx, sample, midi, at, PLAY_SCALE_NOTE_DURATION_MS);
+        const semitone = ((midi % 12) + 12) % 12;
+        const isRoot = semitone === rootSemitone;
+        const pulseTarget: FretboardPlaybackTarget = {
+          midi,
+          stringIndex: 0,
+          isRoot,
+        };
+        scheduleVisualPulse([pulseTarget], index * PLAY_SCALE_STEP_MS, PLAY_SCALE_NOTE_DURATION_MS);
       });
       totalDurationMs =
         PLAY_SCALE_NOTE_DURATION_MS + PLAY_SCALE_STEP_MS * Math.max(0, scaleMidis.length - 1);
     } else {
-      intervals.forEach((interval) => {
-        playMidiAt(ctx, sample, rootMidi + interval, startTimeSec, PLAY_CHORD_DURATION_MS);
+      const chordTargets = intervals.map((interval, index): FretboardPlaybackTarget => ({
+        midi: rootMidi + interval,
+        stringIndex: index,
+        isRoot: interval === 0,
+      }));
+      chordTargets.forEach((target) => {
+        playMidiAt(ctx, sample, target.midi, startTimeSec, PLAY_CHORD_DURATION_MS);
       });
+      scheduleVisualPulse(chordTargets, 0, PLAY_CHORD_DURATION_MS);
       totalDurationMs = PLAY_CHORD_DURATION_MS;
     }
 

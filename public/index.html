@@ -189,7 +189,7 @@
             </div>
 
             <div class="fretboard-controls">
-              <div class="fretboard-note-selector" role="radiogroup" aria-label="Root note">
+              <div class="fretboard-note-selector" role="radiogroup" aria-label="Root note" data-fretboard-hideable>
                 <button type="button" data-fretboard-root="A">A</button>
                 <button type="button" data-fretboard-root="A#">A#</button>
                 <button type="button" data-fretboard-root="B">B</button>
@@ -204,20 +204,31 @@
                 <button type="button" data-fretboard-root="G#">G#</button>
               </div>
 
-              <div class="fretboard-segmented">
+              <div class="fretboard-segmented" data-fretboard-hideable>
                 <button type="button" data-fretboard-display="chord">Chord</button>
                 <button type="button" data-fretboard-display="scale">Scale</button>
+                <button type="button" data-fretboard-display="key">Key</button>
               </div>
 
-              <label class="fretboard-characteristic-label" for="fretboard-characteristic">Characteristic</label>
-              <select id="fretboard-characteristic" class="fretboard-characteristic"></select>
+              <label class="fretboard-characteristic-label" for="fretboard-characteristic" data-fretboard-hideable>Characteristic</label>
+              <select id="fretboard-characteristic" class="fretboard-characteristic" data-fretboard-hideable></select>
 
-              <div class="fretboard-segmented">
+              <div class="fretboard-segmented" data-fretboard-hideable>
                 <button type="button" data-fretboard-annotation="notes">Notes</button>
                 <button type="button" data-fretboard-annotation="degrees">Degrees</button>
               </div>
 
-              <button type="button" class="fretboard-play-action" data-fretboard-play>Play</button>
+              <div class="fretboard-actions">
+                <button type="button" class="fretboard-play-action" data-fretboard-play>Play</button>
+                <button type="button" class="fretboard-hide-action" data-fretboard-hide>Hide</button>
+              </div>
+              <button
+                type="button"
+                class="fretboard-hidden-summary"
+                data-fretboard-summary
+                hidden
+                aria-label="Show fretboard selectors"
+              ></button>
             </div>
           </div>
         </article>

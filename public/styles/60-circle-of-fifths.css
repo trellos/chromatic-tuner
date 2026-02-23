@@ -205,6 +205,23 @@
   text-anchor: middle;
 }
 
+.cof-instrument-label-layer {
+  pointer-events: none;
+}
+
+.cof-instrument-label {
+  dominant-baseline: middle;
+  fill: rgba(17, 35, 74, 0.82);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 1;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
 .cof-mode-banner-layer {
   pointer-events: none;
 }
@@ -699,6 +716,10 @@ body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
   .cof-degree-label {
     font-size: 14px;
   }
+
+  .cof-instrument-label {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 600px) and (orientation: portrait) {
@@ -749,6 +770,11 @@ body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
 
   .cof-degree-label {
     font-size: 11px;
+  }
+
+  .cof-instrument-label {
+    font-size: 12px;
+    letter-spacing: 0.06em;
   }
 
   .cof-secondary-label,
