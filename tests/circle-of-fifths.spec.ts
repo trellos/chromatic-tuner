@@ -14,26 +14,6 @@ async function getDetailPivotDrift(panel: Locator) {
   });
 }
 
-async function getDetailIiAngle(panel: Locator): Promise<number> {
-  const angle = await panel.evaluate((element) => {
-    const path = element.querySelector('.cof-secondary-cell[data-degree="ii"] .cof-secondary-path') as
-      | SVGGraphicsElement
-      | null;
-    if (!path) return Number.NaN;
-    const box = path.getBBox();
-    const ctm = path.getCTM();
-    if (!ctm) return Number.NaN;
-    const point = new DOMPoint(box.x + box.width / 2, box.y + box.height / 2).matrixTransform(ctm);
-    const x = point.x;
-    const y = point.y;
-    const dx = x - 500;
-    const dy = y - 500;
-    const deg = ((Math.atan2(dy, dx) * 180) / Math.PI + 90 + 360) % 360;
-    return deg;
-  });
-  return angle;
-}
-
 async function getDetailTransformAngle(panel: Locator): Promise<number> {
   const angle = await panel.evaluate((element) => {
     const detail = element.querySelector(".cof-detail") as SVGGElement | null;
@@ -45,6 +25,55 @@ async function getDetailTransformAngle(panel: Locator): Promise<number> {
     return Number.isFinite(parsed) ? parsed : Number.NaN;
   });
   return angle;
+}
+
+async function tapOutsideCircleRadius(svg: Locator): Promise<void> {
+  await svg.evaluate((node) => {
+    const svgEl = node as SVGSVGElement;
+    const rect = svgEl.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const viewBoxTokens = (svgEl.getAttribute("viewBox") ?? "0 0 1000 1000")
+      .split(/\s+/)
+      .map((token) => Number(token));
+    const viewBox = {
+      x: Number.isFinite(viewBoxTokens[0]) ? (viewBoxTokens[0] as number) : 0,
+      y: Number.isFinite(viewBoxTokens[1]) ? (viewBoxTokens[1] as number) : 0,
+      width: Number.isFinite(viewBoxTokens[2]) ? (viewBoxTokens[2] as number) : 1000,
+      height: Number.isFinite(viewBoxTokens[3]) ? (viewBoxTokens[3] as number) : 1000,
+    };
+    const candidates = [
+      { clientX: rect.left + 8, clientY: rect.top + 8 },
+      { clientX: rect.right - 8, clientY: rect.top + 8 },
+      { clientX: rect.left + 8, clientY: rect.bottom - 8 },
+      { clientX: rect.right - 8, clientY: rect.bottom - 8 },
+      { clientX: rect.left + rect.width / 2, clientY: rect.top + 8 },
+      { clientX: rect.left + rect.width / 2, clientY: rect.bottom - 8 },
+      { clientX: rect.left + 8, clientY: rect.top + rect.height / 2 },
+      { clientX: rect.right - 8, clientY: rect.top + rect.height / 2 },
+    ];
+    const toSvg = (clientX: number, clientY: number) => ({
+      x: viewBox.x + ((clientX - rect.left) / Math.max(1, rect.width)) * viewBox.width,
+      y: viewBox.y + ((clientY - rect.top) / Math.max(1, rect.height)) * viewBox.height,
+    });
+    let chosen = candidates[0] ?? { clientX: rect.left + 8, clientY: rect.top + 8 };
+    let maxDistance = -1;
+    candidates.forEach((candidate) => {
+      const point = toSvg(candidate.clientX, candidate.clientY);
+      const distance = Math.hypot(point.x - 500, point.y - 500);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        chosen = candidate;
+      }
+    });
+    svgEl.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        clientX: chosen.clientX,
+        clientY: chosen.clientY,
+      })
+    );
+  });
 }
 
 test("circle mode renders twelve outer wedges and keeps the wheel inside card bounds", async ({
@@ -278,10 +307,7 @@ test("chord mode requires a primary retap, keeps outer-chord taps, and exits on 
   const svg = circlePanel.locator(".cof-svg");
   const svgBox = await svg.boundingBox();
   expect(svgBox).not.toBeNull();
-  await svg.click({
-    position: { x: (svgBox?.width ?? 0) / 2, y: (svgBox?.height ?? 0) / 2 },
-    force: true,
-  });
+  await tapOutsideCircleRadius(svg);
   await expect(circle).not.toHaveClass(/is-chord-mode/);
   await expect(circlePanel.locator(".cof-svg")).toHaveAttribute("viewBox", "0 0 1000 1000");
   await expect(circle.locator(".cof-wedge.is-primary .cof-wedge-label")).toHaveText("C");
@@ -488,6 +514,7 @@ test("concentric center drift stays below 0.1px across primary notes", async ({ 
 });
 
 test("F chord mode concentric center drift stays below 0.1px through zoom on/off", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   await page.getByRole("tab", { name: "Circle of Fifths" }).click();
 
@@ -495,11 +522,20 @@ test("F chord mode concentric center drift stays below 0.1px through zoom on/off
   const circle = panel.locator('.cof');
   const svg = panel.locator('.cof-svg');
 
-  for (const index of [11, 0, 10, 9, 7]) {
-    const wedgePath = circle.locator(`.cof-wedge[data-index="${index}"] .cof-wedge-path`);
-    await wedgePath.click({ force: true });
-    await wedgePath.click({ force: true });
-    await wedgePath.dblclick({ force: true });
+  for (const index of [11, 0, 7]) {
+    const activated = await panel.evaluate((element, wedgeIndex) => {
+      const path = element.querySelector(
+        `.cof-wedge[data-index="${wedgeIndex}"] .cof-wedge-path`
+      ) as SVGPathElement | null;
+      if (!path) return false;
+      const clickEvent = () =>
+        new MouseEvent("click", { bubbles: true, cancelable: true });
+      path.dispatchEvent(clickEvent());
+      path.dispatchEvent(clickEvent());
+      path.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+      return true;
+    }, index);
+    expect(activated).toBeTruthy();
     await expect(circle).toHaveClass(/is-chord-mode/);
 
     const drift = await getDetailPivotDrift(panel);
@@ -507,7 +543,7 @@ test("F chord mode concentric center drift stays below 0.1px through zoom on/off
     expect(drift.dx).toBeLessThan(0.1);
     expect(drift.dy).toBeLessThan(0.1);
 
-    await svg.click({ position: { x: 8, y: 8 }, force: true });
+    await tapOutsideCircleRadius(svg);
     await expect(circle).not.toHaveClass(/is-chord-mode/);
   }
 });

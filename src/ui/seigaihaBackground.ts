@@ -195,11 +195,6 @@ type CachedPattern = {
   textureFailed: boolean;
 };
 
-export type SeigaihaRenderStats = {
-  renderCount: number;
-  lastRenderAtMs: number;
-};
-
 export type SeigaihaPerformanceStats = {
   avgFps: number;
   p95FrameTimeMs: number;
@@ -891,13 +886,6 @@ export function setSeigaihaRandomness(value: number): void {
 
 export function getSeigaihaRandomness(): number {
   return getEffectiveRandomness();
-}
-
-export function getSeigaihaRenderStats(): SeigaihaRenderStats {
-  return {
-    renderCount: seigaihaState.renderCount,
-    lastRenderAtMs: seigaihaState.lastRenderAtMs,
-  };
 }
 
 export function getSeigaihaRendererBackend(): SeigaihaRendererBackend {
