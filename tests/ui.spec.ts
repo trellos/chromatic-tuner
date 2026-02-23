@@ -4,6 +4,7 @@ const MODE_TABS = [
   { label: 'Chromatic Tuner', id: 'tuner' },
   { label: 'Metronome', id: 'metronome' },
   { label: 'Fretboard', id: 'fretboard' },
+  { label: 'Circle of Fifths', id: 'circle-of-fifths' },
   { label: 'Drum Machine', id: 'drum-machine' },
 ] as const;
 

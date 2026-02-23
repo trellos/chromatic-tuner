@@ -6,6 +6,7 @@ import {
 } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { createFretboardMode } from "./modes/fretboard.js";
+import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { runModeTransition } from "./mode-transition.js";
 import {
   getSeigaihaDetuneMapping,
@@ -58,6 +59,12 @@ const MODE_REGISTRY: ModeDefinition[] = [
     onDetuneMagnitudeChange: (absCents) => {
       setSeigaihaDetuneMagnitude(absCents);
     },
+    onRandomnessChange: (randomness) => {
+      setSeigaihaModeRandomness(randomness);
+    },
+    onPulse: () => {
+      pulseSeigaihaRandomness();
+    },
   }),
   createMetronomeMode({
     onRandomnessChange: (randomness) => {
@@ -68,6 +75,14 @@ const MODE_REGISTRY: ModeDefinition[] = [
   createFretboardMode({
     onRandomnessChange: (randomness) => {
       setSeigaihaModeRandomness(randomness);
+    },
+  }),
+  createCircleOfFifthsMode({
+    onRandomnessChange: (randomness) => {
+      setSeigaihaModeRandomness(randomness);
+    },
+    onPulse: () => {
+      pulseSeigaihaRandomness();
     },
   }),
   createDrumMachineMode({

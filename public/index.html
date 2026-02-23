@@ -28,6 +28,11 @@
             <div class="mode-title tuner-title">Chromatic Tuner</div>
           </div>
 
+          <div class="tuner-visual-toggle" role="group" aria-label="Tuner visual mode">
+            <button type="button" class="is-active" data-tuner-visual="strobe" aria-pressed="true">Strobe</button>
+            <button type="button" data-tuner-visual="circle" aria-pressed="false">Circle</button>
+          </div>
+
           <div id="tuna-field" class="tuna-field" aria-hidden="true"></div>
 
           <div class="tuner-stack">
@@ -38,6 +43,8 @@
                 <div id="cents"></div>
               </div>
             </div>
+
+            <div class="tuner-circle-host is-hidden" data-tuner-circle-host></div>
 
             <div id="status"></div>
           </div>
@@ -184,6 +191,20 @@
               <button type="button" class="fretboard-play-action" data-fretboard-play>Play</button>
             </div>
           </div>
+        </article>
+
+        <article
+          id="mode-screen-circle-of-fifths"
+          class="mode-screen"
+          data-mode="circle-of-fifths"
+          role="tabpanel"
+          aria-hidden="true"
+        >
+          <div class="mode-header">
+            <div class="mode-title">Circle of Fifths</div>
+          </div>
+
+          <div class="circle-mode-layout" data-circle-host></div>
         </article>
 
         <article
@@ -372,6 +393,7 @@
           <button class="mode-dot is-active" role="tab" aria-selected="true" aria-controls="mode-screen-tuner" data-mode="tuner" aria-label="Chromatic Tuner" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-metronome" data-mode="metronome" aria-label="Metronome" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-fretboard" data-mode="fretboard" aria-label="Fretboard" type="button"></button>
+          <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-circle-of-fifths" data-mode="circle-of-fifths" aria-label="Circle of Fifths" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-drum-machine" data-mode="drum-machine" aria-label="Drum Machine" type="button"></button>
         </div>
       </div>

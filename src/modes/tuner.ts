@@ -1,12 +1,19 @@
 ﻿import type { ModeDefinition } from "./types.js";
+import { createCircleGuitarPlayer } from "../audio/circle-guitar-player.js";
+import {
+  createCircleOfFifthsUi,
+  getCircleChordMidis,
+  type CircleOfFifthsUi,
+} from "../ui/circle-of-fifths.js";
 
 const statusEl = document.getElementById("status");
 const noteEl = document.getElementById("note");
 const centsEl = document.getElementById("cents");
 const strobeVisualizerEl = document.getElementById("strobe-visualizer");
 const tunaFieldEl = document.getElementById("tuna-field");
-
-
+const tunerVisualButtons =
+  document.querySelectorAll<HTMLButtonElement>("[data-tuner-visual]") ?? [];
+const tunerCircleHostEl = document.querySelector<HTMLElement>("[data-tuner-circle-host]");
 
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
@@ -16,9 +23,18 @@ const SHOW_STATUS = new URLSearchParams(window.location.search).has("debug");
 
 type TunerModeOptions = {
   onDetuneMagnitudeChange?: (absCents: number | null) => void;
+  onRandomnessChange?: (randomness: number | null) => void;
+  onPulse?: () => void;
 };
 
 let onDetuneMagnitudeChange: ((absCents: number | null) => void) | null = null;
+let onRandomnessChange: ((randomness: number | null) => void) | null = null;
+let onPulse: (() => void) | null = null;
+
+let tunerVisualMode: "strobe" | "circle" = "strobe";
+let tunerCircleUi: CircleOfFifthsUi | null = null;
+let tunerCircleRandomnessTimer: number | null = null;
+const tunerCircleAudio = createCircleGuitarPlayer();
 
 class AudioInteractionRequiredError extends Error {
   constructor(message = "Audio requires a user interaction to start.") {
@@ -419,8 +435,8 @@ function updateStrobeVisualizer(centsValue: number | null, isDetecting: boolean)
   if (!strobeVisualizerEl) return;
 
   // Update color based on detection state
-  const colorClass = isDetecting ? "detecting" : "idle";
-  strobeVisualizerEl.className = `strobe-tuner ${colorClass}`;
+  strobeVisualizerEl.classList.toggle("detecting", isDetecting);
+  strobeVisualizerEl.classList.toggle("idle", !isDetecting);
 
   // Update circle stroke colors based on detection state
   const svg = strobeVisualizerEl.querySelector("svg");
@@ -434,6 +450,51 @@ function updateStrobeVisualizer(centsValue: number | null, isDetecting: boolean)
 
   updateTunaField(centsValue, isDetecting);
   updateStrobeVisualizerRotation(centsValue, isDetecting);
+}
+
+function setTunerVisualMode(mode: "strobe" | "circle"): void {
+  tunerVisualMode = mode;
+  strobeVisualizerEl?.classList.toggle("is-hidden", mode !== "strobe");
+  tunerCircleHostEl?.classList.toggle("is-hidden", mode !== "circle");
+  tunerVisualButtons.forEach((button) => {
+    const isActive = button.dataset.tunerVisual === mode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function clearTunerCircleRandomness(): void {
+  if (tunerCircleRandomnessTimer !== null) {
+    window.clearTimeout(tunerCircleRandomnessTimer);
+    tunerCircleRandomnessTimer = null;
+  }
+  onRandomnessChange?.(0);
+}
+
+function pulseTunerCircleRandomness(durationMs: number): void {
+  if (tunerCircleRandomnessTimer !== null) {
+    window.clearTimeout(tunerCircleRandomnessTimer);
+  }
+  onPulse?.();
+  onRandomnessChange?.(0.7);
+  tunerCircleRandomnessTimer = window.setTimeout(() => {
+    tunerCircleRandomnessTimer = null;
+    onRandomnessChange?.(0);
+  }, durationMs);
+}
+
+function ensureTunerCircleUi(): void {
+  if (!tunerCircleHostEl || tunerCircleUi) return;
+  tunerCircleUi = createCircleOfFifthsUi(tunerCircleHostEl, {
+    onPrimaryTap: (selection) => {
+      pulseTunerCircleRandomness(440);
+      void tunerCircleAudio.playMidi(selection.primaryMidi, 420);
+    },
+    onSecondaryTap: (chord) => {
+      pulseTunerCircleRandomness(680);
+      void tunerCircleAudio.playChord(getCircleChordMidis(chord), 660);
+    },
+  });
 }
 
 setStatus("Idle");
@@ -737,6 +798,9 @@ async function startAudio() {
         candidateCount = 0;
         centsEma = null;
         onDetuneMagnitudeChange?.(null);
+        tunerCircleUi?.setPrimaryByMidi(null);
+        tunerCircleUi?.setTuningCents(null);
+        clearTunerCircleRandomness();
 
         updateStrobeVisualizer(null, false);
         setReading(null, null);
@@ -786,6 +850,8 @@ async function startAudio() {
 
       const note = midiToNoteName(lockedMidi);
       onDetuneMagnitudeChange?.(Math.abs(centsEma));
+      tunerCircleUi?.setPrimaryByMidi(lockedMidi);
+      tunerCircleUi?.setTuningCents(centsEma);
       updateStrobeVisualizer(centsEma, true);
       setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
       const debugParts: string[] = [];
@@ -829,6 +895,18 @@ async function enterTunerMode(): Promise<void> {
   tunerUiAbort = new AbortController();
   const { signal } = tunerUiAbort;
   setReading(null, null);
+  ensureTunerCircleUi();
+  setTunerVisualMode(tunerVisualMode);
+  tunerVisualButtons.forEach((button) => {
+    button.addEventListener(
+      "click",
+      () => {
+        const mode = button.dataset.tunerVisual === "circle" ? "circle" : "strobe";
+        setTunerVisualMode(mode);
+      },
+      { signal }
+    );
+  });
   if (SHOW_STATUS) {
     setStatus("Initializing audio...");
     document.body.classList.remove("status-hidden");
@@ -960,12 +1038,18 @@ function exitTunerMode(): void {
   cleanupAudio();
   setReading(null, null);
   updateStrobeVisualizer(null, false);
+  tunerCircleUi?.setPrimaryByMidi(null);
+  tunerCircleUi?.setTuningCents(null);
+  clearTunerCircleRandomness();
+  void tunerCircleAudio.destroy();
   onDetuneMagnitudeChange?.(null);
 }
 
 // Mode factory for the Chromatic Tuner screen and lifecycle hooks.
 export function createTunerMode(options: TunerModeOptions = {}): ModeDefinition {
   onDetuneMagnitudeChange = options.onDetuneMagnitudeChange ?? null;
+  onRandomnessChange = options.onRandomnessChange ?? null;
+  onPulse = options.onPulse ?? null;
   return {
     id: "tuner",
     title: "Chromatic Tuner",

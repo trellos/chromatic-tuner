@@ -91,3 +91,28 @@ When editing this system:
 - Random per-frame animation/flicker in the pattern.
 - Non-deterministic randomness that changes between renders.
 - Making color changes all-at-once across a whole wave when per-band independence is desired.
+
+## Circle of Fifths UI (shared between tuner and dedicated mode)
+
+Primary implementation:
+- `src/ui/circle-of-fifths.ts`
+
+Integration points:
+- `src/modes/tuner.ts` (Strobe/Circle toggle + pitch-driven primary updates)
+- `src/modes/circle-of-fifths.ts` (standalone mode wrapper)
+- `public/style.css` (`.cof-*` styles)
+
+### Circle invariants
+
+1. Outer ring is always rendered programmatically with 12 notes.
+2. Inner detail wedges stay hidden until a primary note is set.
+3. Primary note change rotates the inner detail layer; avoid per-frame random motion.
+4. In tuner integration, no detected note means no primary and no inner wedges.
+5. Tuner detune guidance maps signed cents into a bounded rotational offset centered at in-tune.
+6. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
+
+### Circle test expectations
+
+- Verify deterministic note/chord labels and visible-state toggles.
+- Cover at least one desktop and one mobile viewport in Playwright for layout visibility.
+- Prefer class/visibility/count assertions over pixel snapshots.
