@@ -17,6 +17,7 @@
 ## Fretboard mode notes
 - Entry point: `src/modes/fretboard.ts`.
 - Pure theory/render helpers: `src/modes/fretboard-logic.ts`.
+- Reusable UI object: `src/ui/fretboard.ts`.
 - UI markup and styles: `public/index.html` + `public/style.css`.
 - Default state is **C Major scale** in notes view.
 - Open-string membership is shown as small hollow indicators above strings.
@@ -70,4 +71,3 @@
 - Keep drift low by running `npm run lint:css:fix` on style edits.
 - Property order is enforced (`stylelint-order`) to keep diffs deterministic.
 - Styles are split into ordered files under `public/styles/` and imported via `public/style.css`; see `docs/CSS_MAINTENANCE.md`.
-

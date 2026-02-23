@@ -399,6 +399,31 @@ test("fretboard taps play guitar sample across browser engines", async ({ page, 
   expect(pageErrors).toEqual([]);
 });
 
+test("fretboard chord taps play triads rooted on tapped string", async ({ page, browserName }, testInfo) => {
+  const isMobileSafariProject = testInfo.project.name === "Mobile Safari";
+  test.skip(
+    browserName === "webkit" || isMobileSafariProject,
+    "WebKit headless audio is not reliable for sample-playback assertions"
+  );
+
+  await installFretboardAudioCounters(page);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.locator('[data-fretboard-display="chord"]').click();
+
+  const tappedLowE = page.locator('.fretboard-dot[data-string-index="0"]').first();
+  await expect(tappedLowE).toBeVisible();
+
+  const beforeCount = await page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0);
+  await tappedLowE.click();
+  await expect
+    .poll(
+      async () => page.evaluate(() => (window as any).__fretboardBufferSourceCount ?? 0),
+      { timeout: 6000 }
+    )
+    .toBeGreaterThanOrEqual(beforeCount + 3);
+});
+
 test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
   page,
   browserName,

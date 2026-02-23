@@ -101,6 +101,15 @@ const CHORD_INTERVALS: Record<ChordType, readonly number[]> = {
   ninth: [0, 2, 4, 7, 10],
 };
 
+const TRIAD_STRING_GROUP_BY_STRING_INDEX: ReadonlyArray<readonly [number, number, number]> = [
+  [0, 1, 2],
+  [1, 2, 3],
+  [2, 3, 4],
+  [3, 4, 5],
+  [3, 4, 5],
+  [3, 4, 5],
+];
+
 const DEGREE_BY_INTERVAL: Record<number, string> = {
   0: "1",
   1: "b2",
@@ -191,4 +200,57 @@ export function getFretboardDots(state: FretboardState): FretboardDot[] {
   }
 
   return dots;
+}
+
+function getTriadIntervals(chordType: ChordType): readonly [number, number, number] {
+  const intervals = [...new Set(CHORD_INTERVALS[chordType].map((interval) => normalizeSemitone(interval)))].sort(
+    (a, b) => a - b
+  );
+  const second = intervals.find((interval) => interval > 0) ?? 7;
+  const third = intervals.find((interval) => interval > second) ?? 12;
+  return [0, second, third];
+}
+
+function getMidiAtOrAbove(options: {
+  targetPitchClass: number;
+  minimumMidi: number;
+  stringIndex: number;
+}): number {
+  const openMidi = OPEN_STRING_MIDI[options.stringIndex] ?? OPEN_STRING_MIDI[0] ?? 40;
+  let candidate = openMidi;
+  if (candidate < options.minimumMidi) {
+    const semitoneDistance = options.minimumMidi - candidate;
+    candidate += semitoneDistance;
+  }
+
+  const pitchOffset = normalizeSemitone(options.targetPitchClass - normalizeSemitone(candidate));
+  return candidate + pitchOffset;
+}
+
+export function getChordTapMidiTargets(options: {
+  characteristic: CharacteristicType;
+  tappedMidi: number;
+  tappedStringIndex: number;
+}): number[] {
+  const chordType = isChordType(options.characteristic) ? options.characteristic : "major";
+  const triadIntervals = getTriadIntervals(chordType);
+  const rootPitchClass = normalizeSemitone(options.tappedMidi);
+  const stringGroup =
+    TRIAD_STRING_GROUP_BY_STRING_INDEX[options.tappedStringIndex] ??
+    TRIAD_STRING_GROUP_BY_STRING_INDEX[0] ??
+    ([0, 1, 2] as const);
+
+  const bassMidi = options.tappedMidi;
+  const secondMidi = getMidiAtOrAbove({
+    targetPitchClass: rootPitchClass + triadIntervals[1],
+    minimumMidi: bassMidi + 1,
+    stringIndex: stringGroup[1] ?? 1,
+  });
+  const thirdMidi = getMidiAtOrAbove({
+    targetPitchClass: rootPitchClass + triadIntervals[2],
+    minimumMidi: secondMidi + 1,
+    stringIndex: stringGroup[2] ?? 2,
+  });
+
+  return [bassMidi, secondMidi, thirdMidi];
 }
