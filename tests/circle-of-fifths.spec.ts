@@ -124,3 +124,24 @@ test("mobile Safari can switch tuner visual mode between strobe and circle", asy
   await expect(strobe).toBeVisible();
   await expect(host).toBeHidden();
 });
+
+
+test("chord mode shows major suffixes, plays outer taps without changing primary, and exits on double tap", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  await page.getByRole("button", { name: "Primary note C", exact: true }).click();
+  await expect(page.locator(".cof")).toHaveClass(/is-chord-mode/);
+
+  const outerLabels = page.locator(".cof-wedge-label");
+  await expect(outerLabels.first()).toContainText("Cmaj");
+  await expect(outerLabels.nth(1)).toContainText("Gmaj");
+
+  await page.getByRole("button", { name: "Primary note G", exact: true }).click();
+  await expect(page.locator(".cof-wedge.is-primary .cof-wedge-label")).toContainText("Cmaj");
+
+  await page.getByRole("button", { name: "Primary note G", exact: true }).dblclick();
+  await expect(page.locator(".cof")).not.toHaveClass(/is-chord-mode/);
+  await expect(page.locator(".cof-wedge.is-primary .cof-wedge-label")).toHaveText("G");
+  await expect(outerLabels.first()).toHaveText("C");
+});

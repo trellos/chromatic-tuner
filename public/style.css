@@ -1870,6 +1870,16 @@ body.drum-fullscreen .drum-ui {
   fill: #ffffff;
 }
 
+.cof-wedge-label-root {
+  dominant-baseline: middle;
+}
+
+.cof-wedge-label-suffix {
+  font-size: 0.52em;
+  font-weight: 700;
+  dominant-baseline: hanging;
+}
+
 .cof-detail {
   transform-origin: 50% 50%;
   transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 160ms ease;
