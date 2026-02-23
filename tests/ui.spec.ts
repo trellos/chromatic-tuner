@@ -89,6 +89,42 @@ test("seigaiha background: single static traditional layer", async ({ page }) =>
   }
 });
 
+test("ui composite debug mode is hidden without debug query", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("tab", { name: "UI Composite Debug" })).toHaveCount(0);
+});
+
+test("ui composite debug mode appears with debug query and fits without scrollbars", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
+  await expect(panel).toHaveClass(/is-active/);
+  await expect(panel.locator(".drum-mock")).toBeVisible();
+  await expect(panel.locator(".cof")).toBeVisible();
+  await expect(panel.locator(".drum-ui #drum-share-button")).toHaveCount(0);
+  await expect(panel.locator("[data-debug-drum-share]")).toHaveCount(0);
+  const fits = await panel.evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
+  expect(fits).toBeTruthy();
+});
+
+test("ui composite debug circle supports chord mode zoom and outside-tap exit", async ({ page }) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
+  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
+  const circle = panel.locator(".cof");
+  const cWedge = circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
+  await cWedge.click({ force: true });
+  await cWedge.click({ force: true });
+  await expect(circle).toHaveClass(/is-chord-mode/);
+  await cWedge.dblclick({ force: true });
+  await expect(circle).toHaveClass(/is-chord-mode/);
+  await panel.locator(".cof-svg").click({ position: { x: 4, y: 4 }, force: true });
+  await expect(circle).not.toHaveClass(/is-chord-mode/);
+});
+
 test("seigaiha debug override starts disabled and shows editable detune mapping", async ({
   page,
 }) => {

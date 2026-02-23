@@ -141,21 +141,17 @@ export function createCircleOfFifthsMode(
   };
 
   const playChord = async (chord: CircleChordSpec): Promise<void> => {
-    options.onPulse?.();
-    triggerPlaybackRandomness(650);
     const chordMidis = getCircleChordMidis(chord);
     circleUi?.pulseChord(chordMidis, 640);
     await guitarPlayer.playChord(chordMidis, 640);
   };
 
   const playPrimary = async (midi: number): Promise<void> => {
-    options.onPulse?.();
     circleUi?.pulseNote(midi, 400);
     await guitarPlayer.playMidi(midi, 400);
   };
 
   const playMajorChord = async (midi: number): Promise<void> => {
-    options.onPulse?.();
     const chordMidis = getCircleMajorChordMidis(midi);
     circleUi?.pulseChord(chordMidis, 640);
     await guitarPlayer.playChord(chordMidis, 640);
@@ -177,6 +173,17 @@ export function createCircleOfFifthsMode(
       circleUi?.destroy();
       guitarPlayer.setInstrument("guitar-acoustic");
       circleUi = createCircleOfFifthsUi(mountEl, {
+        // UI -> mode callback usage:
+        // - interaction callbacks map to playback/state transitions.
+        // - background callbacks are the only path for mode-owned Seigaiha updates.
+        // - UI DOM state changes are performed through returned Circle UI methods.
+        onBackgroundPulseRequest: () => {
+          options.onPulse?.();
+        },
+        onBackgroundRandomnessRequest: (randomness) => {
+          const clamped = Math.min(1, Math.max(0, randomness));
+          triggerPlaybackRandomness(clamped >= 0.75 ? 650 : 420);
+        },
         onPrimaryTap: (selection) => {
           // Tap flow:
           // - first tap on a primary: select + single-note playback
@@ -206,6 +213,7 @@ export function createCircleOfFifthsMode(
         },
         onBackgroundTap: () => {
           if (!chordModeActive) return;
+          circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
           setChordMode(false);
         },
@@ -226,27 +234,38 @@ export function createCircleOfFifthsMode(
           suppressNextTapPlayback = false;
           void playPrimary(note.midi);
         },
+        onNoteBarPressStart: (note) => {
+          suppressNextTapPlayback = true;
+          circleUi?.holdNote(note.midi);
+          void guitarPlayer.startSustainMidi(note.midi);
+        },
+        onNoteBarPressEnd: () => {
+          circleUi?.releaseHeldNotes();
+          guitarPlayer.stopSustain();
+        },
         onOuterPressStart: (note) => {
           suppressNextTapPlayback = true;
           if (chordModeActive) {
             const chordMidis = getCircleMajorChordMidis(note.midi);
-            circleUi?.pulseChord(chordMidis, 520);
+            circleUi?.holdChord(chordMidis);
             void guitarPlayer.startSustainChord(chordMidis);
             return;
           }
-          circleUi?.pulseNote(note.midi, 420);
+          circleUi?.holdNote(note.midi);
           void guitarPlayer.startSustainMidi(note.midi);
         },
         onOuterPressEnd: () => {
+          circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
         },
         onSecondaryPressStart: (chord) => {
           suppressNextTapPlayback = true;
           const chordMidis = getCircleChordMidis(chord);
-          circleUi?.pulseChord(chordMidis, 520);
+          circleUi?.holdChord(chordMidis);
           void guitarPlayer.startSustainChord(chordMidis);
         },
         onSecondaryPressEnd: () => {
+          circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
         },
       });
@@ -257,6 +276,7 @@ export function createCircleOfFifthsMode(
       chordModeActive = false;
       lastPrimaryLabel = null;
       options.onRandomnessChange?.(null);
+      circleUi?.releaseHeldNotes();
       guitarPlayer.stopSustain();
       guitarPlayer.stopAll();
       circleUi?.destroy();

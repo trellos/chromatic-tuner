@@ -8,6 +8,7 @@ import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretboard.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { createWildTunaMode } from "./modes/wild-tuna.js";
+import { createUiCompositeDebugMode } from "./modes/ui-composite-debug.js";
 import { runModeTransition } from "./mode-transition.js";
 import { createCircleOfFifthsUi } from "./ui/circle-of-fifths.js";
 import { createDrumMachineUi } from "./ui/drum-machine.js";
@@ -38,6 +39,37 @@ declare global {
 }
 
 const carouselShowEl = document.getElementById("carousel-show");
+const isDebugEnabled = new URLSearchParams(window.location.search).has("debug");
+
+function ensureDebugCompositeModeDom(): void {
+  if (!isDebugEnabled) return;
+  const stage = document.querySelector<HTMLElement>(".mode-stage");
+  const dots = document.querySelector<HTMLElement>(".mode-dots");
+  if (!stage || !dots) return;
+  if (!stage.querySelector('.mode-screen[data-mode="ui-composite-debug"]')) {
+    const screen = document.createElement("article");
+    screen.id = "mode-screen-ui-composite-debug";
+    screen.className = "mode-screen";
+    screen.dataset.mode = "ui-composite-debug";
+    screen.setAttribute("role", "tabpanel");
+    screen.setAttribute("aria-hidden", "true");
+    stage.appendChild(screen);
+  }
+  if (!dots.querySelector('.mode-dot[data-mode="ui-composite-debug"]')) {
+    const dot = document.createElement("button");
+    dot.className = "mode-dot";
+    dot.setAttribute("role", "tab");
+    dot.setAttribute("aria-selected", "false");
+    dot.setAttribute("aria-controls", "mode-screen-ui-composite-debug");
+    dot.setAttribute("data-mode", "ui-composite-debug");
+    dot.setAttribute("aria-label", "UI Composite Debug");
+    dot.type = "button";
+    dots.appendChild(dot);
+  }
+}
+
+ensureDebugCompositeModeDom();
+
 const modeDots =
   document.querySelectorAll<HTMLButtonElement>(".mode-dot[data-mode]") ?? [];
 const modeStageEl = document.querySelector<HTMLElement>(".mode-stage");
@@ -112,6 +144,7 @@ const MODE_REGISTRY: ModeDefinition[] = [
       setSeigaihaModeRandomness(randomness);
     },
   }),
+  ...(isDebugEnabled ? [createUiCompositeDebugMode()] : []),
 ];
 
 let activeModeId: ModeId = "tuner";

@@ -112,6 +112,13 @@ test("note-bar flat labels keep lowercase b", async ({ page }) => {
   await expect(noteBarLabels.nth(4)).toHaveText("Db");
   await expect(noteBarLabels.nth(6)).toHaveText("Eb");
   await expect(noteBarLabels.nth(11)).toHaveText("Ab");
+  await expect(noteBarLabels.nth(4)).toHaveCSS("text-transform", "none");
+  const flatTexts = await noteBarLabels.evaluateAll((nodes) =>
+    nodes
+      .map((node) => node.textContent ?? "")
+      .filter((text) => text.includes("b"))
+  );
+  expect(flatTexts).toEqual(["Bb", "Db", "Eb", "Ab"]);
 });
 
 test("selecting F shows inner corner roman numerals and center chord labels", async ({ page }) => {
@@ -200,8 +207,10 @@ test("clicking a note-bar cell triggers note activity on that cell", async ({ pa
   await page.getByRole("tab", { name: "Circle of Fifths" }).click();
   const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
   const cCell = noteBar.locator('.cof-note-cell[data-semitone="0"]');
-  await cCell.dispatchEvent("click");
+  await cCell.dispatchEvent("pointerdown", { pointerId: 77, bubbles: true });
   await expect(cCell).toHaveClass(/is-active/);
+  await cCell.dispatchEvent("pointerup", { pointerId: 77, bubbles: true });
+  await expect(cCell).not.toHaveClass(/is-active/);
 });
 
 test("selecting a primary note adds roman numerals to note-bar diatonic notes", async ({ page }) => {
@@ -439,10 +448,83 @@ test("outer wedge press pulses note-bar notes for sustained playback", async ({ 
   const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const wedge = panel.locator('.cof-wedge[data-index="0"]');
   const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
+  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
+  const trail = cRow.locator(".cof-note-trail");
 
   await wedge.dispatchEvent("pointerdown", { pointerId: 33, bubbles: true });
   await expect(cCell).toHaveClass(/is-active/);
+  await expect(trail).toHaveClass(/is-stretching/);
+  await page.waitForTimeout(700);
+  await expect(cCell).toHaveClass(/is-active/);
+  await expect(trail).toHaveClass(/is-stretching/);
   await wedge.dispatchEvent("pointerup", { pointerId: 33, bubbles: true });
+  await expect(cCell).not.toHaveClass(/is-active/);
+  await expect(trail).toHaveClass(/is-floating/);
+});
+
+test("note-bar cell floats left for 2s after release while degree column stays stable", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const wedge = panel.locator('.cof-wedge[data-index="0"]');
+  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
+  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
+  const cTrail = cRow.locator(".cof-note-trail");
+  const cDegree = panel
+    .locator('.cof-note-cell[data-semitone="0"]')
+    .locator("xpath=preceding-sibling::*[contains(@class,'cof-note-row-degree')]");
+
+  await wedge.dispatchEvent("pointerdown", { pointerId: 47, bubbles: true });
+  await expect(cTrail).toHaveClass(/is-stretching/);
+  await expect(cDegree).not.toHaveClass(/is-floating/);
+  await wedge.dispatchEvent("pointerup", { pointerId: 47, bubbles: true });
+  await expect(cTrail).toHaveClass(/is-floating/);
+  await page.waitForTimeout(2100);
+  await expect(cTrail).toHaveCount(0);
+});
+
+test("note-bar trail stretches left while keeping right edge pinned, then detaches on release", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const wedge = panel.locator('.cof-wedge[data-index="0"]');
+  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
+  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
+  const cTrail = cRow.locator(".cof-note-trail");
+
+  await wedge.dispatchEvent("pointerdown", { pointerId: 61, bubbles: true });
+  await expect(cTrail).toHaveClass(/is-stretching/);
+  const before = await cTrail.boundingBox();
+  await page.waitForTimeout(300);
+  const during = await cTrail.boundingBox();
+  expect(before).not.toBeNull();
+  expect(during).not.toBeNull();
+  expect(
+    Math.abs((during?.x ?? 0) + (during?.width ?? 0) - ((before?.x ?? 0) + (before?.width ?? 0))) <= 2
+  ).toBeTruthy();
+
+  await wedge.dispatchEvent("pointerup", { pointerId: 61, bubbles: true });
+  await expect(cTrail).toHaveClass(/is-floating/);
+  await page.waitForTimeout(300);
+  await expect(cTrail).toHaveClass(/is-floating/);
+});
+
+test("retriggering a note keeps older trails floating while new trail grows", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
+  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
+
+  await cCell.click({ force: true });
+  await page.waitForTimeout(120);
+  await cCell.click({ force: true });
+
+  await expect
+    .poll(async () => cRow.locator(".cof-note-trail").count(), { timeout: 1500 })
+    .toBeGreaterThan(1);
 });
 
 test("double-tapping inside the circle cycles instruments and shows the instrument name indicator", async ({
@@ -502,22 +584,18 @@ test("note-bar supports keyboard activation with Enter and Space", async ({ page
 
   const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
   const dbCell = noteBar.locator('.cof-note-cell[data-semitone="1"]');
+  const dbRow = dbCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
+  const dbTrail = dbRow.locator(".cof-note-trail");
 
-  await dbCell.evaluate((element) => {
-    const target = element as HTMLElement;
-    target.focus();
-    target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-  });
-  await expect(dbCell).toHaveClass(/is-active/);
+  await dbCell.focus();
+  await dbCell.press("Enter");
+  await expect.poll(async () => dbTrail.count(), { timeout: 1200 }).toBeGreaterThan(0);
   await page.waitForTimeout(560);
   await expect(dbCell).not.toHaveClass(/is-active/);
 
-  await dbCell.evaluate((element) => {
-    const target = element as HTMLElement;
-    target.focus();
-    target.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-  });
-  await expect(dbCell).toHaveClass(/is-active/);
+  await dbCell.focus();
+  await dbCell.press(" ");
+  await expect.poll(async () => dbTrail.count(), { timeout: 1200 }).toBeGreaterThan(0);
 });
 
 

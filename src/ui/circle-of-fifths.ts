@@ -14,6 +14,13 @@ export type CircleSelection = {
 };
 
 export type CircleOfFifthsUiOptions = {
+  // Callback contract:
+  // - Tap/double-tap/press callbacks fire from direct user interaction on wedges/note-bar/background.
+  // - `onBackgroundPulseRequest` and `onBackgroundRandomnessRequest` are UI-originated signals intended
+  //   for mode-owned background effects (for example Seigaiha pulse/randomness), not for in-UI rendering.
+  // Usage limits:
+  // - Callbacks should not directly mutate Circle UI DOM internals; use returned UI methods instead.
+  // - Callbacks should be quick and non-blocking (no long sync work), because they run on interaction paths.
   onPrimaryTap?: (selection: CircleSelection) => void;
   onSecondaryTap?: (chord: CircleChordSpec) => void;
   onOuterTap?: (note: CircleNoteTap) => void;
@@ -24,7 +31,11 @@ export type CircleOfFifthsUiOptions = {
   onSecondaryPressEnd?: (chord: CircleChordSpec) => void;
   onInnerDoubleTap?: () => void;
   onNoteBarTap?: (note: { label: string; midi: number }) => void;
+  onNoteBarPressStart?: (note: { label: string; midi: number }) => void;
+  onNoteBarPressEnd?: (note: { label: string; midi: number }) => void;
   onBackgroundTap?: () => void;
+  onBackgroundPulseRequest?: () => void;
+  onBackgroundRandomnessRequest?: (randomness: number) => void;
 };
 
 export type CircleChordModeOptions = {
@@ -40,6 +51,9 @@ export type CircleOfFifthsUi = {
   showInnerIndicator: (text: string) => void;
   pulseNote: (midi: number, durationMs?: number) => void;
   pulseChord: (midis: number[], durationMs?: number) => void;
+  holdNote: (midi: number) => void;
+  holdChord: (midis: number[]) => void;
+  releaseHeldNotes: () => void;
   destroy: () => void;
 };
 
@@ -80,6 +94,9 @@ const SECONDARY_DEGREE_KEYS = ["ii", "iii", "vi"] as const;
 const DIM_DEGREE_KEY = "vii";
 const WEDGE_PULSE_DURATION_MS = 640;
 const OUTER_CLICK_DELAY_MS = 360;
+const TRAIL_FLOAT_DISTANCE_PX = 560;
+const TRAIL_FLOAT_DURATION_MS = 2000;
+const TRAIL_PIXELS_PER_MS = TRAIL_FLOAT_DISTANCE_PX / TRAIL_FLOAT_DURATION_MS;
 const MODE_BANNER_LINE_OFFSETS = [-2, -1, 0, 1, 2] as const;
 const MODE_BANNER_LINE_GAP = 72;
 let circleModeBannerSeq = 0;
@@ -441,7 +458,7 @@ export function createCircleOfFifthsUi(
   modeBannerGroup.setAttribute("clip-path", `url(#${clipId})`);
   const modeBannerTexts = MODE_BANNER_LINE_OFFSETS.map((rowOffset, rowIndex) => {
     const text = createSvgEl("text", "cof-mode-banner");
-    text.setAttribute("x", String(-VIEWBOX_SIZE + (rowIndex % 2 === 0 ? 0 : 120)));
+    text.setAttribute("x", String(VIEWBOX_SIZE + (rowIndex % 2 === 0 ? 0 : 120)));
     text.setAttribute("y", String(CENTER + rowOffset * MODE_BANNER_LINE_GAP));
     modeBannerGroup.appendChild(text);
     return text;
@@ -460,8 +477,12 @@ export function createCircleOfFifthsUi(
 
   const noteBar = document.createElement("div");
   noteBar.className = "cof-note-bar";
-  const noteCells = new Map<number, { cell: HTMLDivElement; degree: HTMLSpanElement }>();
+  const noteCells = new Map<number, { row: HTMLDivElement; cell: HTMLDivElement; degree: HTMLSpanElement }>();
   const notePulseTimeouts = new Map<number, number>();
+  const noteTrailCleanupTimeouts = new Set<number>();
+  const heldNoteSemitones = new Set<number>();
+  const activeNoteTrails = new Map<number, HTMLSpanElement>();
+  const noteTrailNodes = new Set<HTMLSpanElement>();
   NOTE_BAR_ORDER_SEMITONES.forEach((semitone, idx) => {
     const row = document.createElement("div");
     row.className = "cof-note-row";
@@ -480,11 +501,43 @@ export function createCircleOfFifthsUi(
     cell.appendChild(label);
     const midi = midiFromSemitoneNearC4(semitone);
     const noteLabel = NOTE_BAR_LABELS[idx] ?? "?";
+    const notePayload = { label: noteLabel, midi };
     const activate = (): void => {
       pulseNoteCells([semitone], semitone, 520);
-      options.onNoteBarTap?.({ label: noteLabel, midi });
+      options.onBackgroundPulseRequest?.();
+      options.onBackgroundRandomnessRequest?.(0.75);
+      options.onNoteBarTap?.(notePayload);
     };
-    cell.addEventListener("click", activate);
+    let activePointerId: number | null = null;
+    let suppressNextClick = false;
+    const startPress = (event: PointerEvent): void => {
+      if (activePointerId !== null) return;
+      activePointerId = event.pointerId;
+      pulseNoteCells([semitone], semitone, 520);
+      options.onBackgroundPulseRequest?.();
+      options.onBackgroundRandomnessRequest?.(0.75);
+      options.onNoteBarPressStart?.(notePayload);
+    };
+    const endPress = (event: PointerEvent): void => {
+      if (activePointerId === null) return;
+      if (event.pointerId !== activePointerId) return;
+      activePointerId = null;
+      suppressNextClick = true;
+      options.onNoteBarPressEnd?.(notePayload);
+    };
+    cell.addEventListener("pointerdown", startPress);
+    cell.addEventListener("pointerup", endPress);
+    cell.addEventListener("pointercancel", endPress);
+    cell.addEventListener("pointerleave", endPress);
+    cell.addEventListener("click", (event) => {
+      if (!suppressNextClick) {
+        activate();
+        return;
+      }
+      suppressNextClick = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    });
     cell.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
@@ -492,7 +545,7 @@ export function createCircleOfFifthsUi(
     });
     row.appendChild(cell);
     noteBar.appendChild(row);
-    noteCells.set(semitone, { cell, degree: rowDegree });
+    noteCells.set(semitone, { row, cell, degree: rowDegree });
   });
   const frame = document.createElement("div");
   frame.className = "cof-frame";
@@ -590,26 +643,109 @@ export function createCircleOfFifthsUi(
     pulseTimeouts.add(timeoutId);
   };
 
+  const clearNoteTimers = (semitone: number): void => {
+    const pulseTimeout = notePulseTimeouts.get(semitone);
+    if (pulseTimeout !== undefined) {
+      window.clearTimeout(pulseTimeout);
+      notePulseTimeouts.delete(semitone);
+    }
+  };
+
+  const removeTrailNode = (trail: HTMLSpanElement): void => {
+    trail.remove();
+    noteTrailNodes.delete(trail);
+    activeNoteTrails.forEach((activeTrail, semitone) => {
+      if (activeTrail === trail) {
+        activeNoteTrails.delete(semitone);
+      }
+    });
+  };
+
+  const floatTrailNode = (trail: HTMLSpanElement): void => {
+    const frozenWidth = trail.getBoundingClientRect().width;
+    if (Number.isFinite(frozenWidth) && frozenWidth > 0) {
+      trail.style.width = `${frozenWidth.toFixed(2)}px`;
+    }
+    trail.style.transform = "translateX(0) scaleX(1)";
+    trail.classList.remove("is-stretching");
+    void trail.getBoundingClientRect();
+    trail.classList.add("is-floating");
+    const floatTimeout = window.setTimeout(() => {
+      removeTrailNode(trail);
+      noteTrailCleanupTimeouts.delete(floatTimeout);
+    }, 2000);
+    noteTrailCleanupTimeouts.add(floatTimeout);
+  };
+
+  const startTrail = (semitone: number, durationMs: number, held: boolean): void => {
+    const entry = noteCells.get(semitone);
+    if (!entry) return;
+    const previousTrail = activeNoteTrails.get(semitone);
+    if (previousTrail) {
+      floatTrailNode(previousTrail);
+    }
+    const trail = document.createElement("span");
+    trail.className = "cof-note-trail";
+    const rowRect = entry.row.getBoundingClientRect();
+    const cellRect = entry.cell.getBoundingClientRect();
+    const cellWidthPx = Math.max(1, cellRect.width);
+    const growthPx = held ? 1180 : 640;
+    const deltaPx = Math.max(0, growthPx - cellWidthPx);
+    const stretchMs = Math.max(180, deltaPx / TRAIL_PIXELS_PER_MS);
+    const initialWidthPx = Math.max(8, Math.min(cellWidthPx * 0.42, 36));
+    const initialScale = Math.max(0.01, Math.min(1, initialWidthPx / growthPx));
+    trail.style.setProperty("--cof-note-trail-stretch-ms", `${stretchMs.toFixed(0)}ms`);
+    trail.style.setProperty("--cof-note-trail-growth", `${growthPx.toFixed(0)}px`);
+    trail.style.setProperty("--cof-note-trail-initial-scale", `${initialScale.toFixed(4)}`);
+    trail.style.width = `${growthPx.toFixed(2)}px`;
+    trail.style.height = `${Math.max(1, cellRect.height).toFixed(2)}px`;
+    trail.style.top = `${entry.cell.offsetTop}px`;
+    trail.style.right = `${Math.max(0, rowRect.width - entry.cell.offsetLeft).toFixed(2)}px`;
+    trail.style.borderRadius = getComputedStyle(entry.cell).borderRadius;
+    entry.row.appendChild(trail);
+    void trail.getBoundingClientRect();
+    trail.classList.add("is-stretching");
+    activeNoteTrails.set(semitone, trail);
+    noteTrailNodes.add(trail);
+  };
+
+  const floatTrail = (semitone: number): void => {
+    const trail = activeNoteTrails.get(semitone);
+    if (!trail) return;
+    activeNoteTrails.delete(semitone);
+    floatTrailNode(trail);
+  };
+
+  const startNoteVisual = (semitone: number, rootSemitone: number | null, durationMs: number): void => {
+    const entry = noteCells.get(semitone);
+    if (!entry) return;
+    const { cell } = entry;
+    clearNoteTimers(semitone);
+    cell.classList.remove("is-active", "is-root");
+    void cell.getBoundingClientRect();
+    cell.classList.add("is-active");
+    if (rootSemitone !== null && semitone === wrapSemitone(rootSemitone)) {
+      cell.classList.add("is-root");
+    }
+    startTrail(semitone, durationMs, heldNoteSemitones.has(semitone));
+  };
+
+  const finishNoteVisual = (semitone: number): void => {
+    const entry = noteCells.get(semitone);
+    if (!entry) return;
+    const { cell } = entry;
+    clearNoteTimers(semitone);
+    cell.classList.remove("is-active", "is-root");
+    floatTrail(semitone);
+  };
+
   const pulseNoteCells = (semitones: number[], rootSemitone: number | null, durationMs: number): void => {
     const normalized = Array.from(new Set(semitones.map((value) => wrapSemitone(value))));
     normalized.forEach((semitone) => {
-      const entry = noteCells.get(semitone);
-      if (!entry) return;
-      const { cell } = entry;
-      const existingTimeout = notePulseTimeouts.get(semitone);
-      if (existingTimeout !== undefined) {
-        window.clearTimeout(existingTimeout);
-      }
-      cell.classList.remove("is-active", "is-root");
-      cell.style.setProperty("--cof-note-pulse-ms", `${Math.max(120, durationMs)}ms`);
-      void cell.getBoundingClientRect();
-      cell.classList.add("is-active");
-      if (rootSemitone !== null && semitone === wrapSemitone(rootSemitone)) {
-        cell.classList.add("is-root");
-      }
+      startNoteVisual(semitone, rootSemitone, durationMs);
+      if (heldNoteSemitones.has(semitone)) return;
       const timeoutId = window.setTimeout(() => {
-        cell.classList.remove("is-active", "is-root");
-        notePulseTimeouts.delete(semitone);
+        finishNoteVisual(semitone);
       }, Math.max(140, durationMs));
       notePulseTimeouts.set(semitone, timeoutId);
     });
@@ -742,6 +878,8 @@ export function createCircleOfFifthsUi(
       }
 
       options.onOuterTap?.(tap);
+      options.onBackgroundPulseRequest?.();
+      options.onBackgroundRandomnessRequest?.(0.75);
       if (chordModeEnabled) return;
       setPrimaryIndex(index);
       if (selection) options.onPrimaryTap?.(selection);
@@ -777,6 +915,8 @@ export function createCircleOfFifthsUi(
       if (activePointerId !== null) return;
       activePointerId = event.pointerId;
       node.classList.add("is-holding");
+      options.onBackgroundPulseRequest?.();
+      options.onBackgroundRandomnessRequest?.(0.75);
       options.onOuterPressStart?.(emitOuterTap());
     };
 
@@ -859,6 +999,8 @@ export function createCircleOfFifthsUi(
         outer: false,
         layer: "detail",
       });
+      options.onBackgroundPulseRequest?.();
+      options.onBackgroundRandomnessRequest?.(0.75);
       options.onSecondaryTap?.(chord);
     };
 
@@ -871,6 +1013,8 @@ export function createCircleOfFifthsUi(
       activePointerId = event.pointerId;
       heldChord = chord;
       node.classList.add("is-holding");
+      options.onBackgroundPulseRequest?.();
+      options.onBackgroundRandomnessRequest?.(0.75);
       options.onSecondaryPressStart?.(chord);
     };
 
@@ -944,6 +1088,8 @@ export function createCircleOfFifthsUi(
       outer: false,
       layer: "detail",
     });
+    options.onBackgroundPulseRequest?.();
+    options.onBackgroundRandomnessRequest?.(0.75);
     options.onSecondaryTap?.(selection.diminishedChord);
   };
 
@@ -955,6 +1101,8 @@ export function createCircleOfFifthsUi(
     dimPointerId = event.pointerId;
     heldDimChord = selection.diminishedChord;
     dimNode.classList.add("is-holding");
+    options.onBackgroundPulseRequest?.();
+    options.onBackgroundRandomnessRequest?.(0.75);
     options.onSecondaryPressStart?.(selection.diminishedChord);
   };
 
@@ -1183,10 +1331,35 @@ export function createCircleOfFifthsUi(
       if (!midis.length) return;
       pulseNoteCells(midis, midis[0] ?? null, durationMs);
     },
+    holdNote(midi: number) {
+      const semitone = wrapSemitone(midi);
+      heldNoteSemitones.add(semitone);
+      pulseNoteCells([semitone], semitone, 420);
+    },
+    holdChord(midis: number[]) {
+      if (!midis.length) return;
+      const semitones = midis.map((midi) => wrapSemitone(midi));
+      semitones.forEach((semitone) => {
+        heldNoteSemitones.add(semitone);
+      });
+      pulseNoteCells(semitones, semitones[0] ?? null, 520);
+    },
+    releaseHeldNotes() {
+      heldNoteSemitones.forEach((semitone) => {
+        finishNoteVisual(semitone);
+      });
+      heldNoteSemitones.clear();
+    },
     destroy() {
       clearPendingOuterClick();
       notePulseTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       notePulseTimeouts.clear();
+      noteTrailCleanupTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      noteTrailCleanupTimeouts.clear();
+      noteTrailNodes.forEach((trail) => trail.remove());
+      noteTrailNodes.clear();
+      activeNoteTrails.clear();
+      heldNoteSemitones.clear();
       pulseTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       pulseTimeouts.clear();
       container.replaceChildren();

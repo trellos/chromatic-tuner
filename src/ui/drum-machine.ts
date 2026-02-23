@@ -28,6 +28,13 @@ export function getDrumRandomnessForBeat(options: {
 }
 
 export type DrumMachineUiOptions = {
+  // Callback contract:
+  // - `onTransportStart`: fired once when transport transitions from stopped -> playing.
+  // - `onTransportStop`: fired once when transport transitions from playing -> stopped.
+  // - `onBeatBoundary`: fired at each scheduled beat edge with deterministic beat metadata.
+  // Usage limits:
+  // - Callbacks must be side-effect-light and must not mutate Drum UI DOM internals.
+  // - Use these to drive mode-level concerns (for example randomness/background state), not audio timing.
   onTransportStart?: () => void;
   onTransportStop?: () => void;
   onBeatBoundary?: (event: {

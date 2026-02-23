@@ -45,6 +45,10 @@ export function createDrumMachineMode(options: DrumMachineModeOptions = {}): Mod
 
   const drumUi = modeEl
     ? createDrumMachineUi(modeEl, {
+        // UI -> mode callback usage:
+        // - transport start/stop reset mode-owned randomness envelope.
+        // - beat boundary drives deterministic per-beat randomness interpolation.
+        // These callbacks intentionally avoid direct UI mutation.
         onTransportStart: () => {
           emitRandomness(0);
         },

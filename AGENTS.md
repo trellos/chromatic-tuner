@@ -38,7 +38,14 @@
 - When a primary note is selected, note-bar rows show bold uppercase roman numerals in a left column beside each diatonic note square.
 - Double-tapping SVG background inside the circle cycles instruments and updates the inner indicator text.
 - Holding a circle wedge sustains playback while pressed, then releases on pointer end/cancel/leave.
+- Note-bar notes follow the same press lifecycle as wedges: sound starts on pointer down and ends on pointer up/cancel/leave.
 - Sustained playback uses looped sample regions derived from zero-crossing loop points per instrument sample.
+- Note-bar trail behavior:
+  - each played note spawns a separate trail object under the note square
+  - while held/sounding, trail stretch keeps its right edge pinned under the note square and extends left at a constant velocity
+  - on release/end, that same trail keeps its width and both edges move left at the same velocity (about 2 seconds across the circle)
+  - repeated note/chord pulses stack trails instead of replacing them, so rhythmic gaps remain visible between trails
+  - roman numeral degree labels never animate with the trail
 - Rapid double-taps on the same target are debounced to prevent a second short re-attack.
 - Circle instrument set:
   - `ACOUSTIC GUITAR`

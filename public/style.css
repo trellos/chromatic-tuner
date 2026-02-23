@@ -2104,7 +2104,7 @@ body.drum-fullscreen .drum-ui {
 }
 
 .cof-mode-banner.is-scrolling {
-  animation: cof-mode-banner-indicator 1000ms ease-out forwards;
+  animation: cof-mode-banner-indicator 2200ms ease-out forwards;
 }
 
 .cof-note-bar {
@@ -2121,6 +2121,7 @@ body.drum-fullscreen .drum-ui {
 }
 
 .cof-note-row {
+  position: relative;
   min-height: 0;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
@@ -2129,8 +2130,8 @@ body.drum-fullscreen .drum-ui {
 }
 
 .cof-note-cell {
-  --cof-note-pulse-ms: 400ms;
   --cof-note-pop-scale: 1.26;
+  position: relative;
   min-height: 0;
   border-radius: 6px;
   display: grid;
@@ -2144,10 +2145,12 @@ body.drum-fullscreen .drum-ui {
 }
 
 .cof-note-cell-label {
+  position: relative;
+  z-index: 2;
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: none;
   color: rgba(248, 251, 255, 0.96);
   text-shadow:
     0 1px 0 rgba(8, 18, 40, 0.36),
@@ -2171,7 +2174,7 @@ body.drum-fullscreen .drum-ui {
 }
 
 .cof-note-cell.is-active {
-  animation: cof-note-pop var(--cof-note-pulse-ms) ease-out;
+  transform: scale(var(--cof-note-pop-scale));
 }
 
 .cof-note-cell.is-root {
@@ -2198,16 +2201,30 @@ body.drum-fullscreen .drum-ui {
   opacity: 0.3;
 }
 
-@keyframes cof-note-pop {
-  0% {
-    transform: scale(1);
-  }
-  22% {
-    transform: scale(var(--cof-note-pop-scale));
-  }
-  100% {
-    transform: scale(1);
-  }
+.cof-note-trail {
+  --cof-note-trail-stretch-ms: 400ms;
+  --cof-note-trail-growth: 460px;
+  --cof-note-trail-initial-scale: 0.16;
+  position: absolute;
+  display: block;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: var(--cof-note-trail-growth);
+  border-radius: 6px;
+  background: rgba(0, 245, 212, 0.5);
+  pointer-events: none;
+  z-index: 1;
+  transform-origin: right center;
+  transform: translateX(0) scaleX(var(--cof-note-trail-initial-scale));
+}
+
+.cof-note-trail.is-stretching {
+  animation: cof-note-trail-stretch var(--cof-note-trail-stretch-ms) linear forwards;
+}
+
+.cof-note-trail.is-floating {
+  animation: cof-note-trail-float-left 2000ms linear forwards;
 }
 
 .cof.has-primary .cof-wedge[data-degree="i"] .cof-wedge-path {
@@ -2388,18 +2405,73 @@ body.drum-fullscreen .drum-ui {
     opacity: 0;
   }
   58% {
-    transform: translateX(300px);
+    transform: translateX(-560px);
     opacity: 0.78;
   }
   80% {
-    transform: translateX(430px);
+    transform: translateX(-820px);
     opacity: 0.7;
   }
   100% {
-    transform: translateX(540px);
+    transform: translateX(-1040px);
     opacity: 0;
   }
 }
+
+@keyframes cof-note-trail-stretch {
+  0% {
+    transform: translateX(0) scaleX(var(--cof-note-trail-initial-scale));
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(0) scaleX(1);
+    opacity: 0.5;
+  }
+}
+
+@keyframes cof-note-trail-float-left {
+  0% {
+    transform: translateX(0) scaleX(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(-560px) scaleX(1);
+    opacity: 0;
+  }
+}
+
+.mode-screen[data-mode="ui-composite-debug"] {
+  overflow: hidden;
+  padding: 10px;
+}
+
+.ui-composite-debug-shell {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 0.86fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ui-composite-debug-pane {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ui-composite-debug-pane--drum .drum-mock {
+  height: 100%;
+}
+
+.ui-composite-debug-pane--circle .circle-mode-layout {
+  height: 100%;
+}
+
+.ui-composite-debug-pane--circle .cof {
+  width: min(100%, calc((100vh - 260px) * 0.92), 460px);
+  max-height: calc(100vh - 260px);
+}
+
+
 
 @media (max-width: 900px) {
   .cof {
