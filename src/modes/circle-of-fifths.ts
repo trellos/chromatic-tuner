@@ -32,6 +32,7 @@ export function createCircleOfFifthsMode(
   let chordModeRafId: number | null = null;
   let chordModeExitRafId: number | null = null;
   let chordModeStartTime = 0;
+  let lastPrimaryLabel: string | null = null;
 
   const clearRandomnessTimeout = (): void => {
     if (randomnessTimer !== null) {
@@ -136,23 +137,29 @@ export function createCircleOfFifthsMode(
     canFullscreen: false,
     onEnter: () => {
       if (!mountEl) return;
+      lastPrimaryLabel = null;
       circleUi?.destroy();
       circleUi = createCircleOfFifthsUi(mountEl, {
         onPrimaryTap: (selection) => {
-          setChordMode(true);
-          void playPrimary(selection.primaryMidi);
+          const isPrimaryRetap = selection.primaryLabel === lastPrimaryLabel;
+          lastPrimaryLabel = selection.primaryLabel;
+          if (isPrimaryRetap) {
+            setChordMode(true);
+            void playMajorChord(selection.primaryMidi);
+          } else {
+            setChordMode(false);
+            void playPrimary(selection.primaryMidi);
+          }
         },
         onOuterTap: (note) => {
           if (!chordModeActive) return;
           void playMajorChord(note.midi);
         },
-        onOuterDoubleTap: (note) => {
+        onBackgroundTap: () => {
           if (!chordModeActive) return;
           setChordMode(false);
-          circleUi?.setPrimaryByLabel(note.label);
         },
         onSecondaryTap: (chord) => {
-          if (chordModeActive) return;
           void playChord(chord);
         },
       });
@@ -161,6 +168,7 @@ export function createCircleOfFifthsMode(
       clearRandomnessTimeout();
       stopChordModeAnimation();
       chordModeActive = false;
+      lastPrimaryLabel = null;
       options.onRandomnessChange?.(null);
       guitarPlayer.stopAll();
       circleUi?.destroy();

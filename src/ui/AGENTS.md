@@ -106,13 +106,21 @@ Integration points:
 
 1. Outer ring is always rendered programmatically with 12 notes.
 2. Inner detail wedges stay hidden until a primary note is set.
-3. Primary note change rotates the inner detail layer; avoid per-frame random motion.
-4. In tuner integration, no detected note means no primary and no inner wedges.
-5. Tuner detune guidance maps signed cents into a bounded rotational offset centered at in-tune.
-6. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
+3. Detail layer has two inner rings:
+   - middle ring: exactly three wedges (`ii`, `iii`, `vi`)
+   - inner ring: exactly one wedge (`vii°`) for diminished chord
+4. Primary note change rotates the inner detail layer using shortest angular path; avoid long-way spins.
+5. In tuner integration, no detected note means no primary and no inner wedges.
+6. Tuner detune guidance maps signed cents into a bounded rotational offset centered at in-tune.
+7. Roman numeral corner labels on outer wedges must use `I`, `ii`, `iii`, `IV`, `V`, `vi`, `vii°`.
+8. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
 
 ### Circle test expectations
 
 - Verify deterministic note/chord labels and visible-state toggles.
 - Cover at least one desktop and one mobile viewport in Playwright for layout visibility.
 - Prefer class/visibility/count assertions over pixel snapshots.
+- Verify chord-mode enter/exit behavior:
+  - retap primary enters chord mode and plays major triad
+  - background tap exits chord mode
+  - primary tap in chord mode plays major triad (does not exit)

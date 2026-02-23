@@ -130,6 +130,15 @@ Do not preserve dead paths "for later" unless explicitly requested.
 - Dedicated mode is a thin adapter over shared Circle UI (`src/ui/circle-of-fifths.ts`).
 - Taps should trigger guitar-sample playback + seigaiha pulse, but keep theory/render logic in shared UI helpers.
 - Keep this mode focused on lifecycle wiring (`onEnter`/`onExit`) and cleanup only.
+- Interaction contract:
+  - first primary tap sets primary + plays single note
+  - tapping the same primary again enters chord mode + plays primary major triad
+  - in chord mode, any outer wedge tap plays that wedge major triad and does not change the active primary
+  - chord mode exits only from tapping outside wedges (background tap)
+- Background randomness contract:
+  - chord mode oscillates continuously between configured min/max randomness
+  - on chord mode exit, randomness eases back down instead of dropping instantly
+  - one-shot playback pulses can still drive short high-randomness bursts
 
 ### Tuner Circle toggle (`src/modes/tuner.ts`)
 - Tuner supports visual sub-modes (`strobe`, `circle`) via in-mode toggle.

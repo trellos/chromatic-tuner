@@ -6,17 +6,11 @@ export type CircleChordSpec = {
   quality: CircleQuality;
 };
 
-export type CircleLegend = {
-  degreeText: string;
-  chordToneText: string;
-};
-
 export type CircleSelection = {
   primaryLabel: string;
   primaryMidi: number;
   secondaryChords: CircleChordSpec[];
   diminishedChord: CircleChordSpec;
-  legend: CircleLegend;
 };
 
 export type CircleOfFifthsUiOptions = {
@@ -24,6 +18,7 @@ export type CircleOfFifthsUiOptions = {
   onSecondaryTap?: (chord: CircleChordSpec) => void;
   onOuterTap?: (note: CircleNoteTap) => void;
   onOuterDoubleTap?: (note: CircleNoteTap) => void;
+  onBackgroundTap?: () => void;
 };
 
 export type CircleOfFifthsUi = {
@@ -56,18 +51,13 @@ const SECONDARY_OUTER_RADIUS = 314;
 const SECONDARY_INNER_RADIUS = 232;
 const DIM_OUTER_RADIUS = 228;
 const DIM_INNER_RADIUS = 176;
-const LEGEND_OUTER_RADIUS = 170;
-const LEGEND_INNER_RADIUS = 106;
 
 const OUTER_WEDGE_DEG = 30;
-// Keep inner wedge spans equal to outer wedge spans so radial boundaries line up across rings.
 const SECONDARY_WEDGE_DEG = 30;
 const DIM_WEDGE_DEG = 30;
-const LEGEND_WEDGE_DEG = 30;
-
 const SECONDARY_CENTERS = [-30, 0, 30] as const;
 const SECONDARY_INTERVALS = [2, 4, 9] as const; // II, III, VI
-const MAJOR_TRIAD_INTERVALS = [0, 4, 7] as const;
+const WEDGE_PULSE_DURATION_MS = 640;
 
 const OUTER_NOTES: CircleNote[] = [
   { label: "C", semitone: 0 },
@@ -91,6 +81,14 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeDegrees(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function normalizeSignedDegrees(value: number): number {
+  return ((value + 540) % 360) - 180;
+}
+
 function wrapSemitone(value: number): number {
   return ((value % 12) + 12) % 12;
 }
@@ -106,6 +104,27 @@ function noteLabelFromSemitone(semitone: number, preferFlats: boolean): string {
 
 function chordLabel(root: string, quality: CircleQuality): string {
   return quality === "diminished" ? `${root}dim` : `${root}m`;
+}
+
+function degreeLabelForMajorInterval(interval: number): string | null {
+  switch (wrapSemitone(interval)) {
+    case 0:
+      return "I";
+    case 2:
+      return "ii";
+    case 4:
+      return "iii";
+    case 5:
+      return "IV";
+    case 7:
+      return "V";
+    case 9:
+      return "vi";
+    case 11:
+      return "vii°";
+    default:
+      return null;
+  }
 }
 
 function midiFromSemitoneNearC4(semitone: number): number {
@@ -166,32 +185,33 @@ function getSelectionFromPrimary(primaryIndex: number): CircleSelection {
     quality: "diminished",
   };
 
-  const chordToneText = MAJOR_TRIAD_INTERVALS.map((interval) => {
-    const semitone = wrapSemitone(primary.semitone + interval);
-    return noteLabelFromSemitone(semitone, preferFlats);
-  }).join("-");
-
   return {
     primaryLabel: primary.label,
     primaryMidi: midiFromSemitoneNearC4(primary.semitone),
     secondaryChords,
     diminishedChord,
-    legend: {
-      degreeText: "II III VI · VII°",
-      chordToneText,
-    },
   };
 }
 
 export function getCircleChordMidis(chord: CircleChordSpec): number[] {
+  const root = normalizeChordRootMidi(chord.rootMidi);
   if (chord.quality === "diminished") {
-    return [chord.rootMidi, chord.rootMidi + 3, chord.rootMidi + 6];
+    return [root, root + 3, root + 6];
   }
-  return [chord.rootMidi, chord.rootMidi + 3, chord.rootMidi + 7];
+  return [root, root + 3, root + 7];
 }
 
 export function getCircleMajorChordMidis(rootMidi: number): number[] {
-  return [rootMidi, rootMidi + 4, rootMidi + 7];
+  const root = normalizeChordRootMidi(rootMidi);
+  return [root, root + 4, root + 7];
+}
+
+function normalizeChordRootMidi(rootMidi: number): number {
+  if (!Number.isFinite(rootMidi)) return 60;
+  let root = Math.round(rootMidi);
+  while (root < 48) root += 12;
+  while (root > 72) root -= 12;
+  return root;
 }
 
 function createSvgEl<T extends keyof SVGElementTagNameMap>(
@@ -223,13 +243,15 @@ export function createCircleOfFifthsUi(
   const outerGroup = createSvgEl("g", "cof-outer");
   const secondaryGroup = createSvgEl("g", "cof-secondary");
   const dimGroup = createSvgEl("g", "cof-dim");
-  const legendGroup = createSvgEl("g", "cof-legend");
+  const outerPulseGroup = createSvgEl("g", "cof-pulse-layer");
+  const detailPulseGroup = createSvgEl("g", "cof-pulse-layer cof-pulse-layer--detail");
 
   svg.appendChild(outerGroup);
   detailGroup.appendChild(secondaryGroup);
   detailGroup.appendChild(dimGroup);
-  detailGroup.appendChild(legendGroup);
+  detailGroup.appendChild(detailPulseGroup);
   svg.appendChild(detailGroup);
+  svg.appendChild(outerPulseGroup);
   root.appendChild(svg);
   container.replaceChildren(root);
 
@@ -237,31 +259,63 @@ export function createCircleOfFifthsUi(
   let selection: CircleSelection | null = null;
   let chordModeEnabled = false;
   let detuneDeg = 0;
+  let detailBaseDeg = 0;
+  const pulseTimeouts = new Set<number>();
 
-  const updateOuterChordModeLabels = (): void => {
-    root.classList.toggle("is-chord-mode", chordModeEnabled);
-    outerButtons.forEach((button, index) => {
-      const note = OUTER_NOTES[index];
-      const label = button.querySelector<SVGTextElement>(".cof-wedge-label");
-      if (!note || !label) return;
+  const queuePulseCleanup = (pulse: SVGGElement): void => {
+    const timeoutId = window.setTimeout(() => {
+      pulse.remove();
+      pulseTimeouts.delete(timeoutId);
+    }, WEDGE_PULSE_DURATION_MS + 60);
+    pulseTimeouts.add(timeoutId);
+  };
 
-      label.replaceChildren();
-      const rootSpan = createSvgEl("tspan", "cof-wedge-label-root");
-      rootSpan.textContent = note.label;
-      label.appendChild(rootSpan);
+  const emitWedgePulse = (options: {
+    pathD: string;
+    label: string;
+    x: number;
+    y: number;
+    outer: boolean;
+    layer: "outer" | "detail";
+  }): void => {
+    const pulse = createSvgEl("g", "cof-pulse");
+    const pulsePath = createSvgEl("path", "cof-pulse-path");
+    pulsePath.setAttribute("d", options.pathD);
+    pulse.appendChild(pulsePath);
 
-      if (chordModeEnabled) {
-        const suffixSpan = createSvgEl("tspan", "cof-wedge-label-suffix");
-        suffixSpan.textContent = "maj";
-        suffixSpan.setAttribute("dx", "3");
-        label.appendChild(suffixSpan);
-      }
+    const pulseLabelBaseClass = options.outer
+      ? "cof-pulse-label cof-pulse-label--outer"
+      : "cof-pulse-label cof-pulse-label--inner";
+    const pulseLabelClass =
+      options.label.length >= 5
+        ? `${pulseLabelBaseClass} cof-pulse-label--tight`
+        : pulseLabelBaseClass;
+    const pulseLabel = createSvgEl("text", pulseLabelClass);
+    pulseLabel.setAttribute("x", String(options.x));
+    pulseLabel.setAttribute("y", String(options.y));
+    pulseLabel.textContent = options.label;
+    pulse.appendChild(pulseLabel);
+
+    pulse.addEventListener("animationend", () => {
+      pulse.remove();
     });
+    (options.layer === "detail" ? detailPulseGroup : outerPulseGroup).appendChild(pulse);
+    queuePulseCleanup(pulse);
   };
 
   const applyDetailTransform = (): void => {
-    const baseDeg = primaryIndex === null ? 0 : primaryIndex * OUTER_WEDGE_DEG;
-    detailGroup.style.transform = `rotate(${(baseDeg + detuneDeg).toFixed(2)}deg)`;
+    detailGroup.style.transform = `rotate(${(detailBaseDeg + detuneDeg).toFixed(2)}deg)`;
+  };
+
+  const setDetailBaseForPrimary = (index: number | null): void => {
+    if (index === null) {
+      detailBaseDeg = 0;
+      return;
+    }
+    const targetDeg = index * OUTER_WEDGE_DEG;
+    const currentCanonical = normalizeDegrees(detailBaseDeg);
+    const delta = normalizeSignedDegrees(targetDeg - currentCanonical);
+    detailBaseDeg += delta;
   };
 
   const outerButtons = OUTER_NOTES.map((note, index) => {
@@ -285,6 +339,12 @@ export function createCircleOfFifthsUi(
     label.appendChild(labelRoot);
     node.appendChild(label);
 
+    const degreeLabel = createSvgEl("text", "cof-degree-label");
+    const degreeCorner = polarPoint(OUTER_RADIUS - 30, centerDeg + OUTER_WEDGE_DEG / 2 - 2);
+    degreeLabel.setAttribute("x", String(degreeCorner.x));
+    degreeLabel.setAttribute("y", String(degreeCorner.y));
+    node.appendChild(degreeLabel);
+
     const emitOuterTap = (): CircleNoteTap => ({
       index,
       label: note.label,
@@ -294,6 +354,19 @@ export function createCircleOfFifthsUi(
 
     const onActivate = (): void => {
       const tap = emitOuterTap();
+
+      const pathD = path.getAttribute("d");
+      if (pathD) {
+        emitWedgePulse({
+          pathD,
+          label: note.label,
+          x: labelPoint.x,
+          y: labelPoint.y,
+          outer: true,
+          layer: "outer",
+        });
+      }
+
       options.onOuterTap?.(tap);
       if (chordModeEnabled) return;
       setPrimaryIndex(index);
@@ -303,8 +376,6 @@ export function createCircleOfFifthsUi(
     node.addEventListener("click", onActivate);
     node.addEventListener("dblclick", (event) => {
       event.preventDefault();
-      const tap = emitOuterTap();
-      options.onOuterDoubleTap?.(tap);
     });
     node.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -313,7 +384,7 @@ export function createCircleOfFifthsUi(
     });
 
     outerGroup.appendChild(node);
-    return node;
+    return { node, label, degreeLabel, note };
   });
 
   const secondaryNodes = SECONDARY_CENTERS.map((centerDeg, cellIndex) => {
@@ -338,13 +409,34 @@ export function createCircleOfFifthsUi(
 
     node.addEventListener("click", () => {
       const chord = selection?.secondaryChords[cellIndex];
-      if (chord) options.onSecondaryTap?.(chord);
+      const pathD = path.getAttribute("d");
+      if (!chord || !pathD) return;
+      emitWedgePulse({
+        pathD,
+        label: chord.label,
+        x: labelPoint.x,
+        y: labelPoint.y,
+        outer: false,
+        layer: "detail",
+      });
+      options.onSecondaryTap?.(chord);
     });
+
     node.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       const chord = selection?.secondaryChords[cellIndex];
-      if (chord) options.onSecondaryTap?.(chord);
+      const pathD = path.getAttribute("d");
+      if (!chord || !pathD) return;
+      emitWedgePulse({
+        pathD,
+        label: chord.label,
+        x: labelPoint.x,
+        y: labelPoint.y,
+        outer: false,
+        layer: "detail",
+      });
+      options.onSecondaryTap?.(chord);
     });
 
     secondaryGroup.appendChild(node);
@@ -356,9 +448,11 @@ export function createCircleOfFifthsUi(
   dimNode.setAttribute("tabindex", "0");
   dimNode.setAttribute("data-center-deg", "0");
   dimNode.setAttribute("data-span-deg", String(DIM_WEDGE_DEG));
+
   const dimPath = createSvgEl("path", "cof-dim-path");
   dimPath.setAttribute("d", describeAnnularSector(DIM_INNER_RADIUS, DIM_OUTER_RADIUS, 0, DIM_WEDGE_DEG));
   dimNode.appendChild(dimPath);
+
   const dimText = createSvgEl("text", "cof-dim-label");
   const dimLabelPoint = polarPoint((DIM_OUTER_RADIUS + DIM_INNER_RADIUS) / 2, 0);
   dimText.setAttribute("x", String(dimLabelPoint.x));
@@ -366,32 +460,74 @@ export function createCircleOfFifthsUi(
   dimNode.appendChild(dimText);
   dimGroup.appendChild(dimNode);
 
-  legendGroup.setAttribute("data-center-deg", "0");
-  legendGroup.setAttribute("data-span-deg", String(LEGEND_WEDGE_DEG));
+  const playDiminished = (): void => {
+    const pathD = dimPath.getAttribute("d");
+    if (!selection || !pathD) return;
+    emitWedgePulse({
+      pathD,
+      label: selection.diminishedChord.label,
+      x: dimLabelPoint.x,
+      y: dimLabelPoint.y,
+      outer: false,
+      layer: "detail",
+    });
+    options.onSecondaryTap?.(selection.diminishedChord);
+  };
 
-  const legendPath = createSvgEl("path", "cof-legend-path");
-  legendPath.setAttribute("d", describeAnnularSector(LEGEND_INNER_RADIUS, LEGEND_OUTER_RADIUS, 0, LEGEND_WEDGE_DEG));
-  legendGroup.appendChild(legendPath);
+  dimNode.addEventListener("click", playDiminished);
+  dimNode.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    playDiminished();
+  });
 
-  const legendCenter = polarPoint((LEGEND_OUTER_RADIUS + LEGEND_INNER_RADIUS) / 2, 0);
-  const legendDegrees = createSvgEl("text", "cof-legend-line cof-legend-line--degrees");
-  legendDegrees.setAttribute("x", String(legendCenter.x));
-  legendDegrees.setAttribute("y", String(legendCenter.y - 12));
-  legendGroup.appendChild(legendDegrees);
+  svg.addEventListener("click", (event) => {
+    if (!chordModeEnabled) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const clickedWedge = target.closest(".cof-wedge, .cof-secondary-cell, .cof-dim-cell");
+    if (clickedWedge) return;
+    options.onBackgroundTap?.();
+  });
 
-  const legendChordTones = createSvgEl("text", "cof-legend-line cof-legend-line--tones");
-  legendChordTones.setAttribute("x", String(legendCenter.x));
-  legendChordTones.setAttribute("y", String(legendCenter.y + 12));
-  legendGroup.appendChild(legendChordTones);
+  const updateOuterChordModeLabels = (): void => {
+    root.classList.toggle("is-chord-mode", chordModeEnabled);
+    outerButtons.forEach(({ label, note }) => {
+      label.replaceChildren();
+      const rootSpan = createSvgEl("tspan", "cof-wedge-label-root");
+      rootSpan.textContent = note.label;
+      label.appendChild(rootSpan);
+
+      if (chordModeEnabled) {
+        const suffixSpan = createSvgEl("tspan", "cof-wedge-label-suffix");
+        suffixSpan.textContent = "maj";
+        suffixSpan.setAttribute("dx", "3");
+        label.appendChild(suffixSpan);
+      }
+    });
+  };
 
   const setPrimaryIndex = (nextPrimaryIndex: number | null): void => {
     primaryIndex = nextPrimaryIndex;
     selection = nextPrimaryIndex === null ? null : getSelectionFromPrimary(nextPrimaryIndex);
+    setDetailBaseForPrimary(nextPrimaryIndex);
 
-    outerButtons.forEach((button, index) => {
+    outerButtons.forEach(({ node, degreeLabel, note }, index) => {
       const isPrimary = index === primaryIndex;
-      button.classList.toggle("is-primary", isPrimary);
-      button.setAttribute("aria-pressed", isPrimary ? "true" : "false");
+      node.classList.toggle("is-primary", isPrimary);
+      node.setAttribute("aria-pressed", isPrimary ? "true" : "false");
+
+      if (nextPrimaryIndex === null) {
+        degreeLabel.textContent = "";
+        return;
+      }
+      const active = OUTER_NOTES[nextPrimaryIndex];
+      if (!active) {
+        degreeLabel.textContent = "";
+        return;
+      }
+      const interval = wrapSemitone(note.semitone - active.semitone);
+      degreeLabel.textContent = degreeLabelForMajorInterval(interval) ?? "";
     });
 
     if (!selection || primaryIndex === null) {
@@ -402,8 +538,6 @@ export function createCircleOfFifthsUi(
     }
 
     const activeSelection = selection;
-    if (!activeSelection) return;
-
     root.classList.add("has-primary");
     applyDetailTransform();
 
@@ -418,19 +552,7 @@ export function createCircleOfFifthsUi(
     dimText.textContent = activeSelection.diminishedChord.label;
     setTextClassForFit(dimText, "cof-dim-label", activeSelection.diminishedChord.label);
     dimNode.setAttribute("aria-label", `Chord ${activeSelection.diminishedChord.label}`);
-
-    legendDegrees.textContent = activeSelection.legend.degreeText;
-    legendChordTones.textContent = activeSelection.legend.chordToneText;
   };
-
-  dimNode.addEventListener("click", () => {
-    if (selection) options.onSecondaryTap?.(selection.diminishedChord);
-  });
-  dimNode.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    if (selection) options.onSecondaryTap?.(selection.diminishedChord);
-  });
 
   return {
     setPrimaryByLabel(label: string | null) {
@@ -464,7 +586,10 @@ export function createCircleOfFifthsUi(
       updateOuterChordModeLabels();
     },
     destroy() {
+      pulseTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      pulseTimeouts.clear();
       container.replaceChildren();
     },
   };
 }
+

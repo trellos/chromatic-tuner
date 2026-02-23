@@ -134,11 +134,11 @@ export function createSeigaihaWebGlRenderer(): SeigaihaWebGlRenderer {
   const canvas = ensureFullscreenCanvas();
   const context =
     canvas.getContext("webgl", {
-      alpha: true,
+      alpha: false,
       antialias: false,
       depth: false,
       stencil: false,
-      premultipliedAlpha: true,
+      premultipliedAlpha: false,
       preserveDrawingBuffer: false,
     }) ?? canvas.getContext("experimental-webgl");
 

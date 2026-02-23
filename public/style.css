@@ -42,7 +42,6 @@ body {
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
   position: relative;
-  isolation: isolate;
 }
 
 .seigaiha-canvas {
@@ -53,11 +52,13 @@ body {
   pointer-events: none;
   z-index: 0;
   opacity: 0;
-  transition: opacity 120ms linear;
+  visibility: hidden;
+  display: block;
 }
 
 body[data-seigaiha-render-ready="1"] .seigaiha-canvas {
   opacity: 1;
+  visibility: visible;
 }
 
 .seigaiha-debug-control {
@@ -297,6 +298,9 @@ body.drum-fullscreen .mode-stage {
   backdrop-filter: none;
   position: relative;
   overflow: auto;
+  isolation: isolate;
+  background-clip: padding-box;
+  contain: paint;
 
   background-color: var(--panel);
 
@@ -1821,6 +1825,16 @@ body.drum-fullscreen .drum-ui {
   place-items: center;
 }
 
+.mode-screen[data-mode="circle-of-fifths"] {
+  background:
+    radial-gradient(82% 64% at 16% 10%, rgba(255, 107, 214, 0.09) 0%, transparent 52%),
+    radial-gradient(86% 70% at 88% 88%, rgba(0, 245, 212, 0.08) 0%, transparent 58%),
+    linear-gradient(150deg, rgba(246, 247, 255, 0.97), rgba(236, 241, 255, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 30px 60px rgba(4, 8, 16, 0.45);
+}
+
 .mode-screen[data-mode="circle-of-fifths"].is-active {
   justify-content: center;
 }
@@ -1832,14 +1846,26 @@ body.drum-fullscreen .drum-ui {
 }
 
 .tuner-circle-host .cof {
-  width: min(100%, calc(var(--mode-panel-height) - 190px), 460px);
-  max-height: calc(var(--mode-panel-height) - 190px);
+  width: min(100%, calc(var(--mode-panel-height) - 220px), 420px);
+  max-height: calc(var(--mode-panel-height) - 220px);
 }
 
-.cof-svg {
+.mode-screen[data-mode="circle-of-fifths"] .cof-svg {
   width: 100%;
   height: 100%;
   overflow: visible;
+  filter: drop-shadow(0 14px 26px rgba(10, 22, 48, 0.22));
+}
+
+.tuner-circle-host .cof-svg {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tuner-circle-host .cof-wedge-label,
+.tuner-circle-host .cof-wedge.is-primary .cof-wedge-label {
+  filter: none;
 }
 
 .cof-outer .cof-wedge,
@@ -1849,28 +1875,49 @@ body.drum-fullscreen .drum-ui {
   outline: none;
 }
 
+.cof-outer .cof-wedge {
+  transform-origin: 50% 50%;
+  transition: transform 180ms ease;
+}
+
+.cof-outer .cof-wedge:hover {
+  transform: scale(1.015);
+}
+
 .cof-wedge-path {
-  fill: rgba(248, 250, 252, 0.9);
-  stroke: rgba(15, 23, 42, 0.42);
+  fill: rgba(242, 246, 255, 0.95);
+  stroke: rgba(31, 52, 104, 0.45);
   stroke-width: 2;
-  transition: fill 180ms ease;
+  transition: fill 180ms ease, stroke 180ms ease;
 }
 
 .cof-wedge.is-primary .cof-wedge-path {
-  fill: rgba(14, 165, 233, 0.88);
+  fill: rgba(41, 176, 235, 0.94);
+  stroke: rgba(18, 62, 140, 0.78);
 }
 
 .cof-wedge-label {
   font-size: 36px;
   font-weight: 700;
-  fill: #0f172a;
+  fill: #13264f;
+  stroke: rgba(247, 251, 255, 0.9);
+  stroke-width: 1.35;
+  paint-order: stroke fill;
+  letter-spacing: 0.02em;
   text-anchor: middle;
   dominant-baseline: middle;
   pointer-events: none;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 107, 214, 0.88))
+    drop-shadow(2px 2px 0 rgba(0, 245, 212, 0.5));
 }
 
 .cof-wedge.is-primary .cof-wedge-label {
   fill: #ffffff;
+  stroke: rgba(9, 26, 66, 0.88);
+  filter:
+    drop-shadow(0 1px 0 rgba(124, 58, 237, 0.92))
+    drop-shadow(2px 2px 0 rgba(0, 245, 212, 0.62));
 }
 
 .cof-wedge-label-root {
@@ -1880,7 +1927,22 @@ body.drum-fullscreen .drum-ui {
 .cof-wedge-label-suffix {
   font-size: 0.52em;
   font-weight: 700;
+  fill: #1a9be6;
+  stroke: none;
   dominant-baseline: hanging;
+}
+
+.cof-degree-label {
+  font-size: 16px;
+  font-weight: 700;
+  fill: #2563eb;
+  stroke: rgba(247, 251, 255, 0.9);
+  stroke-width: 1;
+  paint-order: stroke fill;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  letter-spacing: 0.01em;
 }
 
 .cof-detail {
@@ -1896,10 +1958,9 @@ body.drum-fullscreen .drum-ui {
 }
 
 .cof-secondary-path,
-.cof-dim-path,
-.cof-legend-path {
-  fill: rgba(255, 255, 255, 0.94);
-  stroke: rgba(15, 23, 42, 0.34);
+.cof-dim-path {
+  fill: rgba(250, 252, 255, 0.95);
+  stroke: rgba(33, 53, 103, 0.3);
   stroke-width: 2;
 }
 
@@ -1918,21 +1979,75 @@ body.drum-fullscreen .drum-ui {
   font-size: 20px;
 }
 
-.cof-legend-line {
-  fill: #0f172a;
-  text-anchor: middle;
-  dominant-baseline: middle;
+.cof-pulse-layer {
   pointer-events: none;
 }
 
-.cof-legend-line--degrees {
-  font-size: 18px;
+.cof-pulse {
+  color: #ff6bd6;
+  transform-origin: 50% 50%;
+  animation:
+    cof-pulse-expand 640ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards,
+    cof-pulse-color 640ms linear forwards;
+}
+
+.cof-pulse-path {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 8px rgba(0, 245, 212, 0.45));
+}
+
+.cof-pulse-label {
+  text-anchor: middle;
+  dominant-baseline: middle;
+  fill: currentColor;
+  stroke: rgba(9, 22, 56, 0.72);
+  stroke-width: 1.1;
+  paint-order: stroke fill;
   font-weight: 700;
 }
 
-.cof-legend-line--tones {
-  font-size: 20px;
-  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+.cof-pulse-label--outer {
+  font-size: 34px;
+}
+
+.cof-pulse-label--inner {
+  font-size: 22px;
+}
+
+.cof-pulse-label--tight {
+  font-size: 18px;
+}
+
+@keyframes cof-pulse-expand {
+  0% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+@keyframes cof-pulse-color {
+  0% {
+    color: #ff6bd6;
+  }
+  25% {
+    color: #7c3aed;
+  }
+  50% {
+    color: #00f5d4;
+  }
+  75% {
+    color: #ff3d81;
+  }
+  100% {
+    color: #ff9e00;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1942,6 +2057,10 @@ body.drum-fullscreen .drum-ui {
 
   .cof-wedge-label {
     font-size: 32px;
+  }
+
+  .cof-degree-label {
+    font-size: 14px;
   }
 }
 
@@ -1964,6 +2083,10 @@ body.drum-fullscreen .drum-ui {
     font-size: 26px;
   }
 
+  .cof-degree-label {
+    font-size: 11px;
+  }
+
   .cof-secondary-label,
   .cof-dim-label {
     font-size: 17px;
@@ -1974,11 +2097,4 @@ body.drum-fullscreen .drum-ui {
     font-size: 14px;
   }
 
-  .cof-legend-line--degrees {
-    font-size: 13px;
-  }
-
-  .cof-legend-line--tones {
-    font-size: 15px;
-  }
 }
