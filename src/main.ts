@@ -5,7 +5,7 @@ import {
   type MetronomeRandomnessParams,
 } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
-import { createFretboardMode } from "./modes/fretboard.js";
+import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretboard.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { runModeTransition } from "./mode-transition.js";
 import {
@@ -814,6 +814,7 @@ function initializeCarouselUi(): void {
 
 // Auto-start tuner mode on page load until the carousel is wired up.
 window.addEventListener("DOMContentLoaded", async () => {
+  preloadFretboardAudioAssets();
   bindSeigaihaInteractionPulse();
   initializeCarouselUi();
   installSeigaihaBackground();

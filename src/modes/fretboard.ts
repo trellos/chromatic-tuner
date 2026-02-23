@@ -60,6 +60,33 @@ const NOTE_TO_SEMITONE: Record<NoteName, number> = {
   G: 7,
   "G#": 8,
 };
+let cachedGuitarSampleBytes: ArrayBuffer | null = null;
+let cachedGuitarSampleBuffer: AudioBuffer | null = null;
+let cachedGuitarSampleFetchPromise: Promise<ArrayBuffer | null> | null = null;
+let cachedGuitarSampleDecodePromise: Promise<AudioBuffer | null> | null = null;
+
+async function fetchGuitarSampleBytes(): Promise<ArrayBuffer | null> {
+  if (cachedGuitarSampleBytes) return cachedGuitarSampleBytes;
+  if (cachedGuitarSampleFetchPromise) return cachedGuitarSampleFetchPromise;
+  cachedGuitarSampleFetchPromise = (async () => {
+    try {
+      const response = await fetch(GUITAR_SAMPLE_URL);
+      if (!response.ok) return null;
+      const bytes = await response.arrayBuffer();
+      cachedGuitarSampleBytes = bytes;
+      return bytes;
+    } catch {
+      return null;
+    } finally {
+      cachedGuitarSampleFetchPromise = null;
+    }
+  })();
+  return cachedGuitarSampleFetchPromise;
+}
+
+export function preloadFretboardAudioAssets(): void {
+  void fetchGuitarSampleBytes();
+}
 
 type FretboardModeOptions = {
   onRandomnessChange?: (randomness: number | null) => void;
@@ -106,15 +133,36 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
 
   const ensureGuitarSample = async (ctx: AudioContext): Promise<AudioBuffer | null> => {
     if (guitarSampleBuffer) return guitarSampleBuffer;
+    if (cachedGuitarSampleBuffer) {
+      guitarSampleBuffer = cachedGuitarSampleBuffer;
+      return guitarSampleBuffer;
+    }
     if (guitarSampleLoadPromise) {
       return guitarSampleLoadPromise;
     }
     guitarSampleLoadPromise = (async () => {
       try {
-        const response = await fetch(GUITAR_SAMPLE_URL);
-        if (!response.ok) return null;
-        const arrayBuffer = await response.arrayBuffer();
-        const decoded = await ctx.decodeAudioData(arrayBuffer);
+        const bytes = await fetchGuitarSampleBytes();
+        if (!bytes) return null;
+        if (cachedGuitarSampleBuffer) {
+          guitarSampleBuffer = cachedGuitarSampleBuffer;
+          return guitarSampleBuffer;
+        }
+        if (!cachedGuitarSampleDecodePromise) {
+          cachedGuitarSampleDecodePromise = (async () => {
+            try {
+              // Clone bytes since some engines may detach the ArrayBuffer during decode.
+              const decoded = await ctx.decodeAudioData(bytes.slice(0));
+              cachedGuitarSampleBuffer = decoded;
+              return decoded;
+            } catch {
+              return null;
+            } finally {
+              cachedGuitarSampleDecodePromise = null;
+            }
+          })();
+        }
+        const decoded = await cachedGuitarSampleDecodePromise;
         guitarSampleBuffer = decoded;
         return decoded;
       } catch {

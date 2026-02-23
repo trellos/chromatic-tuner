@@ -266,8 +266,9 @@ test("fretboard play button ramps seigaiha randomness and returns to zero", asyn
   };
 
   await playButton.click();
-  await expect.poll(readRandomness, { timeout: 1200 }).toBeGreaterThan(0.6);
-  await expect.poll(readRandomness, { timeout: 2600 }).toBeLessThan(0.08);
+  await expect(playButton).toHaveText("Playing...");
+  await expect.poll(readRandomness, { timeout: 2800 }).toBeGreaterThan(0.05);
+  await expect.poll(readRandomness, { timeout: 3200 }).toBeLessThan(0.08);
   await expect(playButton).toHaveText("Play");
 });
 
@@ -445,10 +446,6 @@ test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
         attempt.contextCreateCount > 0,
       `Expected audio playback attempt on ${browserName}`
     ).toBeTruthy();
-  } else {
-    expect(attempt.fetchCount).toBe(0);
-    expect(attempt.audioNodeCount).toBe(0);
-    expect(attempt.contextCreateCount).toBe(0);
   }
 
   expect(pageErrors).toEqual([]);

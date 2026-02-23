@@ -1440,8 +1440,8 @@ body.drum-fullscreen .drum-ui {
 .fretboard-string-labels {
   position: absolute;
   top: -20px;
-  left: 0;
-  right: 0;
+  left: 8px;
+  right: 8px;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   text-align: center;
@@ -1449,8 +1449,14 @@ body.drum-fullscreen .drum-ui {
   letter-spacing: 0.06em;
   color: #e5edf9;
   font-family: "Inter", "Segoe UI", sans-serif;
-  text-shadow: 0 1px 1px rgba(6, 12, 24, 0.52);
+  text-shadow:
+    0 1px 1px rgba(4, 8, 18, 0.9),
+    0 0 10px rgba(4, 8, 18, 0.72);
+  background: linear-gradient(180deg, rgba(5, 13, 28, 0.58), rgba(5, 13, 28, 0.18));
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(6, 12, 24, 0.44);
   z-index: 5;
+  padding: 2px 0;
 }
 
 .fretboard-open-indicators {
@@ -1526,19 +1532,18 @@ body.drum-fullscreen .drum-ui {
   width: 12px;
   height: 12px;
   border-radius: 999px;
-  border: 2px solid rgba(15, 23, 42, 0.95);
+  border: 2px solid var(--tuna-aqua);
   background: transparent;
   left: calc((var(--string-index) / 5) * 100%);
   top: 50%;
-  box-shadow: 0 0 0 1px rgba(214, 229, 246, 0.86);
+  box-shadow: 0 2px 6px rgba(6, 10, 22, 0.35);
   cursor: pointer;
   touch-action: manipulation;
   transform: translate(-50%, -50%);
 }
 
 .fretboard-open-indicator.is-root {
-  border-color: rgba(255, 107, 214, 0.92);
-  box-shadow: 0 0 0 1px rgba(255, 224, 247, 0.95);
+  border-color: var(--tuna-pink);
 }
 
 .fretboard-dot {
@@ -1546,9 +1551,9 @@ body.drum-fullscreen .drum-ui {
   width: clamp(24px, 3vw, 32px);
   aspect-ratio: 1;
   border-radius: 999px;
-  border: 1px solid rgba(0, 245, 212, 0.8);
-  background: rgba(15, 23, 42, 0.95);
-  color: #e2e8f0;
+  border: none;
+  background: var(--tuna-aqua);
+  color: var(--ink);
   font-size: clamp(10px, 1.15vw, 12px);
   display: inline-flex;
   align-items: center;
@@ -1556,16 +1561,15 @@ body.drum-fullscreen .drum-ui {
   font-weight: 600;
   left: calc((var(--string-index) / 5) * 100%);
   top: calc(((var(--fret-index) - 0.5) / 12) * 100%);
-  box-shadow: 0 0 0 1px rgba(8, 21, 42, 0.35);
+  box-shadow: 0 8px 16px rgba(8, 21, 42, 0.28);
   cursor: pointer;
   touch-action: manipulation;
   transform: translate(-50%, -50%);
 }
 
 .fretboard-dot.is-root {
-  background: rgba(255, 107, 214, 0.92);
-  border-color: rgba(255, 224, 247, 0.95);
-  color: #ffffff;
+  background: var(--tuna-pink);
+  color: var(--ink);
 }
 
 .fretboard-inlay {
@@ -1739,7 +1743,6 @@ body.drum-fullscreen .drum-ui {
   .fretboard-dot {
     width: 18px;
     font-size: 9px;
-    border-width: 1px;
   }
 
   .fretboard-controls {
