@@ -7,6 +7,7 @@ import {
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretboard.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
+import { createWildTunaMode } from "./modes/wild-tuna.js";
 import { runModeTransition } from "./mode-transition.js";
 import { createCircleOfFifthsUi } from "./ui/circle-of-fifths.js";
 import { createDrumMachineUi } from "./ui/drum-machine.js";
@@ -101,6 +102,11 @@ const MODE_REGISTRY: ModeDefinition[] = [
       setSeigaihaModeRandomness(randomness);
     },
     getRandomnessTarget: () => drumRandomnessTarget,
+  }),
+  createWildTunaMode({
+    onRandomnessChange: (randomness) => {
+      setSeigaihaModeRandomness(randomness);
+    },
   }),
 ];
 
@@ -496,10 +502,19 @@ function setCarouselHidden(hidden: boolean): void {
   if (carouselShowEl) {
     carouselShowEl.setAttribute("aria-hidden", hidden ? "false" : "true");
   }
-  document.body.classList.toggle(
-    "drum-fullscreen",
-    hidden && activeModeId === "drum-machine"
-  );
+  document.body.classList.toggle("drum-fullscreen", hidden && activeModeId === "drum-machine");
+  document.body.classList.toggle("wild-tuna-fullscreen", hidden && activeModeId === "wild-tuna");
+  if (hidden && activeModeId === "wild-tuna") {
+    document.body.classList.remove("wild-tuna-enter-fullscreen");
+    // Force a style flush so replaying the class restarts the jump animation.
+    void document.body.offsetWidth;
+    document.body.classList.add("wild-tuna-enter-fullscreen");
+    window.setTimeout(() => {
+      document.body.classList.remove("wild-tuna-enter-fullscreen");
+    }, 900);
+  } else {
+    document.body.classList.remove("wild-tuna-enter-fullscreen");
+  }
 }
 
 function bindSeigaihaInteractionPulse(): void {
@@ -776,6 +791,11 @@ async function switchMode(id: ModeId): Promise<void> {
           document.body.classList.contains("carousel-hidden") &&
             activeModeId === "drum-machine"
         );
+        document.body.classList.toggle(
+          "wild-tuna-fullscreen",
+          document.body.classList.contains("carousel-hidden") &&
+            activeModeId === "wild-tuna"
+        );
         if (!nextMode?.canFullscreen) {
           setCarouselHidden(false);
         }
@@ -816,6 +836,14 @@ function initializeCarouselUi(): void {
       setCarouselHidden(false);
     });
   }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const fullscreenTrigger = target.closest<HTMLButtonElement>("[data-wild-tuna-fullscreen]");
+    if (!fullscreenTrigger || activeModeId !== "wild-tuna") return;
+    setCarouselHidden(true);
+  });
 
   if (carouselShowEl) {
     carouselShowEl.addEventListener("click", () => {

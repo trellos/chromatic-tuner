@@ -7,6 +7,7 @@ const MODE_TABS = [
   { label: 'Fretboard', id: 'fretboard' },
   { label: 'Circle of Fifths', id: 'circle-of-fifths' },
   { label: 'Drum Machine', id: 'drum-machine' },
+  { label: 'Wild Tuna', id: 'wild-tuna' },
 ] as const;
 
 type PageIssueTracker = {
@@ -984,4 +985,3 @@ test("circle chord mode oscillates seigaiha randomness and decays on exit", asyn
     .poll(async () => readDebugRandomness(page), { timeout: 2600 })
     .toBeLessThan(0.22);
 });
-

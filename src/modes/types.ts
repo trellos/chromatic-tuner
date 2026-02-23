@@ -1,4 +1,10 @@
-export type ModeId = "tuner" | "metronome" | "fretboard" | "circle-of-fifths" | "drum-machine";
+export type ModeId =
+  | "tuner"
+  | "metronome"
+  | "fretboard"
+  | "circle-of-fifths"
+  | "drum-machine"
+  | "wild-tuna";
 
 // A mode is the high-level object that encapsulates one app screen's
 // identity, capabilities, and lifecycle behavior (enter/exit callbacks).
