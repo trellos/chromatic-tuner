@@ -81,3 +81,46 @@ test("circle mode remains visible in portrait mobile without horizontal overflow
 
   expect(overflow.needsHorizontalScroll).toBeFalsy();
 });
+
+
+test("mobile swipe can navigate from fretboard to circle of fifths mode", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "Mobile Safari", "Touch swipe coverage is mobile-specific.");
+
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
+
+  await page.locator(".mode-stage").dispatchEvent("touchstart", {
+    touches: [{ identifier: 1, clientX: 320, clientY: 360 }],
+    changedTouches: [{ identifier: 1, clientX: 320, clientY: 360 }],
+  });
+  await page.locator(".mode-stage").dispatchEvent("touchmove", {
+    touches: [{ identifier: 1, clientX: 80, clientY: 360 }],
+    changedTouches: [{ identifier: 1, clientX: 80, clientY: 360 }],
+  });
+  await page.locator(".mode-stage").dispatchEvent("touchend", {
+    touches: [],
+    changedTouches: [{ identifier: 1, clientX: 80, clientY: 360 }],
+  });
+
+  await expect(page.locator('.mode-screen[data-mode="circle-of-fifths"]')).toHaveClass(/is-active/);
+});
+
+test("mobile Safari can switch tuner visual mode between strobe and circle", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage is mobile-specific.");
+
+  await page.goto("/");
+
+  const strobe = page.locator("#strobe-visualizer");
+  const host = page.locator("[data-tuner-circle-host]");
+  await expect(strobe).toBeVisible();
+  await expect(host).toBeHidden();
+
+  await page.getByRole("button", { name: "Circle" }).click();
+  await expect(host).toBeVisible();
+  await expect(strobe).toBeHidden();
+
+  await page.getByRole("button", { name: "Strobe" }).click();
+  await expect(strobe).toBeVisible();
+  await expect(host).toBeHidden();
+});
