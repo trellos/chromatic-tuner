@@ -102,6 +102,18 @@ test("circle mode renders twelve outer wedges and keeps the wheel inside card bo
   expect((circleBox?.height ?? 0) <= (screenBox?.height ?? 0) + 1).toBeTruthy();
 });
 
+test("note-bar flat labels keep lowercase b", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const noteBarLabels = page.locator(
+    '.mode-screen[data-mode="circle-of-fifths"] .cof-note-cell-label'
+  );
+  await expect(noteBarLabels.nth(1)).toHaveText("Bb");
+  await expect(noteBarLabels.nth(4)).toHaveText("Db");
+  await expect(noteBarLabels.nth(6)).toHaveText("Eb");
+  await expect(noteBarLabels.nth(11)).toHaveText("Ab");
+});
+
 test("selecting F shows inner corner roman numerals and center chord labels", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "Circle of Fifths" }).click();
@@ -419,6 +431,18 @@ test("outer wedge pointer hold toggles holding class for sustain lifecycle", asy
   await expect(wedge).toHaveClass(/is-holding/);
   await wedge.dispatchEvent("pointerup", { pointerId: 21, bubbles: true });
   await expect(wedge).not.toHaveClass(/is-holding/);
+});
+
+test("outer wedge press pulses note-bar notes for sustained playback", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const wedge = panel.locator('.cof-wedge[data-index="0"]');
+  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
+
+  await wedge.dispatchEvent("pointerdown", { pointerId: 33, bubbles: true });
+  await expect(cCell).toHaveClass(/is-active/);
+  await wedge.dispatchEvent("pointerup", { pointerId: 33, bubbles: true });
 });
 
 test("double-tapping inside the circle cycles instruments and shows the instrument name indicator", async ({

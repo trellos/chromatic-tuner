@@ -1,11 +1,70 @@
-import { createDrumMachineUi, getDrumRandomnessForBeat, getDrumSoundingBeatIndicesFromFlags, type DrumMachineUiOptions } from "../ui/drum-machine.js";
+import {
+  createDrumMachineUi,
+  getDrumRandomnessForBeat,
+  getDrumSoundingBeatIndicesFromFlags,
+} from "../ui/drum-machine.js";
 import type { ModeDefinition } from "./types.js";
 
 export { getDrumRandomnessForBeat, getDrumSoundingBeatIndicesFromFlags };
 
-export function createDrumMachineMode(options: DrumMachineUiOptions = {}): ModeDefinition {
+type DrumMachineModeOptions = {
+  onRandomnessChange?: (randomness: number | null) => void;
+  getRandomnessTarget?: () => number;
+  onRequestFullscreen?: () => void;
+  onExitFullscreen?: () => void;
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+const DEFAULT_RANDOMNESS_TARGET = 0.9;
+
+export function createDrumMachineMode(options: DrumMachineModeOptions = {}): ModeDefinition {
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="drum-machine"]');
-  const drumUi = modeEl ? createDrumMachineUi(modeEl, options) : null;
+  const fullscreenToggle = modeEl?.querySelector<HTMLButtonElement>("#carousel-toggle") ?? null;
+  const fullscreenExit = modeEl?.querySelector<HTMLButtonElement>("#drum-exit") ?? null;
+  const shareButton = modeEl?.querySelector<HTMLButtonElement>("#drum-share-button") ?? null;
+  let modeAbort: AbortController | null = null;
+  let lastRandomness = Number.NaN;
+
+  const emitRandomness = (next: number | null): void => {
+    if (next === null || !Number.isFinite(next)) {
+      lastRandomness = Number.NaN;
+      options.onRandomnessChange?.(null);
+      return;
+    }
+    const clamped = clamp(next, 0, 1);
+    if (Number.isFinite(lastRandomness) && Math.abs(clamped - lastRandomness) <= 0.0005) return;
+    lastRandomness = clamped;
+    options.onRandomnessChange?.(clamped);
+  };
+
+  const getRandomnessTarget = (): number =>
+    clamp(options.getRandomnessTarget?.() ?? DEFAULT_RANDOMNESS_TARGET, 0, 1);
+
+  const drumUi = modeEl
+    ? createDrumMachineUi(modeEl, {
+        onTransportStart: () => {
+          emitRandomness(0);
+        },
+        onTransportStop: () => {
+          emitRandomness(0);
+        },
+        onBeatBoundary: ({ beatIndex, beatHasSound, soundingBeatIndices }) => {
+          if (beatIndex === 0) {
+            emitRandomness(0);
+          }
+          if (!beatHasSound) return;
+          const next = getDrumRandomnessForBeat({
+            beatIndex,
+            soundingBeatIndices,
+            target: getRandomnessTarget(),
+          });
+          if (next !== null) emitRandomness(next);
+        },
+      })
+    : null;
 
   return {
     id: "drum-machine",
@@ -14,10 +73,51 @@ export function createDrumMachineMode(options: DrumMachineUiOptions = {}): ModeD
     preserveState: true,
     canFullscreen: true,
     onEnter: async () => {
+      modeAbort?.abort();
+      modeAbort = new AbortController();
+      const { signal } = modeAbort;
+      if (fullscreenToggle) {
+        fullscreenToggle.disabled = false;
+        fullscreenToggle.addEventListener("click", () => options.onRequestFullscreen?.(), {
+          signal,
+        });
+      }
+      if (fullscreenExit) {
+        fullscreenExit.addEventListener("click", () => options.onExitFullscreen?.(), { signal });
+      }
+      if (shareButton) {
+        shareButton.addEventListener(
+          "click",
+          () => {
+            const shareUrl = drumUi?.getShareUrl();
+            if (!shareUrl) return;
+            void (async () => {
+              try {
+                if (navigator.clipboard?.writeText) {
+                  await navigator.clipboard.writeText(shareUrl);
+                  shareButton.setAttribute("aria-label", "Share URL copied");
+                } else {
+                  window.prompt("Copy this drum track URL", shareUrl);
+                }
+              } catch {
+                window.prompt("Copy this drum track URL", shareUrl);
+              }
+            })();
+          },
+          { signal }
+        );
+      }
+      emitRandomness(0);
       await drumUi?.enter();
     },
     onExit: () => {
+      modeAbort?.abort();
+      modeAbort = null;
+      if (fullscreenToggle) {
+        fullscreenToggle.disabled = true;
+      }
       drumUi?.exit();
+      emitRandomness(null);
     },
   };
 }

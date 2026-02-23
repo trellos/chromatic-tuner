@@ -508,6 +508,9 @@ export function createCircleOfFifthsUi(
   let detuneDeg = 0;
   let detailBaseDeg = 0;
   let pendingOuterClickTimeout: number | null = null;
+  let lastBackgroundTapAt = 0;
+  let lastBackgroundTapX = 0;
+  let lastBackgroundTapY = 0;
   const pulseTimeouts = new Set<number>();
 
   // UI state transitions:
@@ -977,17 +980,37 @@ export function createCircleOfFifthsUi(
     playDiminished();
   });
 
-  svg.addEventListener("click", (event) => {
+  const maybeHandleBackgroundTap = (
+    target: EventTarget | null,
+    clientX: number,
+    clientY: number
+  ): void => {
     if (!chordModeEnabled) return;
-    const target = event.target;
     if (!(target instanceof Element)) return;
     const clickedWedge = target.closest(".cof-wedge, .cof-secondary-cell, .cof-dim-cell");
     if (clickedWedge) return;
-    const point = clientToSvgPoint(event.clientX, event.clientY);
+    const point = clientToSvgPoint(clientX, clientY);
     const dx = point.x - CENTER;
     const dy = point.y - CENTER;
     if (Math.sqrt(dx * dx + dy * dy) <= OUTER_RADIUS) return;
+    const now = performance.now();
+    const nearDuplicate =
+      now - lastBackgroundTapAt < 420 &&
+      Math.abs(clientX - lastBackgroundTapX) <= 4 &&
+      Math.abs(clientY - lastBackgroundTapY) <= 4;
+    if (nearDuplicate) return;
+    lastBackgroundTapAt = now;
+    lastBackgroundTapX = clientX;
+    lastBackgroundTapY = clientY;
     options.onBackgroundTap?.();
+  };
+
+  svg.addEventListener("click", (event) => {
+    maybeHandleBackgroundTap(event.target, event.clientX, event.clientY);
+  });
+
+  svg.addEventListener("pointerup", (event) => {
+    maybeHandleBackgroundTap(event.target, event.clientX, event.clientY);
   });
 
   svg.addEventListener("dblclick", (event) => {

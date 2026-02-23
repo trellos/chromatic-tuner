@@ -229,9 +229,12 @@ export function createCircleOfFifthsMode(
         onOuterPressStart: (note) => {
           suppressNextTapPlayback = true;
           if (chordModeActive) {
-            void guitarPlayer.startSustainChord(getCircleMajorChordMidis(note.midi));
+            const chordMidis = getCircleMajorChordMidis(note.midi);
+            circleUi?.pulseChord(chordMidis, 520);
+            void guitarPlayer.startSustainChord(chordMidis);
             return;
           }
+          circleUi?.pulseNote(note.midi, 420);
           void guitarPlayer.startSustainMidi(note.midi);
         },
         onOuterPressEnd: () => {
@@ -239,7 +242,9 @@ export function createCircleOfFifthsMode(
         },
         onSecondaryPressStart: (chord) => {
           suppressNextTapPlayback = true;
-          void guitarPlayer.startSustainChord(getCircleChordMidis(chord));
+          const chordMidis = getCircleChordMidis(chord);
+          circleUi?.pulseChord(chordMidis, 520);
+          void guitarPlayer.startSustainChord(chordMidis);
         },
         onSecondaryPressEnd: () => {
           guitarPlayer.stopSustain();

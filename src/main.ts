@@ -37,9 +37,7 @@ declare global {
   }
 }
 
-const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
-const drumExitEl = document.getElementById("drum-exit");
 const modeDots =
   document.querySelectorAll<HTMLButtonElement>(".mode-dot[data-mode]") ?? [];
 const modeStageEl = document.querySelector<HTMLElement>(".mode-stage");
@@ -102,6 +100,12 @@ const MODE_REGISTRY: ModeDefinition[] = [
       setSeigaihaModeRandomness(randomness);
     },
     getRandomnessTarget: () => drumRandomnessTarget,
+    onRequestFullscreen: () => {
+      setCarouselHidden(true);
+    },
+    onExitFullscreen: () => {
+      setCarouselHidden(false);
+    },
   }),
   createWildTunaMode({
     onRandomnessChange: (randomness) => {
@@ -528,15 +532,11 @@ function bindSeigaihaInteractionPulse(): void {
 }
 
 function updateCarouselState(): void {
-  const activeMode = getModeById(activeModeId);
   modeDots.forEach((dot) => {
     const isActive = dot.dataset.mode === activeModeId;
     dot.classList.toggle("is-active", isActive);
     dot.setAttribute("aria-selected", String(isActive));
   });
-  if (carouselToggleEl) {
-    (carouselToggleEl as HTMLButtonElement).disabled = !activeMode?.canFullscreen;
-  }
 }
 
 function setActiveScreen(id: ModeId): void {
@@ -822,20 +822,6 @@ function initializeCarouselUi(): void {
       setCarouselHidden(false);
     });
   });
-
-  if (carouselToggleEl) {
-    carouselToggleEl.addEventListener("click", () => {
-      const activeMode = getModeById(activeModeId);
-      if (!activeMode?.canFullscreen) return;
-      setCarouselHidden(true);
-    });
-  }
-
-  if (drumExitEl) {
-    drumExitEl.addEventListener("click", () => {
-      setCarouselHidden(false);
-    });
-  }
 
   document.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;

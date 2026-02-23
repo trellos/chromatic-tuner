@@ -28,13 +28,20 @@ export function getDrumRandomnessForBeat(options: {
 }
 
 export type DrumMachineUiOptions = {
-  onRandomnessChange?: (randomness: number | null) => void;
-  getRandomnessTarget?: () => number;
+  onTransportStart?: () => void;
+  onTransportStop?: () => void;
+  onBeatBoundary?: (event: {
+    beatIndex: number;
+    beatHasSound: boolean;
+    soundingBeatIndices: number[];
+    beatsPerBar: number;
+  }) => void;
 };
 
 export type DrumMachineUi = {
   enter: () => Promise<void>;
   exit: () => void;
+  getShareUrl: () => string;
   destroy: () => void;
 };
 
@@ -44,7 +51,6 @@ export function createDrumMachineUi(
   rootEl: HTMLElement,
   options: DrumMachineUiOptions = {}
 ): DrumMachineUi {
-  let randomness = 0;
   // Lifecycle overview:
   // 1) `enterMode` syncs UI state, wires listeners, and seeds the initial pattern.
   // 2) UI interactions mutate pattern/tempo/kit and can start/stop transport.
@@ -54,7 +60,6 @@ export function createDrumMachineUi(
   const drumGridsEl = drumMockEl?.querySelector<HTMLElement>(".drum-grids") ?? null;
   const playheadEl = drumMockEl?.querySelector<HTMLElement>(".drum-playhead") ?? null;
   const playButton = rootEl.querySelector<HTMLButtonElement>("#drum-play-toggle");
-  const shareButton = rootEl.querySelector<HTMLButtonElement>("#drum-share-button");
   const beatButton = rootEl.querySelector<HTMLButtonElement>("#drum-beat-button");
   const beatMenu = rootEl.querySelector<HTMLElement>("#drum-beat-menu");
   const kitButton = rootEl.querySelector<HTMLButtonElement>("#drum-kit-button");
@@ -68,7 +73,6 @@ export function createDrumMachineUi(
   const BPM_MAX = 180;
   const LOOKAHEAD_MS = 25;
   const SCHEDULE_AHEAD = 0.1;
-  const DEFAULT_RANDOMNESS_TARGET = 0.9;
   type KitId = "rock" | "electro" | "house" | "lofi" | "latin" | "woodblock";
   type VoiceId = "kick" | "snare" | "hat" | "perc";
 
@@ -184,20 +188,6 @@ export function createDrumMachineUi(
   };
 
   const isKitId = (value: string): value is KitId => value in DRUM_KITS;
-  const getRandomnessTarget = () =>
-    clamp(options.getRandomnessTarget?.() ?? DEFAULT_RANDOMNESS_TARGET, 0, 1);
-
-  const emitRandomness = (next: number | null, force = false) => {
-    if (next === null || !Number.isFinite(next)) {
-      options.onRandomnessChange?.(null);
-      return;
-    }
-    const clamped = clamp(next, 0, 1);
-    if (!force && Math.abs(clamped - randomness) <= 0.0005) return;
-    randomness = clamped;
-    options.onRandomnessChange?.(randomness);
-  };
-
   const setKitLabel = () => {
     if (kitLabel) {
       kitLabel.textContent = DRUM_KITS[currentKit].name;
@@ -518,20 +508,6 @@ export function createDrumMachineUi(
     return url.toString();
   };
 
-  const copyShareUrl = async () => {
-    const shareUrl = getShareUrl();
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-        shareButton?.setAttribute("aria-label", "Share URL copied");
-      } else {
-        window.prompt("Copy this drum track URL", shareUrl);
-      }
-    } catch {
-      window.prompt("Copy this drum track URL", shareUrl);
-    }
-  };
-
   const hydrateTrackFromUrl = async () => {
     const params = new URLSearchParams(window.location.search);
     const encodedTrack = params.get(TRACK_PARAM_KEY);
@@ -702,31 +678,23 @@ export function createDrumMachineUi(
 
       if (isBeatBoundary) {
         const beatIndex = Math.floor(stepToHighlight / stepsPerBeat);
-        if (beatIndex === 0) {
-          // Reset each bar, then rise in beat-sized jumps toward target.
-          emitRandomness(0, true);
-        }
         const beatStartStep = beatIndex * stepsPerBeat;
         const beatHasSound = beatContainsAnySound(
           activeGrid,
           beatStartStep,
           stepsPerBeat
         );
-        if (beatHasSound) {
-          const soundingBeatIndices = getSoundingBeatIndices(
-            activeGrid,
-            beatsPerBar,
-            stepsPerBeat
-          );
-          const nextRandomness = getDrumRandomnessForBeat({
-            beatIndex,
-            soundingBeatIndices,
-            target: getRandomnessTarget(),
-          });
-          if (nextRandomness !== null) {
-            emitRandomness(nextRandomness, nextRandomness <= 0.0005);
-          }
-        }
+        const soundingBeatIndices = getSoundingBeatIndices(
+          activeGrid,
+          beatsPerBar,
+          stepsPerBeat
+        );
+        options.onBeatBoundary?.({
+          beatIndex,
+          beatHasSound,
+          soundingBeatIndices,
+          beatsPerBar,
+        });
       }
       currentStep = (currentStep + 1) % stepsPerBar;
       nextStepTime += stepDuration;
@@ -739,7 +707,7 @@ export function createDrumMachineUi(
     if (!audioContext) return;
     isPlaying = true;
     currentStep = 0;
-    emitRandomness(0, true);
+    options.onTransportStart?.();
     nextStepTime = audioContext.currentTime + 0.05;
     schedulerId = window.setInterval(scheduleSteps, LOOKAHEAD_MS);
     if (playButton) playButton.textContent = "Stop";
@@ -767,7 +735,7 @@ export function createDrumMachineUi(
       lastStepIndex = null;
     }
     playheadEl?.classList.remove("is-active");
-    emitRandomness(0, true);
+    options.onTransportStop?.();
     if (playButton) playButton.textContent = "Play";
   };
 
@@ -832,16 +800,6 @@ export function createDrumMachineUi(
       },
       { signal }
     );
-
-    if (shareButton) {
-      shareButton.addEventListener(
-        "click",
-        () => {
-          void copyShareUrl();
-        },
-        { signal }
-      );
-    }
 
     if (playButton) {
       playButton.addEventListener(
@@ -936,7 +894,6 @@ export function createDrumMachineUi(
   };
 
   const enter = async () => {
-    emitRandomness(0, true);
     setSignature(signature);
     setBpm(bpm);
     setBeatLabel();
@@ -963,12 +920,13 @@ export function createDrumMachineUi(
     detachVisualViewportListeners = null;
     bodyClassObserver?.disconnect();
     bodyClassObserver = null;
-    emitRandomness(null);
+    options.onTransportStop?.();
   };
 
   return {
     enter,
     exit,
+    getShareUrl,
     destroy() {
       exit();
     },
