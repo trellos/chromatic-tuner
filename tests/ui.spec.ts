@@ -940,3 +940,28 @@ test('tuner status toggle is not duplicated after mode re-entry', async ({ page 
   await page.locator('#strobe-visualizer').click();
   await expect(page.locator('body')).toHaveClass(/status-hidden/);
 });
+
+
+test("circle chord mode oscillates seigaiha randomness and decays on exit", async ({ page }) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  await page.getByRole("button", { name: "Primary note C", exact: true }).click();
+
+  const sampled = new Set<number>();
+  for (let i = 0; i < 6; i += 1) {
+    await page.waitForTimeout(180);
+    const value = await readDebugRandomness(page);
+    if (Number.isFinite(value)) {
+      sampled.add(Math.round(value * 100));
+    }
+  }
+
+  expect(sampled.size >= 3).toBeTruthy();
+
+  await page.getByRole("button", { name: "Primary note G", exact: true }).dblclick();
+
+  await expect
+    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
+    .toBeLessThan(0.05);
+});

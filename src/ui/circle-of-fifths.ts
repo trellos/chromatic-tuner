@@ -22,18 +22,28 @@ export type CircleSelection = {
 export type CircleOfFifthsUiOptions = {
   onPrimaryTap?: (selection: CircleSelection) => void;
   onSecondaryTap?: (chord: CircleChordSpec) => void;
+  onOuterTap?: (note: CircleNoteTap) => void;
+  onOuterDoubleTap?: (note: CircleNoteTap) => void;
 };
 
 export type CircleOfFifthsUi = {
   setPrimaryByLabel: (label: string | null) => void;
   setPrimaryByMidi: (midi: number | null) => void;
   setTuningCents: (cents: number | null) => void;
+  setChordMode: (enabled: boolean) => void;
   destroy: () => void;
 };
 
 type CircleNote = {
   label: string;
   semitone: number;
+};
+
+export type CircleNoteTap = {
+  index: number;
+  label: string;
+  midi: number;
+  isPrimary: boolean;
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -180,6 +190,10 @@ export function getCircleChordMidis(chord: CircleChordSpec): number[] {
   return [chord.rootMidi, chord.rootMidi + 3, chord.rootMidi + 7];
 }
 
+export function getCircleMajorChordMidis(rootMidi: number): number[] {
+  return [rootMidi, rootMidi + 4, rootMidi + 7];
+}
+
 function createSvgEl<T extends keyof SVGElementTagNameMap>(
   tag: T,
   className?: string
@@ -221,7 +235,29 @@ export function createCircleOfFifthsUi(
 
   let primaryIndex: number | null = null;
   let selection: CircleSelection | null = null;
+  let chordModeEnabled = false;
   let detuneDeg = 0;
+
+  const updateOuterChordModeLabels = (): void => {
+    root.classList.toggle("is-chord-mode", chordModeEnabled);
+    outerButtons.forEach((button, index) => {
+      const note = OUTER_NOTES[index];
+      const label = button.querySelector<SVGTextElement>(".cof-wedge-label");
+      if (!note || !label) return;
+
+      label.replaceChildren();
+      const rootSpan = createSvgEl("tspan", "cof-wedge-label-root");
+      rootSpan.textContent = note.label;
+      label.appendChild(rootSpan);
+
+      if (chordModeEnabled) {
+        const suffixSpan = createSvgEl("tspan", "cof-wedge-label-suffix");
+        suffixSpan.textContent = "maj";
+        suffixSpan.setAttribute("dx", "3");
+        label.appendChild(suffixSpan);
+      }
+    });
+  };
 
   const applyDetailTransform = (): void => {
     const baseDeg = primaryIndex === null ? 0 : primaryIndex * OUTER_WEDGE_DEG;
@@ -244,18 +280,36 @@ export function createCircleOfFifthsUi(
     const labelPoint = polarPoint((OUTER_RADIUS + OUTER_INNER_RADIUS) / 2, centerDeg);
     label.setAttribute("x", String(labelPoint.x));
     label.setAttribute("y", String(labelPoint.y));
-    label.textContent = note.label;
+    const labelRoot = createSvgEl("tspan", "cof-wedge-label-root");
+    labelRoot.textContent = note.label;
+    label.appendChild(labelRoot);
     node.appendChild(label);
 
-    node.addEventListener("click", () => {
+    const emitOuterTap = (): CircleNoteTap => ({
+      index,
+      label: note.label,
+      midi: midiFromSemitoneNearC4(note.semitone),
+      isPrimary: index === primaryIndex,
+    });
+
+    const onActivate = (): void => {
+      const tap = emitOuterTap();
+      options.onOuterTap?.(tap);
+      if (chordModeEnabled) return;
       setPrimaryIndex(index);
       if (selection) options.onPrimaryTap?.(selection);
+    };
+
+    node.addEventListener("click", onActivate);
+    node.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      const tap = emitOuterTap();
+      options.onOuterDoubleTap?.(tap);
     });
     node.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      setPrimaryIndex(index);
-      if (selection) options.onPrimaryTap?.(selection);
+      onActivate();
     });
 
     outerGroup.appendChild(node);
@@ -404,6 +458,10 @@ export function createCircleOfFifthsUi(
       }
       detuneDeg = clamp((cents / 7) * 8, -12, 12);
       applyDetailTransform();
+    },
+    setChordMode(enabled: boolean) {
+      chordModeEnabled = enabled;
+      updateOuterChordModeLabels();
     },
     destroy() {
       container.replaceChildren();
