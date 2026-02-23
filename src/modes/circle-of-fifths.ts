@@ -94,6 +94,9 @@ export function createCircleOfFifthsMode(
   };
 
   const setChordMode = (next: boolean): void => {
+    // Chord mode has two coupled effects:
+    // 1) UI mode switch (outer taps become major-triad playback)
+    // 2) background randomness animation (oscillate while active, ease out on exit)
     if (chordModeActive === next) return;
     chordModeActive = next;
     circleUi?.setChordMode(next);
@@ -116,17 +119,22 @@ export function createCircleOfFifthsMode(
   const playChord = async (chord: CircleChordSpec): Promise<void> => {
     options.onPulse?.();
     triggerPlaybackRandomness(650);
-    await guitarPlayer.playChord(getCircleChordMidis(chord), 640);
+    const chordMidis = getCircleChordMidis(chord);
+    circleUi?.pulseChord(chordMidis, 640);
+    await guitarPlayer.playChord(chordMidis, 640);
   };
 
   const playPrimary = async (midi: number): Promise<void> => {
     options.onPulse?.();
+    circleUi?.pulseNote(midi, 400);
     await guitarPlayer.playMidi(midi, 400);
   };
 
   const playMajorChord = async (midi: number): Promise<void> => {
     options.onPulse?.();
-    await guitarPlayer.playChord(getCircleMajorChordMidis(midi), 640);
+    const chordMidis = getCircleMajorChordMidis(midi);
+    circleUi?.pulseChord(chordMidis, 640);
+    await guitarPlayer.playChord(chordMidis, 640);
   };
 
   return {
@@ -136,11 +144,15 @@ export function createCircleOfFifthsMode(
     preserveState: false,
     canFullscreen: false,
     onEnter: () => {
+      // Recreate UI each entry to avoid stale listeners/state between mode switches.
       if (!mountEl) return;
       lastPrimaryLabel = null;
       circleUi?.destroy();
       circleUi = createCircleOfFifthsUi(mountEl, {
         onPrimaryTap: (selection) => {
+          // Tap flow:
+          // - first tap on a primary: select + single-note playback
+          // - retap same primary: enter chord mode + play primary major triad
           const isPrimaryRetap = selection.primaryLabel === lastPrimaryLabel;
           lastPrimaryLabel = selection.primaryLabel;
           if (isPrimaryRetap) {
@@ -161,6 +173,9 @@ export function createCircleOfFifthsMode(
         },
         onSecondaryTap: (chord) => {
           void playChord(chord);
+        },
+        onNoteBarTap: (note) => {
+          void playPrimary(note.midi);
         },
       });
     },

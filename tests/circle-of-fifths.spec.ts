@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 
 test("circle mode renders twelve outer wedges and keeps the wheel inside card bounds", async ({
   page,
@@ -8,8 +8,12 @@ test("circle mode renders twelve outer wedges and keeps the wheel inside card bo
 
   const circleScreen = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
+  const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
   await expect(circleScreen).toHaveClass(/is-active/);
   await expect(circle.locator(".cof-wedge")).toHaveCount(12);
+  await expect(noteBar.locator(".cof-note-cell")).toHaveCount(12);
+  await expect(noteBar.locator(".cof-note-cell-label").first()).toHaveText("A");
+  await expect(noteBar.locator(".cof-note-cell-label").nth(4)).toHaveText("Db");
   await expect(circle).not.toHaveClass(/has-primary/);
 
   const [screenBox, circleBox] = await Promise.all([
@@ -22,29 +26,63 @@ test("circle mode renders twelve outer wedges and keeps the wheel inside card bo
   expect((circleBox?.height ?? 0) <= (screenBox?.height ?? 0) + 1).toBeTruthy();
 });
 
-test("selecting F places II III VI wedges under Bb F C respectively", async ({ page }) => {
+test("selecting F shows inner corner roman numerals and center chord labels", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "Circle of Fifths" }).click();
   const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
-  const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').click({ force: true });
 
   await expect(circle).toHaveClass(/has-primary/);
   await expect(circle.locator(".cof-secondary-label").nth(0)).toHaveText("Gm");
   await expect(circle.locator(".cof-secondary-label").nth(1)).toHaveText("Am");
   await expect(circle.locator(".cof-secondary-label").nth(2)).toHaveText("Dm");
-  await expect(circle.locator(".cof-dim-label")).toHaveText("Edim");
+  await expect(circle.locator(".cof-dim-label")).toHaveText("E°");
+
+  await expect(circle.locator(".cof-secondary-degree-label").nth(0)).toHaveText("ii");
+  await expect(circle.locator(".cof-secondary-degree-label").nth(1)).toHaveText("iii");
+  await expect(circle.locator(".cof-secondary-degree-label").nth(2)).toHaveText("vi");
+  await expect(circle.locator(".cof-dim-degree-label")).toHaveText("vii°");
+
+  const outerDegrees = circle.locator(".cof-degree-label");
+  await expect(outerDegrees.nth(11)).toHaveText("I");
+  await expect(outerDegrees.nth(10)).toHaveText("IV");
+  await expect(outerDegrees.nth(0)).toHaveText("V");
+  await expect(outerDegrees.nth(1)).toHaveText("");
+  await expect(outerDegrees.nth(9)).toHaveText("");
 
   const spans = await circle.locator('.cof-secondary-cell').evaluateAll((cells) =>
     cells.map((cell) => Number((cell as SVGGElement).getAttribute('data-span-deg') ?? '0'))
   );
-  expect(spans).toEqual([30, 30, 30]);
+  expect(spans).toEqual([24, 24, 24]);
 
   const xPositions = await circle.locator(".cof-secondary-label").evaluateAll((labels) =>
     labels.map((label) => Number((label as SVGTextElement).getAttribute("x") ?? "0"))
   );
   expect(xPositions[0]! < xPositions[1]!).toBeTruthy();
   expect(xPositions[1]! < xPositions[2]!).toBeTruthy();
+});
+
+test("double-clicking vi enters minor mode and double-clicking III exits to major", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
+
+  await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').click({ force: true }); // F primary
+  await expect(circle.locator('.cof-wedge[data-index="3"] .cof-degree-label')).toHaveText(""); // vi hidden on outer
+
+  await circle.locator('.cof-secondary-cell').nth(2).locator('.cof-secondary-path').dblclick({ force: true }); // inner vi wedge
+  await expect(circle.locator('.cof-wedge[data-index="11"] .cof-degree-label')).toHaveText("III");
+  await expect(circle.locator('.cof-wedge[data-index="10"] .cof-degree-label')).toHaveText("VI");
+  await expect(circle.locator('.cof-wedge[data-index="0"] .cof-degree-label')).toHaveText("VII");
+  await expect(circle.locator(".cof-secondary-degree-label").nth(0)).toHaveText("iv");
+  await expect(circle.locator(".cof-secondary-degree-label").nth(1)).toHaveText("v");
+  await expect(circle.locator(".cof-secondary-degree-label").nth(2)).toHaveText("i");
+  await expect(circle.locator(".cof-dim-degree-label")).toHaveText("ii°");
+
+  await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').dblclick({ force: true }); // now III
+  await expect(circle.locator('.cof-wedge[data-index="11"] .cof-degree-label')).toHaveText("I");
+  await expect(circle.locator('.cof-wedge[data-index="10"] .cof-degree-label')).toHaveText("IV");
+  await expect(circle.locator('.cof-wedge[data-index="0"] .cof-degree-label')).toHaveText("V");
 });
 
 test("tuner circle toggle renders wedge-based circle without overflow", async ({ page }) => {
@@ -67,6 +105,15 @@ test("tuner circle toggle renders wedge-based circle without overflow", async ({
   }));
   expect(overflow.horizontal).toBeFalsy();
   expect(overflow.verticalOverflowPx).toBeLessThanOrEqual(24);
+});
+
+test("clicking a note-bar cell triggers note activity on that cell", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
+  const cCell = noteBar.locator('.cof-note-cell').filter({ hasText: "C" }).first();
+  await cCell.click({ force: true });
+  await expect(cCell).toHaveClass(/is-active/);
 });
 
 test("circle mode remains visible in portrait mobile without horizontal overflow", async ({ page }) => {

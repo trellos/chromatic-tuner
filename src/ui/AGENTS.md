@@ -1,4 +1,4 @@
-# UI Directory Guide
+﻿# UI Directory Guide
 
 This file describes how `src/ui` modules should be designed and maintained as this directory grows.
 
@@ -112,8 +112,16 @@ Integration points:
 4. Primary note change rotates the inner detail layer using shortest angular path; avoid long-way spins.
 5. In tuner integration, no detected note means no primary and no inner wedges.
 6. Tuner detune guidance maps signed cents into a bounded rotational offset centered at in-tune.
-7. Roman numeral corner labels on outer wedges must use `I`, `ii`, `iii`, `IV`, `V`, `vi`, `vii°`.
-8. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
+7. Roman numeral corner labels on outer wedges:
+   - major mode: show `I`, `IV`, `V`
+   - minor mode: show `III`, `VI`, `VII` (relative minor mapping)
+8. Inner detail wedges should show corner roman numerals (`ii`, `iii`, `vi`, `vii°`) and center chord labels (`m` / `°`) while playback follows the selected key.
+9. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
+10. Diminished chord labels should use the `°` symbol (for example `B°`) instead of the `dim` suffix.
+11. Relative minor mode toggle:
+   - entering: double-tap middle-ring `vi`
+   - exiting: double-tap outer `III`
+   - when active, outer roman labels and inner roman detail labels remap to relative minor degrees.
 
 ### Circle test expectations
 
