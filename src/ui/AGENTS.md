@@ -8,6 +8,7 @@ This file describes how `src/ui` modules should be designed and maintained as th
 
 Current entry:
 - `seigaihaBackground.ts`: app background pattern generation + install/update API.
+- `drum-machine.ts`: reusable drum machine UI object (lifecycle + transport).
 
 Future entries should follow the same principles:
 - module owns its own rendering/state concerns,
@@ -132,3 +133,19 @@ Integration points:
   - retap primary enters chord mode and plays major triad
   - background tap exits chord mode
   - primary tap in chord mode plays major triad (does not exit)
+
+## Drum Machine UI (shared object)
+
+Primary implementation:
+- `src/ui/drum-machine.ts`
+
+Integration points:
+- `src/modes/drum-machine.ts` (mode adapter)
+- `src/main.ts` (`window.__tunaUiObjects` exposure for coexistence testing)
+
+### Drum invariants
+
+1. UI object must be reusable and lifecycle-driven (`enter`, `exit`, `destroy`).
+2. Transport and scheduling behavior must match existing mode behavior.
+3. Share/hydration contract (`track` base64url payload) must remain deterministic.
+4. Randomness callback emits `null` on exit and bounded `0..1` values while active.

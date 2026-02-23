@@ -206,3 +206,59 @@ test("chord mode requires a primary retap, keeps outer-chord taps, and exits on 
   await expect(circle.locator(".cof-wedge.is-primary .cof-wedge-label")).toHaveText("C");
   await expect(outerLabels.first()).toHaveText("C");
 });
+
+test("indicator animation triggers for primary note, chord mode, and minor/major mode transitions", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
+  const banners = circle.locator(".cof-mode-banner");
+  const firstBanner = banners.first();
+
+  const aWedge = circle.locator('.cof-wedge[data-index="3"]');
+  await aWedge.focus();
+  await aWedge.press("Enter");
+  await expect(circle).toHaveClass(/has-primary/);
+  await expect(firstBanner).toHaveClass(/cof-mode-banner--indicator/);
+  await expect(firstBanner).toHaveClass(/is-scrolling/);
+
+  await aWedge.press("Enter");
+  await expect(circle).toHaveClass(/is-chord-mode/);
+  await expect(firstBanner).toContainText("CHORD");
+
+  await circle
+    .locator('.cof-secondary-cell')
+    .nth(2)
+    .locator(".cof-secondary-path")
+    .dispatchEvent("dblclick");
+  await expect(firstBanner).toContainText("minor");
+
+  await circle.locator('.cof-wedge[data-index="3"] .cof-wedge-path').dispatchEvent("dblclick");
+  await expect(firstBanner).toContainText("MAJOR");
+});
+
+test("note-bar supports keyboard activation with Enter and Space", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
+  const dbCell = noteBar.locator('.cof-note-cell').filter({ hasText: "Db" }).first();
+
+  await dbCell.evaluate((element) => {
+    const target = element as HTMLElement;
+    target.focus();
+    target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  });
+  await expect(dbCell).toHaveClass(/is-active/);
+  await page.waitForTimeout(560);
+  await expect(dbCell).not.toHaveClass(/is-active/);
+
+  await dbCell.evaluate((element) => {
+    const target = element as HTMLElement;
+    target.focus();
+    target.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+  });
+  await expect(dbCell).toHaveClass(/is-active/);
+});

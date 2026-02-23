@@ -8,6 +8,8 @@ import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretboard.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { runModeTransition } from "./mode-transition.js";
+import { createCircleOfFifthsUi } from "./ui/circle-of-fifths.js";
+import { createDrumMachineUi } from "./ui/drum-machine.js";
 import {
   getSeigaihaDetuneMapping,
   getSeigaihaPerformanceStats,
@@ -24,6 +26,15 @@ import {
   pulseSeigaihaRandomness,
   setSeigaihaRandomness,
 } from "./ui/seigaihaBackground.js";
+
+declare global {
+  interface Window {
+    __tunaUiObjects?: {
+      createCircleOfFifthsUi: typeof createCircleOfFifthsUi;
+      createDrumMachineUi: typeof createDrumMachineUi;
+    };
+  }
+}
 
 const carouselToggleEl = document.getElementById("carousel-toggle");
 const carouselShowEl = document.getElementById("carousel-show");
@@ -104,6 +115,11 @@ let swipeTargetScreen: HTMLElement | null = null;
 let swipeTargetMode: ModeId | null = null;
 let isSwipeDragging = false;
 let syncSeigaihaDebugModeVisibility: (() => void) | null = null;
+
+window.__tunaUiObjects = {
+  createCircleOfFifthsUi,
+  createDrumMachineUi,
+};
 
 function parseModeId(value: string | null): ModeId | null {
   if (!value) return null;
