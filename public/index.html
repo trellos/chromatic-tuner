@@ -52,6 +52,35 @@
         </article>
 
         <article
+          id="mode-screen-wild-tuna"
+          class="mode-screen"
+          data-mode="wild-tuna"
+          role="tabpanel"
+          aria-hidden="true"
+        >
+          <div class="wild-tuna-mode-shell">
+            <h2 class="wild-tuna-title">Wild Tuna</h2>
+            <div class="wild-tuna-card" aria-label="Wild Tuna card">
+              <img
+                class="wild-tuna-fish"
+                src="./favicon.svg"
+                alt="Tuna"
+                width="128"
+                height="128"
+              />
+              <button
+                class="carousel-toggle wild-tuna-fullscreen-trigger"
+                type="button"
+                aria-label="Go fullscreen"
+                data-wild-tuna-fullscreen
+              >
+                <span class="fullscreen-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article
           id="mode-screen-metronome"
           class="mode-screen"
           data-mode="metronome"
@@ -395,6 +424,7 @@
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-fretboard" data-mode="fretboard" aria-label="Fretboard" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-circle-of-fifths" data-mode="circle-of-fifths" aria-label="Circle of Fifths" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-drum-machine" data-mode="drum-machine" aria-label="Drum Machine" type="button"></button>
+          <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-wild-tuna" data-mode="wild-tuna" aria-label="Wild Tuna" type="button"></button>
         </div>
       </div>
 
