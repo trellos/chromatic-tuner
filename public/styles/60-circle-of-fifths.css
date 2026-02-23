@@ -75,17 +75,19 @@
 }
 
 .cof {
-  --cof-outer-fill-base: rgba(242, 246, 255, 0.95);
+  --cof-outer-fill-base: #d9deea;
   --cof-label-fill-main: #f8fbff;
   --cof-label-stroke-main: rgba(9, 26, 66, 0.85);
   --cof-detail-label-fill: #f8fbff;
   --cof-detail-label-stroke: rgba(12, 21, 48, 0.9);
-  --cof-i-fill: rgba(0, 245, 212, 0.22);
-  --cof-ivv-fill: rgba(255, 107, 214, 0.18);
-  --cof-third-fill: rgba(124, 58, 237, 0.08);
-  --cof-dim-fill: rgba(255, 158, 0, 0.08);
-  --cof-inner-third-fill: rgba(124, 58, 237, 0.36);
-  --cof-inner-dim-fill: rgba(255, 158, 0, 0.34);
+  --cof-i-fill: #95c0d2;
+  --cof-ivv-fill: #b9add4;
+  --cof-lesser-fill: #d0d6e2;
+  --cof-third-fill: #beb3d2;
+  --cof-dim-fill: #d5bf98;
+  --cof-inner-third-fill: #a796c8;
+  --cof-inner-dim-fill: #cfb186;
+  --cof-note-lesser-fill: #bda8cf;
   aspect-ratio: 1 / 1;
   max-height: calc(var(--mode-panel-height) - 72px);
   position: relative;
@@ -252,7 +254,7 @@
 
 .cof-note-cell {
   --cof-note-pop-scale: 1.26;
-  background: rgba(124, 58, 237, 0.16);
+  background-color: rgba(124, 58, 237, 0.22);
   border: none;
   border-radius: 6px;
   box-shadow: 0 2px 6px rgba(8, 18, 40, 0.14);
@@ -303,23 +305,23 @@
 }
 
 .cof-frame.has-primary .cof-note-cell[data-degree="i"] {
-  background: rgba(0, 245, 212, 0.76);
+  background-color: rgba(149, 192, 210, 0.9);
 }
 
 .cof-frame.has-primary .cof-note-cell[data-degree="iv"],
 .cof-frame.has-primary .cof-note-cell[data-degree="v"] {
-  background: rgba(255, 107, 214, 0.74);
+  background-color: rgba(185, 173, 212, 0.9);
 }
 
 .cof-frame.has-primary .cof-note-cell[data-degree="ii"],
 .cof-frame.has-primary .cof-note-cell[data-degree="iii"],
 .cof-frame.has-primary .cof-note-cell[data-degree="vi"],
 .cof-frame.has-primary .cof-note-cell[data-degree="vii"] {
-  background: rgba(255, 107, 214, 0.66);
+  background-color: rgba(189, 168, 207, 0.82);
 }
 
 .cof-frame.has-primary .cof-note-cell[data-diatonic="false"] {
-  opacity: 0.3;
+  opacity: 0.56;
 }
 
 .cof-note-trail {
@@ -366,11 +368,11 @@
 .cof.has-primary .cof-wedge[data-degree="ii"] .cof-wedge-path,
 .cof.has-primary .cof-wedge[data-degree="iii"] .cof-wedge-path,
 .cof.has-primary .cof-wedge[data-degree="vi"] .cof-wedge-path {
-  fill: var(--cof-outer-fill-base);
+  fill: var(--cof-lesser-fill);
 }
 
 .cof.has-primary .cof-wedge[data-degree="vii"] .cof-wedge-path {
-  fill: var(--cof-outer-fill-base);
+  fill: var(--cof-lesser-fill);
 }
 
 .cof.has-primary .cof-wedge[data-degree="i"] .cof-wedge-label,
@@ -393,7 +395,7 @@
 
 .cof-secondary-path,
 .cof-dim-path {
-  fill: rgba(250, 252, 255, 0.95);
+  fill: #dfe7f4;
   stroke: none;
 }
 
@@ -563,20 +565,43 @@
 
 .mode-screen[data-mode="ui-composite-debug"] {
   overflow: hidden;
-  padding: 10px;
+  padding: 10px 10px 12px;
 }
 
 .ui-composite-debug-shell {
   display: grid;
   gap: 8px;
-  grid-template-rows: minmax(0, 0.86fr) minmax(0, 1fr);
+  grid-template-areas:
+    "fullscreen"
+    "drum"
+    "circle";
+  grid-template-rows: auto minmax(0, 0.8fr) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
+}
+
+.ui-composite-debug-fullscreen-btn {
+  grid-area: fullscreen;
+  justify-self: end;
+  min-height: 30px;
+  padding: 6px 10px;
+  z-index: 4;
 }
 
 .ui-composite-debug-pane {
   min-height: 0;
   overflow: hidden;
+}
+
+.ui-composite-debug-pane--drum {
+  grid-area: drum;
+}
+
+.ui-composite-debug-pane--circle {
+  display: grid;
+  grid-area: circle;
+  place-items: center;
+  position: relative;
 }
 
 .ui-composite-debug-pane--drum .drum-mock {
@@ -585,16 +610,84 @@
 
 .ui-composite-debug-pane--circle .circle-mode-layout {
   height: 100%;
+  max-width: 100%;
+  width: 100%;
 }
 
 .ui-composite-debug-pane--circle .cof {
-  max-height: calc(100vh - 260px);
-  width: min(100%, calc((100vh - 260px) * 0.92), 460px);
+  max-height: calc(100vh - 314px);
+  width: min(100%, calc((100vh - 314px) * 0.82), 390px);
+}
+
+body.ui-composite-debug-fullscreen .app-header,
+body.ui-composite-debug-fullscreen .carousel,
+body.ui-composite-debug-fullscreen .carousel-show,
+body.ui-composite-debug-fullscreen .mode-dots,
+body.ui-composite-debug-fullscreen .seigaiha-debug-control {
+  display: none;
+}
+
+body.ui-composite-debug-fullscreen {
+  padding: 0;
+}
+
+body.ui-composite-debug-fullscreen main,
+body.ui-composite-debug-fullscreen .app,
+body.ui-composite-debug-fullscreen .mode-stage {
+  height: 100vh;
+  max-width: 100%;
+  width: 100%;
+}
+
+body.ui-composite-debug-fullscreen .mode-stage {
+  min-height: 100vh;
+}
+
+body.ui-composite-debug-fullscreen .mode-screen[data-mode="ui-composite-debug"] {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  height: 100vh;
+  overflow: hidden;
+  padding: 8px 10px 10px;
+  width: 100vw;
+}
+
+body.ui-composite-debug-fullscreen .ui-composite-debug-fullscreen-btn {
+  display: none;
+}
+
+body.ui-composite-debug-fullscreen .ui-composite-debug-shell {
+  gap: 6px;
+  grid-template-areas:
+    "drum"
+    "circle";
+  grid-template-rows: minmax(0, 0.82fr) minmax(0, 1fr);
+}
+
+body.ui-composite-debug-fullscreen .ui-composite-debug-pane--circle .cof {
+  max-height: calc(100vh - 242px);
+  width: min(100%, calc((100vh - 242px) * 0.86), 470px);
+}
+
+body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-grids,
+body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-grids,
+body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
+  border-color: rgba(12, 16, 32, 0.14);
 }
 
 
-
 @media (max-width: 900px) {
+  .ui-composite-debug-pane--circle .cof {
+    max-height: calc(100vh - 320px);
+    width: min(100%, calc((100vh - 320px) * 0.8), 360px);
+  }
+
   .cof {
     width: min(100%, calc(var(--mode-panel-height) - 86px), 500px);
   }
@@ -609,6 +702,33 @@
 }
 
 @media (max-width: 600px) and (orientation: portrait) {
+  .mode-screen[data-mode="ui-composite-debug"] {
+    padding: 8px;
+  }
+
+  .ui-composite-debug-shell {
+    gap: 6px;
+    grid-template-rows: auto minmax(0, 0.92fr) minmax(0, 1fr);
+  }
+
+  .ui-composite-debug-pane--circle .cof {
+    max-height: calc(100vh - 304px);
+    width: min(100%, calc((100vh - 304px) * 0.78), 320px);
+  }
+
+  body.ui-composite-debug-fullscreen .mode-screen[data-mode="ui-composite-debug"] {
+    padding: 6px;
+  }
+
+  body.ui-composite-debug-fullscreen .ui-composite-debug-shell {
+    grid-template-rows: minmax(0, 0.95fr) minmax(0, 1fr);
+  }
+
+  body.ui-composite-debug-fullscreen .ui-composite-debug-pane--circle .cof {
+    max-height: calc(100vh - 286px);
+    width: min(100%, calc((100vh - 286px) * 0.8), 360px);
+  }
+
   .mode-screen[data-mode="circle-of-fifths"] {
     padding: 12px;
   }

@@ -30,6 +30,7 @@
 - Detail layer has 2 inner rings:
   - middle: three minor wedges (`ii`, `iii`, `vi`)
   - inner: one diminished wedge (`vii°`)
+  - preserve a visible annular gap between middle and inner rings; do not let rings touch/overlap
 - Chord mode flow:
   - first tap on a primary note sets primary and plays single note
   - tapping the same primary note again enters chord mode and plays that primary major triad
@@ -38,6 +39,7 @@
   - chord mode exits only when tapping outside the circle radius (not just outside wedges)
 - Exiting chord mode restores full-circle zoom.
 - When a primary note is selected, note-bar rows show bold uppercase roman numerals in a left column beside each diatonic note square.
+- Note-bar rectangles must stay visibly filled for all degrees; `ii/iii/vi/vii` can be more muted than `I/IV/V` but should remain clearly visible.
 - Double-tapping SVG background inside the circle cycles instruments and updates the inner indicator text.
 - Holding a circle wedge sustains playback while pressed, then releases on pointer end/cancel/leave.
 - Note-bar notes follow the same press lifecycle as wedges: sound starts on pointer down and ends on pointer up/cancel/leave.

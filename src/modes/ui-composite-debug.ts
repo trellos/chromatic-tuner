@@ -151,6 +151,7 @@ export function createUiCompositeDebugMode(): ModeDefinition {
     canFullscreen: false,
     onEnter: async () => {
       if (!modeEl) return;
+      document.body.classList.remove("ui-composite-debug-fullscreen");
       rootEl?.remove();
       chordModeActive = false;
       lastPrimaryLabel = null;
@@ -162,6 +163,9 @@ export function createUiCompositeDebugMode(): ModeDefinition {
       const shell = document.createElement("div");
       shell.className = "ui-composite-debug-shell";
       shell.innerHTML = `
+        <button class="ui-composite-debug-fullscreen-btn ghost-btn" type="button" data-ui-composite-fullscreen>
+          Fullscreen
+        </button>
         <section class="ui-composite-debug-pane ui-composite-debug-pane--drum">
           ${createDebugDrumMarkup()}
         </section>
@@ -174,7 +178,12 @@ export function createUiCompositeDebugMode(): ModeDefinition {
 
       const drumRoot = shell.querySelector<HTMLElement>(".ui-composite-debug-pane--drum");
       const circleHost = shell.querySelector<HTMLElement>(".ui-composite-debug-circle-host");
+      const fullscreenBtn = shell.querySelector<HTMLButtonElement>("[data-ui-composite-fullscreen]");
       if (!drumRoot || !circleHost) return;
+      fullscreenBtn?.addEventListener("click", () => {
+        log("mode.onFullscreen");
+        document.body.classList.add("ui-composite-debug-fullscreen");
+      });
 
       drumUi = createDrumMachineUi(drumRoot, {
         onTransportStart: () => log("drum.onTransportStart"),
@@ -287,6 +296,7 @@ export function createUiCompositeDebugMode(): ModeDefinition {
     },
     onExit: () => {
       log("mode.onExit");
+      document.body.classList.remove("ui-composite-debug-fullscreen");
       chordModeActive = false;
       circleUi?.releaseHeldNotes();
       circleUi?.destroy();

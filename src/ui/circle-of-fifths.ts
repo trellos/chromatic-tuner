@@ -75,10 +75,10 @@ const CENTER = VIEWBOX_SIZE / 2;
 
 const OUTER_RADIUS = 450;
 const OUTER_INNER_RADIUS = 320;
-const SECONDARY_OUTER_RADIUS = 314;
-const SECONDARY_INNER_RADIUS = 232;
-const DIM_OUTER_RADIUS = 228;
-const DIM_INNER_RADIUS = 176;
+const SECONDARY_OUTER_RADIUS = 318;
+const SECONDARY_INNER_RADIUS = 224;
+const DIM_OUTER_RADIUS = 218;
+const DIM_INNER_RADIUS = 160;
 
 const OUTER_STEP_DEG = 30;
 const OUTER_WEDGE_DEG = 25;
@@ -686,9 +686,9 @@ export function createCircleOfFifthsUi(
     }
     const trail = document.createElement("span");
     trail.className = "cof-note-trail";
-    const rowRect = entry.row.getBoundingClientRect();
-    const cellRect = entry.cell.getBoundingClientRect();
-    const cellWidthPx = Math.max(1, cellRect.width);
+    const rowWidthPx = Math.max(1, entry.row.clientWidth);
+    const cellWidthPx = Math.max(1, entry.cell.offsetWidth);
+    const cellHeightPx = Math.max(1, entry.cell.offsetHeight);
     const growthPx = held ? 1180 : 640;
     const deltaPx = Math.max(0, growthPx - cellWidthPx);
     const stretchMs = Math.max(180, deltaPx / TRAIL_PIXELS_PER_MS);
@@ -698,9 +698,9 @@ export function createCircleOfFifthsUi(
     trail.style.setProperty("--cof-note-trail-growth", `${growthPx.toFixed(0)}px`);
     trail.style.setProperty("--cof-note-trail-initial-scale", `${initialScale.toFixed(4)}`);
     trail.style.width = `${growthPx.toFixed(2)}px`;
-    trail.style.height = `${Math.max(1, cellRect.height).toFixed(2)}px`;
+    trail.style.height = `${cellHeightPx.toFixed(2)}px`;
     trail.style.top = `${entry.cell.offsetTop}px`;
-    trail.style.right = `${Math.max(0, rowRect.width - entry.cell.offsetLeft).toFixed(2)}px`;
+    trail.style.right = `${Math.max(0, rowWidthPx - entry.cell.offsetLeft).toFixed(2)}px`;
     trail.style.borderRadius = getComputedStyle(entry.cell).borderRadius;
     entry.row.appendChild(trail);
     void trail.getBoundingClientRect();

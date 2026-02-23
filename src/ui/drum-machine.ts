@@ -52,6 +52,19 @@ export type DrumMachineUi = {
   destroy: () => void;
 };
 
+// Icons from Heroicons (MIT): https://heroicons.com
+const DRUM_PLAY_ICON_SVG = `
+  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+  </svg>
+`;
+
+const DRUM_STOP_ICON_SVG = `
+  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path>
+  </svg>
+`;
+
 // Reusable Drum Machine UI object: pattern editing, transport scheduling,
 // kit loading, and lifecycle-managed listener wiring for a host element.
 export function createDrumMachineUi(
@@ -171,6 +184,18 @@ export function createDrumMachineUi(
   let bodyClassObserver: MutationObserver | null = null;
   let detachVisualViewportListeners: (() => void) | null = null;
   let hasSeedPattern = false;
+
+  const setPlayButtonState = (playing: boolean): void => {
+    if (!playButton) return;
+    const label = playing ? "Stop" : "Play";
+    const iconSvg = playing ? DRUM_STOP_ICON_SVG : DRUM_PLAY_ICON_SVG;
+    playButton.dataset.transportState = playing ? "playing" : "stopped";
+    playButton.setAttribute("aria-label", label);
+    playButton.innerHTML = `
+      <span class="drum-play-icon" aria-hidden="true">${iconSvg}</span>
+      <span class="drum-play-label">${label}</span>
+    `;
+  };
 
   type SharedTrackPayload = {
     version: number;
@@ -717,7 +742,7 @@ export function createDrumMachineUi(
     options.onTransportStart?.();
     nextStepTime = audioContext.currentTime + 0.05;
     schedulerId = window.setInterval(scheduleSteps, LOOKAHEAD_MS);
-    if (playButton) playButton.textContent = "Stop";
+    setPlayButtonState(true);
   };
 
   const stopTransport = () => {
@@ -743,7 +768,7 @@ export function createDrumMachineUi(
     }
     playheadEl?.classList.remove("is-active");
     options.onTransportStop?.();
-    if (playButton) playButton.textContent = "Play";
+    setPlayButtonState(false);
   };
 
   const attachUi = () => {
@@ -905,6 +930,7 @@ export function createDrumMachineUi(
     setBpm(bpm);
     setBeatLabel();
     setKitLabel();
+    setPlayButtonState(false);
     attachUi();
     syncResponsiveLayout();
     scheduleLayoutSync();

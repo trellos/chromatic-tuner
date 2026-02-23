@@ -46,9 +46,38 @@
 }
 
 .drum-play {
+  align-items: center;
+  display: inline-flex;
   font-size: 12px;
+  justify-content: center;
   letter-spacing: 0.1em;
+  min-width: 48px;
   padding: 8px 16px;
+  position: relative;
+}
+
+.drum-play-icon {
+  display: inline-flex;
+  height: 18px;
+  width: 18px;
+}
+
+.drum-play-icon svg {
+  fill: currentColor;
+  height: 100%;
+  width: 100%;
+}
+
+.drum-play-label {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .drum-random {

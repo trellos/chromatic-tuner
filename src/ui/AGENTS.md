@@ -110,6 +110,7 @@ Integration points:
 3. Detail layer has two inner rings:
    - middle ring: exactly three wedges (`ii`, `iii`, `vi`)
    - inner ring: exactly one wedge (`vii°`) for diminished chord
+   - keep a visible geometric gap between these two rings (no edge contact).
 4. Primary note change rotates the inner detail layer using shortest angular path; avoid long-way spins.
 5. In tuner integration, no detected note means no primary and no inner wedges.
 6. Tuner detune guidance maps signed cents into a bounded rotational offset centered at in-tune.
@@ -131,6 +132,7 @@ Integration points:
    - when a primary is selected, each diatonic note row shows its roman numeral in a left column outside the note square.
    - roman numerals in the note bar should render as bold uppercase tokens (for example `III`, `VII°`).
    - note labels remain uppercase note names (not chord symbols).
+   - note rectangles should remain visible across patterned backgrounds; lesser degrees (`ii`,`iii`,`vi`,`vii`) may be intentionally more muted than `I/IV/V`, but never near-invisible.
 14. Instrument cycling:
    - a double-tap on SVG background inside the circle radius cycles circle playback instruments.
    - inner indicator text shows the active instrument name (for example `ELECTRIC GUITAR`, `PIPE ORGAN`).

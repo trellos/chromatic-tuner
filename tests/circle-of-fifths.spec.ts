@@ -242,6 +242,80 @@ test("selecting a primary note adds roman numerals to note-bar diatonic notes", 
   expect(diatonicAlpha).toBeGreaterThanOrEqual(0.5);
 });
 
+test("inner diminished ring keeps a visible gap from the middle ring", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
+  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
+
+  const gap = await circle.evaluate((element) => {
+    const middle = element.querySelector(
+      '.cof-secondary-cell[data-degree="ii"] .cof-secondary-path'
+    ) as SVGPathElement | null;
+    const inner = element.querySelector('.cof-dim-cell .cof-dim-path') as SVGPathElement | null;
+    const parseRadii = (d: string | null): { outer: number; inner: number } | null => {
+      if (!d) return null;
+      const matches = [...d.matchAll(/A\s*([-\d.]+)\s+([-\d.]+)/g)];
+      if (matches.length < 2) return null;
+      const outer = Number(matches[0]?.[1] ?? Number.NaN);
+      const innerR = Number(matches[1]?.[1] ?? Number.NaN);
+      if (!Number.isFinite(outer) || !Number.isFinite(innerR)) return null;
+      return { outer, inner: innerR };
+    };
+    const middleR = parseRadii(middle?.getAttribute("d") ?? null);
+    const innerR = parseRadii(inner?.getAttribute("d") ?? null);
+    if (!middleR || !innerR) return Number.NaN;
+    return middleR.inner - innerR.outer;
+  });
+
+  expect(Number.isFinite(gap)).toBeTruthy();
+  expect(gap).toBeGreaterThan(2);
+});
+
+test("lesser-degree note rectangles stay visible but more muted than I/IV/V", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  await panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true }); // C major
+
+  const metrics = await panel.evaluate((element) => {
+    const parseColor = (color: string): { r: number; g: number; b: number; a: number } | null => {
+      const nums = color.match(/[-\d.]+/g)?.map((token) => Number(token)) ?? [];
+      if (nums.length < 3) return null;
+      const [r, g, b] = nums;
+      const a = nums.length >= 4 ? (nums[3] ?? 1) : 1;
+      if (![r, g, b, a].every((value) => Number.isFinite(value))) return null;
+      return { r: r ?? 0, g: g ?? 0, b: b ?? 0, a };
+    };
+    const read = (semitone: string) => {
+      const cell = element.querySelector(`.cof-note-cell[data-semitone="${semitone}"]`) as HTMLElement | null;
+      if (!cell) return { hasCell: false, alpha: 0, lum: 0, raw: "" };
+      const raw = getComputedStyle(cell).backgroundColor;
+      const parsed = parseColor(raw);
+      if (!parsed) return { hasCell: true, alpha: Number.NaN, lum: Number.NaN, raw };
+      const { r, g, b, a: alpha } = parsed;
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      return { hasCell: true, alpha, lum, raw };
+    };
+    return {
+      tonic: read("0"), // C (I)
+      lesser: read("2"), // D (II)
+    };
+  });
+
+  expect(metrics.tonic.hasCell).toBeTruthy();
+  expect(metrics.lesser.hasCell).toBeTruthy();
+  expect(metrics.tonic.raw).not.toBe("transparent");
+  expect(metrics.lesser.raw).not.toBe("transparent");
+  expect(metrics.tonic.raw).not.toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.lesser.raw).not.toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.lesser.raw).not.toBe(metrics.tonic.raw);
+  if (Number.isFinite(metrics.tonic.alpha) && Number.isFinite(metrics.lesser.alpha)) {
+    expect(metrics.tonic.alpha).toBeGreaterThan(0.5);
+    expect(metrics.lesser.alpha).toBeGreaterThan(0.45);
+  }
+});
+
 test("circle mode remains visible in portrait mobile without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
