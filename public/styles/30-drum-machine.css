@@ -1,0 +1,522 @@
+.drum-mock {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.drum-ui {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(12, 16, 32, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+  box-sizing: border-box;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  max-width: var(--drum-grid-width, 100%);
+  min-width: var(--drum-grid-width, auto);
+  padding: 10px 14px;
+  width: var(--drum-grid-width, auto);
+}
+
+.drum-tempo {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(12, 16, 32, 0.15);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 10px;
+  padding: 6px 10px;
+}
+
+.drum-tempo .tempo-value {
+  font-size: 20px;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: center;
+}
+
+.drum-tempo .tempo-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+
+.drum-play {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
+}
+
+.drum-random {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  padding: 8px 14px;
+  text-transform: uppercase;
+}
+
+.drum-beat-picker {
+  position: relative;
+}
+
+.drum-beat-picker .option-menu {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.drum-kit-trigger {
+  align-items: center;
+  display: inline-flex;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+  width: 162px;
+}
+
+#drum-kit-label {
+  display: inline-block;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.drum-share-button {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #0f172a;
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+}
+
+.drum-share-button svg {
+  fill: currentColor;
+  height: 24px;
+  width: 24px;
+}
+
+.drum-share-button:hover,
+.drum-share-button:focus-visible {
+  color: #111827;
+}
+
+.drum-share-button:focus-visible {
+  outline: 2px solid rgba(15, 23, 42, 0.35);
+  outline-offset: 1px;
+}
+
+.drum-rotator {
+  align-items: center;
+  display: flex;
+  filter: drop-shadow(0 18px 30px rgba(15, 23, 42, 0.25));
+  flex-direction: column;
+  height: auto;
+  justify-content: center;
+  margin: 0 auto;
+  width: min(700px, 100%);
+}
+
+.drum-grids {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.6));
+  border: 1px solid rgba(12, 16, 32, 0.12);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 14px;
+  position: relative;
+  width: 100%;
+}
+
+.drum-playhead {
+  background: linear-gradient(180deg, rgba(0, 245, 212, 0.32), rgba(0, 245, 212, 0.08));
+  border-radius: 6px;
+  height: 100%;
+  left: var(--playhead-left, 0px);
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: translateX(
+    calc(
+      var(--playhead-index, 0) *
+      var(--playhead-width, calc(100% / var(--playhead-count, 16)))
+    )
+  );
+  transition:
+    opacity 0.15s ease,
+    transform var(--playhead-ms, 120ms) linear;
+  width: var(--playhead-width, calc(100% / var(--playhead-count, 16)));
+  z-index: 0;
+}
+
+.drum-playhead.is-active {
+  opacity: 1;
+}
+
+.drum-grid {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.drum-mock[data-signature="4/4"] .drum-grid[data-signature="4/4"] {
+  display: flex;
+}
+
+.drum-row {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 70px 1fr;
+}
+
+.drum-label {
+  color: rgba(15, 23, 42, 0.7);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.drum-steps {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(16, minmax(18px, 1fr));
+}
+
+.step {
+  aspect-ratio: 1 / 1;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
+  border: 1px solid rgba(12, 16, 32, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.step.is-on {
+  background: linear-gradient(135deg, var(--tuna-purple), var(--tuna-aqua));
+  border-color: rgba(0, 245, 212, 0.6);
+  box-shadow: 0 6px 12px rgba(0, 245, 212, 0.25);
+}
+
+.step.is-current {
+  animation: columnPulse 0.3s cubic-bezier(0.2, 0.9, 0.2, 1);
+  border-color: rgba(0, 245, 212, 0.7);
+}
+
+@keyframes columnPulse {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(0, 245, 212, 0.35),
+      inset 0 0 0 rgba(255, 61, 129, 0.15);
+    transform: scale(1);
+  }
+  60% {
+    box-shadow:
+      0 0 0 5px rgba(0, 245, 212, 0.2),
+      inset 0 0 8px rgba(255, 61, 129, 0.25);
+    transform: scale(1.04);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(0, 245, 212, 0),
+      inset 0 0 0 rgba(255, 61, 129, 0);
+    transform: scale(1);
+  }
+}
+
+.drum-exit {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  color: #f8fafc;
+  cursor: pointer;
+  display: none;
+  font-size: 16px;
+  font-weight: 700;
+  height: 40px;
+  justify-content: center;
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 40px;
+  z-index: 3;
+}
+
+body.drum-fullscreen .drum-exit {
+  display: inline-flex;
+}
+
+body.drum-fullscreen .app-header,
+body.drum-fullscreen .carousel,
+body.drum-fullscreen .carousel-show {
+  display: none;
+}
+
+body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
+  border-radius: 0;
+  box-shadow: none;
+  height: 100vh;
+  max-width: 100vw;
+  overflow: auto;
+  padding: 24px;
+  width: 100vw;
+}
+
+body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .mode-header {
+  display: none;
+}
+
+body.drum-fullscreen .drum-mock {
+  box-sizing: border-box;
+  justify-content: flex-start;
+  min-height: 100%;
+  padding-top: 56px;
+}
+
+body.drum-fullscreen .drum-rotator {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  max-height: none;
+  width: min(1200px, 100%);
+}
+
+body.drum-fullscreen .drum-ui {
+  max-width: min(720px, 100%);
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  body {
+    padding: 16px;
+  }
+
+  h1 {
+    margin-bottom: 20px;
+    min-height: 30px;
+  }
+
+  .hero-title {
+    font-size: 46px;
+    letter-spacing: 0.25em;
+    padding-bottom: 16px;
+  }
+
+  .hero-title::after {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+  }
+
+  .strobe-tuner {
+    height: min(320px, 86vw);
+    margin-bottom: 0;
+    width: min(320px, 86vw);
+  }
+
+  .tuner-stack {
+    margin-bottom: 0;
+    width: min(320px, 86vw);
+  }
+
+  #note {
+    font-size: 40px;
+    min-height: 40px;
+  }
+
+  #cents {
+    font-size: 18px;
+    min-height: 18px;
+  }
+
+  .mode-screen {
+    overflow: auto;
+    padding: 18px;
+  }
+
+  .mode-stage {
+    --mode-panel-height: min(74svh, 604px);
+  }
+
+  .tempo-dial {
+    width: min(260px, 78vw);
+  }
+
+  .drum-rotator {
+    width: min(620px, 100%);
+  }
+
+  .drum-row {
+    grid-template-columns: 52px 1fr;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
+    padding: 8px;
+  }
+
+  body.drum-fullscreen .drum-mock {
+    overflow: auto;
+    padding-top: 52px;
+  }
+
+  body.drum-fullscreen .drum-rotator {
+    aspect-ratio: auto;
+    max-height: none;
+    max-width: 100%;
+    transform: none;
+    width: min(720px, 100%);
+  }
+
+  body.drum-fullscreen .drum-grids {
+    min-width: 0;
+  }
+
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .drum-ui {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    overflow: visible;
+    padding: 10px 12px;
+  }
+
+  .drum-ui > * {
+    flex: 0 1 auto;
+  }
+
+  .drum-tempo {
+    gap: 8px;
+    min-width: 144px;
+    order: 1;
+    padding: 6px 8px;
+  }
+
+  .drum-play {
+    order: 4;
+    width: 100%;
+  }
+
+  #drum-beat-button {
+    white-space: nowrap;
+  }
+
+  .drum-kit-trigger {
+    width: 124px;
+  }
+
+  #drum-kit-label {
+    max-width: 62px;
+  }
+
+  .drum-share-button {
+    min-height: 34px;
+    min-width: 34px;
+  }
+
+  .drum-tempo .ghost-btn {
+    min-height: 34px;
+    min-width: 34px;
+    padding: 7px 10px;
+  }
+
+  .drum-random {
+    letter-spacing: 0.14em;
+    min-height: 34px;
+    min-width: 84px;
+    padding: 8px 12px;
+  }
+
+  .drum-play {
+    min-height: 34px;
+    min-width: 74px;
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-mock {
+    justify-content: center;
+    min-height: 100svh;
+    overflow: hidden;
+    padding-top: 0;
+    position: relative;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-rotator {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    left: 50%;
+    max-width: min(94svh, 860px);
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+    width: min(94svh, 860px);
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-ui {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    overflow-x: visible;
+    overflow-y: visible;
+    padding: 8px 10px;
+    width: 100%;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-ui > * {
+    flex: 0 1 auto;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-row {
+    gap: 8px;
+    grid-template-columns: 42px 1fr;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-grids {
+    gap: 8px;
+    margin: 0;
+    max-width: 100%;
+    min-height: 210px;
+    min-width: 0;
+    padding: 10px;
+    transform: none;
+    width: 100%;
+  }
+
+  body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-steps {
+    gap: 4px;
+    grid-template-columns: repeat(16, minmax(14px, 1fr));
+  }
+}
+

@@ -3,6 +3,8 @@
 ## Core workflow
 - Install: `npm ci`
 - Typecheck: `npm run typecheck`
+- CSS lint: `npm run lint:css`
+- CSS autofix: `npm run lint:css:fix`
 - E2E: `npm run test:e2e`
 - Dev server: `npm run dev`
 
@@ -60,4 +62,10 @@
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
 - Avoid test-only branches in runtime code.
+
+## CSS maintainability
+- CSS lint rules are defined in `.stylelintrc.cjs`.
+- Keep drift low by running `npm run lint:css:fix` on style edits.
+- Property order is enforced (`stylelint-order`) to keep diffs deterministic.
+- Styles are split into ordered files under `public/styles/` and imported via `public/style.css`; see `docs/CSS_MAINTENANCE.md`.
 

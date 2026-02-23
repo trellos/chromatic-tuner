@@ -1,0 +1,530 @@
+:root {
+  --ink: #0b1020;
+  --ink-soft: #1f2a44;
+  --tuna-pink: #ff6bd6;
+  --tuna-purple: #7c3aed;
+  --tuna-aqua: #00f5d4;
+  --tuna-sunset: #ff3d81;
+  --tuna-gold: #ff9e00;
+  --panel: #f2f4ff;
+  --panel-strong: #ffffff;
+  --stroke: rgba(12, 16, 32, 0.12);
+
+}
+
+html {
+  height: -webkit-fill-available;
+  min-height: 100%;
+}
+
+body {
+  align-items: center;
+  background:
+    radial-gradient(92% 70% at 50% 110%, rgba(156, 232, 255, 1) 0%, rgba(126, 206, 255, 0.72) 28%, rgba(72, 138, 244, 0.34) 52%, transparent 74%),
+    radial-gradient(70% 58% at 8% 10%, rgba(184, 126, 255, 0.82) 0%, rgba(132, 92, 240, 0.42) 36%, transparent 74%),
+    radial-gradient(72% 56% at 6% 100%, rgba(206, 178, 255, 0.82) 0%, rgba(150, 132, 255, 0.38) 44%, transparent 76%),
+    linear-gradient(180deg, #061343 0%, #174abf 44%, #1b57cb 66%, #0e327f 100%);
+  background-color: #12398f;
+  color: #f8fafc;
+  display: flex;
+  font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
+  justify-content: center;
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  padding: 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.seigaiha-canvas {
+  display: block;
+  height: 100vh;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: fixed;
+  visibility: hidden;
+  width: 100vw;
+  z-index: 0;
+}
+
+body[data-seigaiha-render-ready="1"] .seigaiha-canvas {
+  opacity: 1;
+  visibility: visible;
+}
+
+.seigaiha-debug-control {
+  background: rgba(6, 12, 28, 0.82);
+  border: 1px solid rgba(226, 232, 240, 0.3);
+  border-radius: 10px;
+  color: #e2e8f0;
+  display: grid;
+  font-size: 12px;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  padding: 10px 12px;
+  position: fixed;
+  right: 10px;
+  top: 10px;
+  width: 220px;
+  z-index: 40;
+}
+
+.seigaiha-debug-title,
+.seigaiha-debug-subtitle {
+  margin: 0;
+}
+
+.seigaiha-debug-title {
+  font-weight: 700;
+}
+
+.seigaiha-debug-subtitle {
+  margin-top: 4px;
+  opacity: 0.92;
+}
+
+.seigaiha-debug-switch {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.seigaiha-debug-switch input[type="checkbox"] {
+  height: 14px;
+  margin: 0;
+  width: 14px;
+}
+
+.seigaiha-debug-switch input[type="number"] {
+  background: rgba(9, 16, 36, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: #e2e8f0;
+  margin-left: auto;
+  padding: 4px 6px;
+  width: 70px;
+}
+
+.seigaiha-debug-section {
+  display: grid;
+  gap: 6px;
+}
+
+.seigaiha-debug-control input[type="range"] {
+  width: 100%;
+}
+
+.seigaiha-debug-value {
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  justify-self: end;
+}
+
+.seigaiha-debug-fps {
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  justify-self: end;
+  opacity: 0.9;
+}
+
+.seigaiha-debug-metrics {
+  background: rgba(9, 16, 36, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.22);
+  border-radius: 6px;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 6px 8px;
+  white-space: pre;
+}
+
+.seigaiha-debug-table {
+  border-collapse: collapse;
+  font-size: 11px;
+  width: 100%;
+}
+
+.seigaiha-debug-table th,
+.seigaiha-debug-table td {
+  padding: 4px 0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.seigaiha-debug-table input[type="number"] {
+  background: rgba(9, 16, 36, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: #e2e8f0;
+  padding: 4px 6px;
+  width: 94px;
+}
+
+.seigaiha-debug-table--compact td:first-child {
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  width: 38px;
+}
+
+main {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  max-width: 760px;
+  position: relative;
+  width: 100%;
+  z-index: 1;
+}
+
+.app {
+  gap: 24px;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-header {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.carousel {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.carousel-toggle {
+  align-items: center;
+  background: rgba(17, 24, 39, 0.4);
+  border: 1px solid rgba(0, 245, 212, 0.6);
+  border-radius: 999px;
+  color: #e2e8f0;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  height: 38px;
+  justify-content: center;
+  letter-spacing: 0.12em;
+  padding: 0;
+  text-transform: uppercase;
+  width: 38px;
+}
+
+.carousel-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.carousel-show {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(0, 245, 212, 0.6);
+  border-radius: 999px;
+  color: #e2e8f0;
+  cursor: pointer;
+  display: none;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 8px 14px;
+  text-transform: uppercase;
+}
+
+body.carousel-hidden .carousel {
+  display: none;
+}
+
+body.carousel-hidden .carousel-show {
+  display: inline-flex;
+}
+
+body.drum-fullscreen {
+  padding: 0;
+}
+
+body.drum-fullscreen main {
+  max-width: 100%;
+  width: 100%;
+}
+
+body.drum-fullscreen .mode-stage {
+  width: 100%;
+}
+
+.mode-stage {
+  --mode-panel-height: 604px;
+  display: flex;
+  justify-content: center;
+  min-height: var(--mode-panel-height);
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-y;
+  width: 100%;
+}
+
+.mode-stage.metronome-overflow-visible {
+  overflow: visible;
+}
+
+.mode-screen {
+  backdrop-filter: none;
+  background: var(--panel);
+  background-clip: padding-box;
+
+  background-color: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 28px;
+  box-shadow: 0 30px 60px rgba(4, 8, 16, 0.45);
+  box-sizing: border-box;
+  color: var(--ink);
+  contain: paint;
+  display: none;
+  height: var(--mode-panel-height);
+  isolation: isolate;
+  min-height: var(--mode-panel-height);
+  overflow: auto;
+  padding: 24px;
+  position: relative;
+  width: min(720px, 100%);
+
+}
+
+.mode-screen.is-active {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.mode-screen.is-swipe-active {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  left: 0;
+  margin-inline: auto;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  will-change: transform;
+  z-index: 4;
+}
+
+.mode-stage.is-swiping {
+  touch-action: none;
+}
+
+.mode-screen[data-mode="tuner"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mode-screen[data-mode="wild-tuna"] {
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.wild-tuna-mode-shell {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  width: min(420px, 100%);
+}
+
+.wild-tuna-title {
+  color: #eef6ff;
+  font-size: clamp(2rem, 4.4vw, 2.8rem);
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-shadow: 0 10px 20px rgba(11, 21, 48, 0.35);
+  text-transform: uppercase;
+}
+
+.wild-tuna-card {
+  background: linear-gradient(180deg, rgba(10, 39, 118, 0.72), rgba(11, 24, 72, 0.84));
+  border: 1px solid rgba(206, 231, 255, 0.5);
+  border-radius: 26px;
+  box-shadow: 0 24px 44px rgba(7, 13, 30, 0.45);
+  display: grid;
+  gap: 22px;
+  min-height: 280px;
+  padding: 24px;
+  place-items: center;
+  transition: opacity 450ms ease, transform 450ms ease;
+  width: min(360px, 100%);
+}
+
+.wild-tuna-fish {
+  filter: drop-shadow(0 12px 10px rgba(2, 12, 40, 0.35));
+  height: auto;
+  transform-origin: 50% 65%;
+  width: min(160px, 36vw);
+}
+
+.wild-tuna-fullscreen-trigger {
+  height: 44px;
+  width: 44px;
+}
+
+body.wild-tuna-fullscreen .app-header,
+body.wild-tuna-fullscreen .carousel,
+body.wild-tuna-fullscreen .carousel-show {
+  display: none;
+}
+
+body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body.wild-tuna-fullscreen .wild-tuna-title {
+  opacity: 0;
+}
+
+body.wild-tuna-fullscreen .wild-tuna-card {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.9);
+}
+
+body.wild-tuna-enter-fullscreen .wild-tuna-card {
+  opacity: 0;
+}
+
+body.wild-tuna-enter-fullscreen .wild-tuna-fish {
+  animation: wild-tuna-dive 820ms cubic-bezier(0.28, 0.9, 0.4, 1);
+}
+
+@keyframes wild-tuna-dive {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  32% {
+    opacity: 1;
+    transform: translateY(-92px) rotate(-10deg) scale(1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(190px) rotate(16deg) scale(0.76);
+  }
+}
+
+.mode-screen[data-mode="tuner"] {
+  --tuner-dial-size: min(520px, calc(var(--mode-panel-height) - 140px), 90vw);
+  overflow: hidden;
+}
+
+.mode-screen[data-mode="metronome"] {
+  overflow: visible;
+}
+
+.mode-screen[data-mode="tuner"].is-active {
+  gap: 16px;
+}
+
+.mode-screen[data-mode="tuner"] > .tuna-field {
+  z-index: 0;
+}
+
+.mode-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mode-title {
+  background: linear-gradient(90deg, var(--tuna-pink) 0%, var(--tuna-purple) 50%, var(--tuna-aqua) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-align: center;
+  text-rendering: geometricPrecision;
+  text-transform: uppercase;
+}
+
+.mode-screen[data-mode="tuner"] .mode-header {
+  align-items: center;
+}
+
+
+.tuner-stack {
+  margin: 0 auto;
+  position: relative;
+  width: min(var(--tuner-dial-size), 100%);
+}
+
+h1 {
+  margin: 0 0 36px 0;
+  min-height: 34px;
+  text-align: center;
+}
+
+.hero-title {
+  background: linear-gradient(90deg, var(--tuna-pink) 0%, var(--tuna-purple) 45%, var(--tuna-aqua) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  line-height: 1;
+  padding: 6px 10px 18px;
+  position: relative;
+  text-rendering: geometricPrecision;
+  text-transform: uppercase;
+}
+
+.hero-title::before {
+  color: #070b16;
+  content: attr(data-text);
+  left: 0;
+  position: absolute;
+  text-shadow:
+    1px 1px #ff6bd6,
+    2px 2px #ff3d81,
+    3px 3px #7c3aed,
+    4px 4px #00f5d4,
+    5px 5px #7df9ff,
+    6px 6px #c7f9ff,
+    7px 7px #e2f9ff;
+  top: 0;
+  z-index: -1;
+}
+
+.hero-title::after {
+  color: rgba(226, 232, 240, 0.7);
+  content: "===[ T U N A ]===";
+  font-size: 12px;
+  left: 50%;
+  letter-spacing: 0.35em;
+  position: absolute;
+  top: 100%;
+  transform: translate(-50%, 8px);
+  white-space: pre;
+}
+

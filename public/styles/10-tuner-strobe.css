@@ -1,0 +1,167 @@
+/* Strobe Tuner Visualization */
+.strobe-tuner {
+  align-items: center;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  height: var(--tuner-dial-size);
+  justify-content: center;
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+  width: var(--tuner-dial-size);
+}
+
+.strobe-tuner::before {
+  background: radial-gradient(
+    circle,
+    rgba(0, 0, 0, 0.02),
+    rgba(0, 0, 0, 0.05)
+  );
+  background-position: center top;
+  background-size: 100% 200%;
+  border-top-left-radius: 50% 100%;
+  border-top-right-radius: 50% 100%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+  content: "";
+  height: 50%;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: 2;
+}
+
+
+.tuna-field {
+  --detune: 0;
+  --sharpness: 0;
+  --flatness: 0;
+  --state-rotation: 0deg;
+  border-radius: inherit;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(var(--state-rotation));
+  transition: transform 140ms ease-out;
+  z-index: 0;
+}
+
+.tuna-tile {
+  background-image: url("./favicon.svg");
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: saturate(calc(0.85 + var(--detune) * 0.8));
+  height: 17px;
+  margin: 0;
+  opacity: 0.2;
+  position: absolute;
+  transition:
+    left 140ms linear,
+    top 140ms linear,
+    transform 140ms linear,
+    opacity 120ms linear,
+    filter 120ms linear;
+  width: 17px;
+}
+
+.tuna-field.is-detecting .tuna-tile {
+  opacity: 0.52;
+}
+
+.tuna-field.is-sharp .tuna-tile {
+  filter: hue-rotate(calc(var(--sharpness) * 12deg)) saturate(1.2);
+}
+
+.tuna-field.is-flat .tuna-tile {
+  filter: hue-rotate(calc(-1 * var(--flatness) * 10deg)) saturate(0.95);
+}
+
+/* SVG Strobe Pattern */
+.strobe-tuner svg {
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  transform-origin: center;
+  width: 100%;
+  z-index: 1;
+}
+
+.strobe-tuner.idle svg {
+  opacity: 0.5;
+}
+
+.strobe-tuner.detecting svg {
+  opacity: 1;
+}
+
+#reading {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  left: 50%;
+  padding: 0 16px;
+  pointer-events: none;
+  position: absolute;
+
+  text-align: center;
+  top: calc(50% - 8px);
+  transform: translate(-50%, -100%);
+  width: 100%;
+  z-index: 2;
+}
+
+#note {
+  color: #0f172a;
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin: 0;
+  min-height: 48px;
+}
+
+#cents {
+  color: rgba(15, 23, 42, 0.6);
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  margin-top: 6px;
+  min-height: 20px;
+}
+
+#status {
+  align-items: center;
+  background-color: rgba(248, 250, 252, 0.7);
+  border-radius: 6px;
+  color: rgba(15, 23, 42, 0.6);
+  display: flex;
+  font-size: 14px;
+  justify-content: center;
+  left: 50%;
+  line-height: 1.5;
+  margin-top: 0;
+  min-height: 40px;
+  padding: 12px;
+  position: absolute;
+  text-align: center;
+  top: calc(50% + 8px);
+  transform: translateX(-50%);
+  width: 100%;
+  word-break: break-word;
+  z-index: 4;
+}
+
+body.status-hidden #status {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+

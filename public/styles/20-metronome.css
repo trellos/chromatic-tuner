@@ -1,0 +1,219 @@
+.metronome-panel {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: visible;
+}
+
+.tempo-dial {
+  --dial-rotation: -15deg;
+  --dial-rotation-inverse: 15deg;
+  aspect-ratio: 1 / 1;
+  border: 3px solid rgba(0, 245, 212, 0.62);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 8px rgba(0, 245, 212, 0.15),
+    0 16px 30px rgba(15, 23, 42, 0.2);
+  display: grid;
+  place-items: center;
+  position: relative;
+  touch-action: none;
+  width: min(320px, 78vw);
+}
+
+.metro-starburst {
+  background:
+    repeating-conic-gradient(
+      from 0deg,
+      rgba(0, 245, 212, 0.25) 0deg 10deg,
+      transparent 10deg 20deg
+    );
+  border-radius: 50%;
+  filter: blur(0.6px);
+  inset: 6%;
+  opacity: 0.35;
+  position: absolute;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.metro-starburst.is-pulsing {
+  opacity: 0.8;
+  transform: scale(1.04);
+}
+
+.tempo-wheel {
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 60%),
+    repeating-conic-gradient(
+      from -90deg,
+      rgba(15, 23, 42, 0.25) 0deg 6deg,
+      transparent 6deg 12deg
+    );
+  border-radius: 50%;
+  box-shadow:
+    inset 0 12px 20px rgba(15, 23, 42, 0.18),
+    inset 0 -10px 18px rgba(255, 255, 255, 0.7),
+    0 18px 30px rgba(15, 23, 42, 0.25);
+  filter: blur(0.2px);
+  inset: 0;
+  position: absolute;
+}
+
+.tempo-wheel::before,
+.tempo-wheel::after {
+  border-radius: 50%;
+  content: "";
+  position: absolute;
+}
+
+.tempo-wheel::before {
+  border: 2px solid rgba(15, 23, 42, 0.2);
+  box-shadow:
+    inset 0 0 12px rgba(15, 23, 42, 0.2),
+    inset 0 0 30px rgba(0, 245, 212, 0.08);
+  inset: 6%;
+}
+
+.tempo-wheel::after {
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08);
+  inset: 14%;
+}
+
+.tempo-ring {
+  background: radial-gradient(circle at top, rgba(0, 245, 212, 0.18), transparent 70%);
+  border: 2px solid rgba(12, 16, 32, 0.2);
+  border-radius: 50%;
+  display: grid;
+  height: 70%;
+  place-items: center;
+  position: relative;
+  transform: rotate(var(--dial-rotation));
+  transition: transform 0.1s ease-out;
+  width: 70%;
+}
+
+.tempo-indicator {
+  background: linear-gradient(180deg, var(--tuna-pink), var(--tuna-aqua));
+  border-radius: 999px;
+  box-shadow: 0 6px 12px rgba(0, 245, 212, 0.35);
+  height: 24px;
+  left: 50%;
+  position: absolute;
+  top: 7%;
+  transform: translateX(-50%);
+  width: 4px;
+}
+
+.tempo-center {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transform: rotate(var(--dial-rotation-inverse));
+}
+
+.tempo-value {
+  font-size: 44px;
+  font-weight: 700;
+}
+
+.tempo-label {
+  color: rgba(15, 23, 42, 0.6);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.metro-controls {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.primary-btn,
+.ghost-btn {
+  background: #ffffff;
+  border: 1px solid rgba(12, 16, 32, 0.2);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  padding: 10px 18px;
+  text-transform: uppercase;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, var(--tuna-pink), var(--tuna-aqua));
+  border: none;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.metro-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.option-chip {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(12, 16, 32, 0.15);
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 6px 12px;
+  text-transform: uppercase;
+}
+
+.metro-option {
+  overflow: visible;
+  padding: 6px;
+  position: relative;
+}
+
+.option-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+.option-menu {
+  background: #ffffff;
+  border: 1px solid rgba(12, 16, 32, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  display: none;
+  isolation: isolate;
+  left: 50%;
+  min-width: 120px;
+  padding: 6px;
+  position: absolute;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 20;
+}
+
+.option-menu.is-open {
+  display: grid;
+  gap: 4px;
+}
+
+.option-menu button {
+  background: rgba(15, 23, 42, 0.05);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
