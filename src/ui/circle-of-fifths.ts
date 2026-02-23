@@ -18,16 +18,26 @@ export type CircleOfFifthsUiOptions = {
   onSecondaryTap?: (chord: CircleChordSpec) => void;
   onOuterTap?: (note: CircleNoteTap) => void;
   onOuterDoubleTap?: (note: CircleNoteTap) => void;
+  onOuterPressStart?: (note: CircleNoteTap) => void;
+  onOuterPressEnd?: (note: CircleNoteTap) => void;
+  onSecondaryPressStart?: (chord: CircleChordSpec) => void;
+  onSecondaryPressEnd?: (chord: CircleChordSpec) => void;
+  onInnerDoubleTap?: () => void;
   onNoteBarTap?: (note: { label: string; midi: number }) => void;
   onBackgroundTap?: () => void;
+};
+
+export type CircleChordModeOptions = {
+  zoomToPrimary?: boolean;
 };
 
 export type CircleOfFifthsUi = {
   setPrimaryByLabel: (label: string | null) => void;
   setPrimaryByMidi: (midi: number | null) => void;
   setTuningCents: (cents: number | null) => void;
-  setChordMode: (enabled: boolean) => void;
+  setChordMode: (enabled: boolean, options?: CircleChordModeOptions) => void;
   setMinorMode: (enabled: boolean) => void;
+  showInnerIndicator: (text: string) => void;
   pulseNote: (midi: number, durationMs?: number) => void;
   pulseChord: (midis: number[], durationMs?: number) => void;
   destroy: () => void;
@@ -58,6 +68,8 @@ const DIM_INNER_RADIUS = 176;
 
 const OUTER_STEP_DEG = 30;
 const OUTER_WEDGE_DEG = 25;
+const ZOOMED_VIEWBOX_SIZE = 700;
+const ZOOM_FOCUS_RADIUS = 110;
 const SECONDARY_WEDGE_DEG = 24;
 const DIM_WEDGE_DEG = 24;
 const SECONDARY_CENTERS = [-30, 0, 30] as const;
@@ -204,6 +216,44 @@ function outerDegreeLabelForMode(token: CircleDegreeToken | null, minorMode: boo
   if (!minorMode) return token === "I" || token === "IV" || token === "V" ? token : "";
   if (token === "I" || token === "IV" || token === "V") return minorTokenFromMajorToken(token);
   return "";
+}
+
+function noteBarDegreeLabelForMode(token: CircleDegreeToken | null, minorMode: boolean): string {
+  if (!token) return "";
+  if (!minorMode) {
+    switch (token) {
+      case "I":
+        return "I";
+      case "ii":
+        return "II";
+      case "iii":
+        return "III";
+      case "IV":
+        return "IV";
+      case "V":
+        return "V";
+      case "vi":
+        return "VI";
+      case "vii°":
+        return "VII°";
+    }
+  }
+  switch (token) {
+    case "I":
+      return "III";
+    case "ii":
+      return "IV";
+    case "iii":
+      return "V";
+    case "IV":
+      return "VI";
+    case "V":
+      return "VII";
+    case "vi":
+      return "I";
+    case "vii°":
+      return "II°";
+  }
 }
 
 function setTextClassForFit(target: SVGTextElement, baseClass: string, text: string): void {
@@ -410,9 +460,15 @@ export function createCircleOfFifthsUi(
 
   const noteBar = document.createElement("div");
   noteBar.className = "cof-note-bar";
-  const noteCells = new Map<number, HTMLDivElement>();
+  const noteCells = new Map<number, { cell: HTMLDivElement; degree: HTMLSpanElement }>();
   const notePulseTimeouts = new Map<number, number>();
   NOTE_BAR_ORDER_SEMITONES.forEach((semitone, idx) => {
+    const row = document.createElement("div");
+    row.className = "cof-note-row";
+    const rowDegree = document.createElement("span");
+    rowDegree.className = "cof-note-row-degree";
+    rowDegree.textContent = "";
+    row.appendChild(rowDegree);
     const cell = document.createElement("div");
     cell.className = "cof-note-cell";
     cell.setAttribute("data-semitone", String(semitone));
@@ -434,8 +490,9 @@ export function createCircleOfFifthsUi(
       event.preventDefault();
       activate();
     });
-    noteBar.appendChild(cell);
-    noteCells.set(semitone, cell);
+    row.appendChild(cell);
+    noteBar.appendChild(row);
+    noteCells.set(semitone, { cell, degree: rowDegree });
   });
   const frame = document.createElement("div");
   frame.className = "cof-frame";
@@ -447,6 +504,7 @@ export function createCircleOfFifthsUi(
   let selection: CircleSelection | null = null;
   let chordModeEnabled = false;
   let minorModeEnabled = false;
+  let chordZoomPrimaryIndex: number | null = null;
   let detuneDeg = 0;
   let detailBaseDeg = 0;
   let pendingOuterClickTimeout: number | null = null;
@@ -462,6 +520,36 @@ export function createCircleOfFifthsUi(
     pendingOuterClickTimeout = null;
   };
 
+  const getSvgViewBoxRect = (): { x: number; y: number; width: number; height: number } => {
+    const attribute = svg.getAttribute("viewBox");
+    if (!attribute) {
+      return { x: 0, y: 0, width: VIEWBOX_SIZE, height: VIEWBOX_SIZE };
+    }
+    const values = attribute
+      .split(/\s+/)
+      .map((token) => Number(token))
+      .filter((value) => Number.isFinite(value));
+    if (values.length < 4) {
+      return { x: 0, y: 0, width: VIEWBOX_SIZE, height: VIEWBOX_SIZE };
+    }
+    return {
+      x: values[0] ?? 0,
+      y: values[1] ?? 0,
+      width: values[2] ?? VIEWBOX_SIZE,
+      height: values[3] ?? VIEWBOX_SIZE,
+    };
+  };
+
+  const clientToSvgPoint = (clientX: number, clientY: number): { x: number; y: number } => {
+    const rect = svg.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const viewBox = getSvgViewBoxRect();
+    const x = viewBox.x + (px / Math.max(1, rect.width)) * viewBox.width;
+    const y = viewBox.y + (py / Math.max(1, rect.height)) * viewBox.height;
+    return { x, y };
+  };
+
   const showInnerCircleIndicator = (text: string): void => {
     modeBannerTexts.forEach((line) => {
       line.textContent = buildTessellatedIndicatorText(text, 18);
@@ -472,6 +560,23 @@ export function createCircleOfFifthsUi(
     modeBannerTexts.forEach((line) => {
       line.classList.add("is-scrolling");
     });
+  };
+
+  const applyChordZoom = (): void => {
+    if (!chordModeEnabled || chordZoomPrimaryIndex === null) {
+      svg.setAttribute("viewBox", `0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`);
+      return;
+    }
+    const zoomCenterDeg = chordZoomPrimaryIndex * OUTER_STEP_DEG;
+    const focusPoint = polarPoint(ZOOM_FOCUS_RADIUS, zoomCenterDeg);
+    const half = ZOOMED_VIEWBOX_SIZE / 2;
+    const maxOffset = VIEWBOX_SIZE - ZOOMED_VIEWBOX_SIZE;
+    const x = clamp(focusPoint.x - half, 0, maxOffset);
+    const y = clamp(focusPoint.y - half, 0, maxOffset);
+    svg.setAttribute(
+      "viewBox",
+      `${x.toFixed(2)} ${y.toFixed(2)} ${ZOOMED_VIEWBOX_SIZE} ${ZOOMED_VIEWBOX_SIZE}`
+    );
   };
 
   const queuePulseCleanup = (pulse: SVGGElement): void => {
@@ -485,8 +590,9 @@ export function createCircleOfFifthsUi(
   const pulseNoteCells = (semitones: number[], rootSemitone: number | null, durationMs: number): void => {
     const normalized = Array.from(new Set(semitones.map((value) => wrapSemitone(value))));
     normalized.forEach((semitone) => {
-      const cell = noteCells.get(semitone);
-      if (!cell) return;
+      const entry = noteCells.get(semitone);
+      if (!entry) return;
+      const { cell } = entry;
       const existingTimeout = notePulseTimeouts.get(semitone);
       if (existingTimeout !== undefined) {
         window.clearTimeout(existingTimeout);
@@ -507,10 +613,11 @@ export function createCircleOfFifthsUi(
   };
 
   const updateNoteBarDegreeColors = (primarySemitone: number | null): void => {
-    noteCells.forEach((cell, semitone) => {
+    noteCells.forEach(({ cell, degree }, semitone) => {
       if (primarySemitone === null) {
         cell.removeAttribute("data-degree");
         cell.removeAttribute("data-diatonic");
+        degree.textContent = "";
         return;
       }
       const interval = wrapSemitone(semitone - primarySemitone);
@@ -518,10 +625,12 @@ export function createCircleOfFifthsUi(
       if (!token) {
         cell.removeAttribute("data-degree");
         cell.setAttribute("data-diatonic", "false");
+        degree.textContent = "";
         return;
       }
       cell.setAttribute("data-degree", degreeKeyFromToken(token));
       cell.setAttribute("data-diatonic", "true");
+      degree.textContent = noteBarDegreeLabelForMode(token, minorModeEnabled);
     });
   };
 
@@ -559,7 +668,11 @@ export function createCircleOfFifthsUi(
   };
 
   const applyDetailTransform = (): void => {
-    detailGroup.style.transform = `rotate(${(detailBaseDeg + detuneDeg).toFixed(2)}deg)`;
+    const angle = detailBaseDeg + detuneDeg;
+    detailGroup.setAttribute(
+      "transform",
+      `translate(${CENTER} ${CENTER}) rotate(${angle.toFixed(2)}) translate(${-CENTER} ${-CENTER})`
+    );
   };
 
   const setDetailBaseForPrimary = (index: number | null): void => {
@@ -656,6 +769,22 @@ export function createCircleOfFifthsUi(
       return false;
     };
 
+    let activePointerId: number | null = null;
+    const startOuterPress = (event: PointerEvent): void => {
+      if (activePointerId !== null) return;
+      activePointerId = event.pointerId;
+      node.classList.add("is-holding");
+      options.onOuterPressStart?.(emitOuterTap());
+    };
+
+    const endOuterPress = (event: PointerEvent): void => {
+      if (activePointerId === null) return;
+      if (event.pointerId !== activePointerId) return;
+      activePointerId = null;
+      node.classList.remove("is-holding");
+      options.onOuterPressEnd?.(emitOuterTap());
+    };
+
     node.addEventListener("click", () => {
       if (!shouldDelayForMinorToggle()) {
         onActivate();
@@ -672,6 +801,10 @@ export function createCircleOfFifthsUi(
       clearPendingOuterClick();
       onDoubleActivate();
     });
+    node.addEventListener("pointerdown", startOuterPress);
+    node.addEventListener("pointerup", endOuterPress);
+    node.addEventListener("pointercancel", endOuterPress);
+    node.addEventListener("pointerleave", endOuterPress);
     node.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
@@ -726,7 +859,34 @@ export function createCircleOfFifthsUi(
       options.onSecondaryTap?.(chord);
     };
 
+    let activePointerId: number | null = null;
+    let heldChord: CircleChordSpec | null = null;
+    const startSecondaryPress = (event: PointerEvent): void => {
+      if (activePointerId !== null) return;
+      const chord = selection?.secondaryChords[cellIndex];
+      if (!chord) return;
+      activePointerId = event.pointerId;
+      heldChord = chord;
+      node.classList.add("is-holding");
+      options.onSecondaryPressStart?.(chord);
+    };
+
+    const endSecondaryPress = (event: PointerEvent): void => {
+      if (activePointerId === null) return;
+      if (event.pointerId !== activePointerId) return;
+      activePointerId = null;
+      node.classList.remove("is-holding");
+      if (heldChord) {
+        options.onSecondaryPressEnd?.(heldChord);
+      }
+      heldChord = null;
+    };
+
     node.addEventListener("click", activateSecondaryCell);
+    node.addEventListener("pointerdown", startSecondaryPress);
+    node.addEventListener("pointerup", endSecondaryPress);
+    node.addEventListener("pointercancel", endSecondaryPress);
+    node.addEventListener("pointerleave", endSecondaryPress);
     if (cellIndex === 2) {
       path.addEventListener("dblclick", (event) => {
         event.preventDefault();
@@ -784,7 +944,33 @@ export function createCircleOfFifthsUi(
     options.onSecondaryTap?.(selection.diminishedChord);
   };
 
+  let dimPointerId: number | null = null;
+  let heldDimChord: CircleChordSpec | null = null;
+  const startDimPress = (event: PointerEvent): void => {
+    if (dimPointerId !== null) return;
+    if (!selection) return;
+    dimPointerId = event.pointerId;
+    heldDimChord = selection.diminishedChord;
+    dimNode.classList.add("is-holding");
+    options.onSecondaryPressStart?.(selection.diminishedChord);
+  };
+
+  const endDimPress = (event: PointerEvent): void => {
+    if (dimPointerId === null) return;
+    if (event.pointerId !== dimPointerId) return;
+    dimPointerId = null;
+    dimNode.classList.remove("is-holding");
+    if (heldDimChord) {
+      options.onSecondaryPressEnd?.(heldDimChord);
+    }
+    heldDimChord = null;
+  };
+
   dimNode.addEventListener("click", playDiminished);
+  dimNode.addEventListener("pointerdown", startDimPress);
+  dimNode.addEventListener("pointerup", endDimPress);
+  dimNode.addEventListener("pointercancel", endDimPress);
+  dimNode.addEventListener("pointerleave", endDimPress);
   dimNode.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -797,7 +983,22 @@ export function createCircleOfFifthsUi(
     if (!(target instanceof Element)) return;
     const clickedWedge = target.closest(".cof-wedge, .cof-secondary-cell, .cof-dim-cell");
     if (clickedWedge) return;
+    const point = clientToSvgPoint(event.clientX, event.clientY);
+    const dx = point.x - CENTER;
+    const dy = point.y - CENTER;
+    if (Math.sqrt(dx * dx + dy * dy) <= OUTER_RADIUS) return;
     options.onBackgroundTap?.();
+  });
+
+  svg.addEventListener("dblclick", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(".cof-wedge, .cof-secondary-cell, .cof-dim-cell")) return;
+    const point = clientToSvgPoint(event.clientX, event.clientY);
+    const dx = point.x - CENTER;
+    const dy = point.y - CENTER;
+    if (Math.sqrt(dx * dx + dy * dy) > OUTER_RADIUS) return;
+    options.onInnerDoubleTap?.();
   });
 
   const updateOuterChordModeLabels = (): void => {
@@ -867,6 +1068,7 @@ export function createCircleOfFifthsUi(
       frame.classList.remove("has-primary");
       detuneDeg = 0;
       applyDetailTransform();
+      applyChordZoom();
       return;
     }
 
@@ -893,6 +1095,7 @@ export function createCircleOfFifthsUi(
     if (prevPrimaryIndex !== primaryIndex) {
       showInnerCircleIndicator(activeSelection.primaryLabel);
     }
+    applyChordZoom();
   };
 
   const setMinorModeInternal = (enabled: boolean): void => {
@@ -929,14 +1132,26 @@ export function createCircleOfFifthsUi(
       detuneDeg = clamp((cents / 7) * 8, -12, 12);
       applyDetailTransform();
     },
-    setChordMode(enabled: boolean) {
-      if (chordModeEnabled === enabled) return;
+    setChordMode(enabled: boolean, modeOptions: CircleChordModeOptions = {}) {
+      if (enabled) {
+        chordZoomPrimaryIndex = modeOptions.zoomToPrimary ? primaryIndex : null;
+      } else {
+        chordZoomPrimaryIndex = null;
+      }
+      if (chordModeEnabled === enabled) {
+        applyChordZoom();
+        return;
+      }
       chordModeEnabled = enabled;
       showInnerCircleIndicator(enabled ? "CHORD" : "NOTE");
       updateOuterChordModeLabels();
+      applyChordZoom();
     },
     setMinorMode(enabled: boolean) {
       setMinorModeInternal(enabled);
+    },
+    showInnerIndicator(text: string) {
+      showInnerCircleIndicator(text);
     },
     pulseNote(midi: number, durationMs = 400) {
       pulseNoteCells([midi], midi, durationMs);

@@ -123,6 +123,24 @@ Integration points:
    - entering: double-tap middle-ring `vi`
    - exiting: double-tap outer `III`
    - when active, outer roman labels and inner roman detail labels remap to relative minor degrees.
+12. Chord-mode zoom:
+   - entering chord mode from a primary double-tap should zoom viewBox toward that primary sector while keeping the I/IV/V and inner detail wedges in-frame.
+   - exiting chord mode must restore the full-circle viewBox.
+   - inner and outer rings must remain concentric while zoomed (same visual pivot center).
+13. Note bar degree badges:
+   - when a primary is selected, each diatonic note row shows its roman numeral in a left column outside the note square.
+   - roman numerals in the note bar should render as bold uppercase tokens (for example `III`, `VII°`).
+   - note labels remain uppercase note names (not chord symbols).
+14. Instrument cycling:
+   - a double-tap on SVG background inside the circle radius cycles circle playback instruments.
+   - inner indicator text shows the active instrument name (for example `ELECTRIC GUITAR`, `PIPE ORGAN`).
+   - in chord mode, inner/background double-tap must not exit chord mode or cancel zoom.
+15. Hold-to-sustain behavior:
+   - pointer-down on an outer wedge starts sustain playback for that wedge role (note in note mode, major triad in chord mode).
+   - pointer-down on inner detail wedges starts sustain playback for the selected chord.
+   - pointer-up/cancel/leave stops sustain with a short release envelope.
+16. Chord zoom safety:
+   - zoom target should keep the primary harmonic cluster (`I`, `IV`, `V`, `ii`, `iii`, `vi`, `vii°`) visible within the SVG viewport.
 
 ### Circle test expectations
 
@@ -131,8 +149,15 @@ Integration points:
 - Prefer class/visibility/count assertions over pixel snapshots.
 - Verify chord-mode enter/exit behavior:
   - retap primary enters chord mode and plays major triad
-  - background tap exits chord mode
+  - primary double-tap while in chord mode applies zoom-to-primary view
+  - only taps outside the circle radius exit chord mode
+  - chord-mode exit resets zoom to full-circle view
   - primary tap in chord mode plays major triad (does not exit)
+- Verify rapid double-tap on the same note/chord does not trigger duplicate short re-attacks.
+- Verify note-bar roman numeral badges for at least one selected key.
+- Verify inner-circle background double-tap cycles instrument indicator text deterministically.
+- Verify zoomed chord view does not clip the primary harmonic cluster in desktop and portrait mobile.
+- Verify wedge pointer hold toggles the holding lifecycle state (`is-holding`) deterministically.
 
 ## Drum Machine UI (shared object)
 

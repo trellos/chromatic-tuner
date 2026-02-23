@@ -1,4 +1,4 @@
-# Repository Guide
+﻿# Repository Guide
 
 ## Core workflow
 - Install: `npm ci`
@@ -31,8 +31,21 @@
 - Chord mode flow:
   - first tap on a primary note sets primary and plays single note
   - tapping the same primary note again enters chord mode and plays that primary major triad
+  - if the retap is a primary double tap, chord mode zooms to that primary cluster while keeping I/IV/V and inner detail wedges visible
   - while in chord mode, tapping any outer wedge plays that wedge's major triad and does not change primary
-  - chord mode exits only when tapping SVG background (outside wedges)
+  - chord mode exits only when tapping outside the circle radius (not just outside wedges)
+- Exiting chord mode restores full-circle zoom.
+- When a primary note is selected, note-bar rows show bold uppercase roman numerals in a left column beside each diatonic note square.
+- Double-tapping SVG background inside the circle cycles instruments and updates the inner indicator text.
+- Holding a circle wedge sustains playback while pressed, then releases on pointer end/cancel/leave.
+- Sustained playback uses looped sample regions derived from zero-crossing loop points per instrument sample.
+- Rapid double-taps on the same target are debounced to prevent a second short re-attack.
+- Circle instrument set:
+  - `ACOUSTIC GUITAR`
+  - `ELECTRIC GUITAR`
+  - `SPANISH GUITAR`
+  - `PIPE ORGAN`
+  - `HOUSE ORGAN`
 - Inner detail rotation should always follow shortest angular path when primary changes.
 - Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
 
@@ -40,3 +53,4 @@
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
 - Avoid test-only branches in runtime code.
+
