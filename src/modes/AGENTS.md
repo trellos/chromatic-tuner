@@ -125,3 +125,13 @@ Do not preserve dead paths "for later" unless explicitly requested.
 
 - Keep PR title/body plain ASCII and concise when possible.
 - If PR creation returns a 400 from host integration, retry with a shorter title and a minimal body first, then expand only if accepted.
+
+### Circle of Fifths (`src/modes/circle-of-fifths.ts`)
+- Dedicated mode is a thin adapter over shared Circle UI (`src/ui/circle-of-fifths.ts`).
+- Taps should trigger guitar-sample playback + seigaiha pulse, but keep theory/render logic in shared UI helpers.
+- Keep this mode focused on lifecycle wiring (`onEnter`/`onExit`) and cleanup only.
+
+### Tuner Circle toggle (`src/modes/tuner.ts`)
+- Tuner supports visual sub-modes (`strobe`, `circle`) via in-mode toggle.
+- Pitch detection drives Circle primary note + detune-guidance rotation when Circle view is active.
+- No detected note must clear Circle primary and hide inner detail wedges.
