@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { resolveSeigaihaRandomnessDriver } from "../src/ui/seigaihaBackground.ts";
+import { resolveSeigaihaRandomnessDriver } from "../src/ui/seigaihaBackground.js";
 
 test("seigaiha arbitration: debug override has highest priority", () => {
   const driver = resolveSeigaihaRandomnessDriver({

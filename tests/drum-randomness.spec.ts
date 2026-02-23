@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   getDrumRandomnessForBeat,
   getDrumSoundingBeatIndicesFromFlags,
-} from "../src/modes/drum-machine.ts";
+} from "../src/modes/drum-machine.js";
 
 test("drum randomness: collects sounding beats in order", () => {
   const sounding = getDrumSoundingBeatIndicesFromFlags([

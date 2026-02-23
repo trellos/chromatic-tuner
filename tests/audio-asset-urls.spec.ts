@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import {
   DRUM_MACHINE_SAMPLE_URLS,
   METRONOME_SAMPLE_URLS,
-} from "../src/audio/embedded-samples.ts";
-import { WOODBLOCK_SAMPLE_URLS } from "../src/audio/woodblock-samples.ts";
+} from "../src/audio/embedded-samples.js";
+import { WOODBLOCK_SAMPLE_URLS } from "../src/audio/woodblock-samples.js";
 
 function collectUrls(value: unknown): string[] {
   if (typeof value === "string") return [value];
