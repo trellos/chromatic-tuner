@@ -8,7 +8,7 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   </head>
 
-  <body>
+  <body class="status-hidden">
     <main class="app">
       <header class="app-header">
         <div class="brand">
@@ -25,10 +25,10 @@
           aria-hidden="false"
         >
           <div class="mode-header">
-            <div class="mode-title tuner-title">Chromatic Tuner</div>
+            <div class="mode-title">Chromatic Tuner</div>
           </div>
 
-          <div class="tuner-visual-toggle" role="group" aria-label="Tuner visual mode">
+          <div class="tuner-visual-toggle" role="group" aria-label="Tuner visual mode" data-no-mode-swipe>
             <button type="button" class="is-active" data-tuner-visual="strobe" aria-pressed="true">Strobe</button>
             <button type="button" data-tuner-visual="circle" aria-pressed="false">Circle</button>
           </div>

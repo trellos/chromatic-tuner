@@ -527,6 +527,25 @@ function getModeByOffset(offset: number): ModeId | null {
   return nextMode ?? null;
 }
 
+
+function isSwipeGestureExcludedTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      [
+        "button",
+        "input",
+        "select",
+        "textarea",
+        "label",
+        "[role='button']",
+        "[role='slider']",
+        "[data-no-mode-swipe]",
+      ].join(",")
+    )
+  );
+}
+
 function requestModeSwitchFromSwipe(nextMode: ModeId): void {
   // Intentionally non-blocking: touchend should finish immediately,
   // while switchMode handles async lifecycle and error reporting.
@@ -631,6 +650,10 @@ function bindModeSwipe(): void {
         clearSwipeState();
         return;
       }
+      if (isSwipeGestureExcludedTarget(event.target)) {
+        clearSwipeState();
+        return;
+      }
       const touch = event.touches[0];
       if (!touch) return;
       swipeStartX = touch.clientX;
@@ -640,13 +663,17 @@ function bindModeSwipe(): void {
       swipeTargetMode = null;
       isSwipeDragging = false;
     },
-    { passive: true }
+    { passive: true, capture: true }
   );
 
   modeStageEl.addEventListener(
     "touchmove",
     (event) => {
       if (document.body.classList.contains("drum-fullscreen")) return;
+      if (isSwipeGestureExcludedTarget(event.target)) {
+        clearSwipeState();
+        return;
+      }
       const touch = event.touches[0];
       if (!touch) return;
       const dx = touch.clientX - swipeStartX;
@@ -663,7 +690,7 @@ function bindModeSwipe(): void {
       }
       renderSwipe(dx);
     },
-    { passive: false }
+    { passive: false, capture: true }
   );
 
   modeStageEl.addEventListener(
@@ -671,7 +698,7 @@ function bindModeSwipe(): void {
     () => {
       clearSwipeState();
     },
-    { passive: true }
+    { passive: true, capture: true }
   );
 
   modeStageEl.addEventListener(
@@ -706,7 +733,7 @@ function bindModeSwipe(): void {
         requestModeSwitchFromSwipe(nextMode);
       }
     },
-    { passive: true }
+    { passive: true, capture: true }
   );
 }
 

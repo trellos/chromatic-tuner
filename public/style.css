@@ -357,19 +357,9 @@ body.drum-fullscreen .mode-stage {
 }
 
 .mode-title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.mode-screen[data-mode="tuner"] .mode-header {
-  align-items: center;
-}
-
-.tuner-title {
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   font-size: 30px;
+  font-weight: 700;
   letter-spacing: 0.26em;
   text-transform: uppercase;
   color: transparent;
@@ -378,6 +368,10 @@ body.drum-fullscreen .mode-stage {
   background-clip: text;
   text-rendering: geometricPrecision;
   text-align: center;
+}
+
+.mode-screen[data-mode="tuner"] .mode-header {
+  align-items: center;
 }
 
 
