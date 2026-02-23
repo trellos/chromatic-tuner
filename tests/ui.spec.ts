@@ -72,6 +72,7 @@ test("seigaiha background: single static traditional layer", async ({ page }) =>
       position: style?.position ?? null,
       inset: style?.inset ?? null,
       pointerEvents: style?.pointerEvents ?? null,
+      transform: style?.transform ?? null,
     };
   });
 
@@ -88,6 +89,7 @@ test("seigaiha background: single static traditional layer", async ({ page }) =>
     expect(bg.position).toBe("fixed");
     expect(bg.inset).toBe("0px");
     expect(bg.pointerEvents).toBe("none");
+    expect(bg.transform).toBe("none");
   }
 });
 
