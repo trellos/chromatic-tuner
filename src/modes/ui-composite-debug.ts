@@ -7,6 +7,8 @@ import {
   type CircleChordModeOptions,
 } from "../ui/circle-of-fifths.js";
 import { createDrumMachineUi } from "../ui/drum-machine.js";
+import type { LooperRecordable, LooperRecorder } from "./looper-recordable.js";
+import { createUiCompositeLooper } from "./ui-composite-looper.js";
 import type { ModeDefinition } from "./types.js";
 
 const TAP_PLAYBACK_DEBOUNCE_MS = 440;
@@ -89,6 +91,13 @@ export function createUiCompositeDebugMode(): ModeDefinition {
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="ui-composite-debug"]');
   let drumUi: ReturnType<typeof createDrumMachineUi> | null = null;
   let circleUi: ReturnType<typeof createCircleOfFifthsUi> | null = null;
+  let looperUi: ReturnType<typeof createUiCompositeLooper> | null = null;
+  let circleRecorder: LooperRecorder | null = null;
+  const circleRecordable: LooperRecordable = {
+    setLooperRecorder: (recorder) => {
+      circleRecorder = recorder;
+    },
+  };
   let rootEl: HTMLElement | null = null;
   let chordModeActive = false;
   let lastPrimaryLabel: string | null = null;
@@ -118,21 +127,45 @@ export function createUiCompositeDebugMode(): ModeDefinition {
     circleUi?.setChordMode(next, modeOptions);
   };
 
-  const playChord = async (chord: CircleChordSpec): Promise<void> => {
+  const playMidis = async (
+    midis: number[],
+    durationMs: number,
+    shouldRecord: boolean
+  ): Promise<void> => {
+    const cleanedMidis = midis
+      .filter((value) => Number.isFinite(value))
+      .map((value) => Math.round(value));
+    if (!cleanedMidis.length) return;
+    if (shouldRecord) circleRecorder?.recordPulse(cleanedMidis, durationMs);
+    if (cleanedMidis.length === 1) {
+      const midi = cleanedMidis[0];
+      if (midi === undefined) return;
+      circleUi?.pulseNote(midi, durationMs);
+      await guitarPlayer.playMidi(midi, durationMs);
+      return;
+    }
+    circleUi?.pulseChord(cleanedMidis, durationMs);
+    await guitarPlayer.playChord(cleanedMidis, durationMs);
+  };
+
+  const playChord = async (
+    chord: CircleChordSpec,
+    shouldRecord = true
+  ): Promise<void> => {
     const chordMidis = getCircleChordMidis(chord);
-    circleUi?.pulseChord(chordMidis, 640);
-    await guitarPlayer.playChord(chordMidis, 640);
+    await playMidis(chordMidis, 640, shouldRecord);
   };
 
-  const playPrimary = async (midi: number): Promise<void> => {
-    circleUi?.pulseNote(midi, 400);
-    await guitarPlayer.playMidi(midi, 400);
+  const playPrimary = async (midi: number, shouldRecord = true): Promise<void> => {
+    await playMidis([midi], 400, shouldRecord);
   };
 
-  const playMajorChord = async (midi: number): Promise<void> => {
+  const playMajorChord = async (
+    midi: number,
+    shouldRecord = true
+  ): Promise<void> => {
     const chordMidis = getCircleMajorChordMidis(midi);
-    circleUi?.pulseChord(chordMidis, 640);
-    await guitarPlayer.playChord(chordMidis, 640);
+    await playMidis(chordMidis, 640, shouldRecord);
   };
 
   const log = (name: string, payload?: unknown): void => {
@@ -152,6 +185,8 @@ export function createUiCompositeDebugMode(): ModeDefinition {
     onEnter: async () => {
       if (!modeEl) return;
       document.body.classList.remove("ui-composite-debug-fullscreen");
+      looperUi?.destroy();
+      looperUi = null;
       rootEl?.remove();
       chordModeActive = false;
       lastPrimaryLabel = null;
@@ -170,6 +205,7 @@ export function createUiCompositeDebugMode(): ModeDefinition {
           ${createDebugDrumMarkup()}
         </section>
         <section class="ui-composite-debug-pane ui-composite-debug-pane--circle">
+          <div class="ui-composite-debug-looper-host" data-ui-composite-looper></div>
           <div class="circle-mode-layout ui-composite-debug-circle-host"></div>
         </section>
       `;
@@ -178,17 +214,39 @@ export function createUiCompositeDebugMode(): ModeDefinition {
 
       const drumRoot = shell.querySelector<HTMLElement>(".ui-composite-debug-pane--drum");
       const circleHost = shell.querySelector<HTMLElement>(".ui-composite-debug-circle-host");
+      const looperHost = shell.querySelector<HTMLElement>("[data-ui-composite-looper]");
       const fullscreenBtn = shell.querySelector<HTMLButtonElement>("[data-ui-composite-fullscreen]");
-      if (!drumRoot || !circleHost) return;
+      if (!drumRoot || !circleHost || !looperHost) return;
       fullscreenBtn?.addEventListener("click", () => {
         log("mode.onFullscreen");
         document.body.classList.add("ui-composite-debug-fullscreen");
       });
 
+      looperUi = createUiCompositeLooper({
+        getMeasureDurationMs: () => {
+          const bpm = drumUi?.getBpm() ?? 120;
+          return (60 / Math.max(1, bpm)) * 4 * 1000;
+        },
+        onPlaybackEvent: (playback) => {
+          void playMidis(playback.midis, playback.durationMs, false);
+        },
+      });
+      looperHost.replaceChildren(looperUi.rootEl);
+      circleRecordable.setLooperRecorder(looperUi);
+
       drumUi = createDrumMachineUi(drumRoot, {
-        onTransportStart: () => log("drum.onTransportStart"),
-        onTransportStop: () => log("drum.onTransportStop"),
-        onBeatBoundary: (event) => log("drum.onBeatBoundary", event),
+        onTransportStart: () => {
+          log("drum.onTransportStart");
+          looperUi?.onTransportStart();
+        },
+        onTransportStop: () => {
+          log("drum.onTransportStop");
+          looperUi?.onTransportStop();
+        },
+        onBeatBoundary: (event) => {
+          log("drum.onBeatBoundary", event);
+          looperUi?.onBeatBoundary(event);
+        },
       });
 
       circleUi = createCircleOfFifthsUi(circleHost, {
@@ -201,13 +259,13 @@ export function createUiCompositeDebugMode(): ModeDefinition {
             setChordMode(true);
             if (!skipPlayback) {
               if (shouldDebounceTapPlayback(`maj:${selection.primaryMidi}`)) return;
-              void playMajorChord(selection.primaryMidi);
+              void playMajorChord(selection.primaryMidi, true);
             }
           } else {
             setChordMode(false);
             if (!skipPlayback) {
               if (shouldDebounceTapPlayback(`note:${selection.primaryMidi}`)) return;
-              void playPrimary(selection.primaryMidi);
+              void playPrimary(selection.primaryMidi, true);
             }
           }
         },
@@ -215,14 +273,14 @@ export function createUiCompositeDebugMode(): ModeDefinition {
           log("circle.onSecondaryTap", chord);
           if (shouldSuppressTapPlayback()) return;
           if (shouldDebounceTapPlayback(`sec:${chord.label}`)) return;
-          void playChord(chord);
+          void playChord(chord, true);
         },
         onOuterTap: (note) => {
           log("circle.onOuterTap", note);
           if (!chordModeActive) return;
           if (shouldSuppressTapPlayback()) return;
           if (shouldDebounceTapPlayback(`maj:${note.midi}`)) return;
-          void playMajorChord(note.midi);
+          void playMajorChord(note.midi, true);
         },
         onOuterDoubleTap: (note) => {
           log("circle.onOuterDoubleTap", note);
@@ -234,15 +292,22 @@ export function createUiCompositeDebugMode(): ModeDefinition {
           suppressNextTapPlayback = true;
           if (chordModeActive) {
             const chordMidis = getCircleMajorChordMidis(note.midi);
+            circleRecorder?.recordHoldStart(`outer:maj:${note.midi}`, chordMidis);
             circleUi?.holdChord(chordMidis);
             void guitarPlayer.startSustainChord(chordMidis);
             return;
           }
+          circleRecorder?.recordHoldStart(`outer:note:${note.midi}`, [note.midi]);
           circleUi?.holdNote(note.midi);
           void guitarPlayer.startSustainMidi(note.midi);
         },
         onOuterPressEnd: (note) => {
           log("circle.onOuterPressEnd", note);
+          if (chordModeActive) {
+            circleRecorder?.recordHoldEnd(`outer:maj:${note.midi}`);
+          } else {
+            circleRecorder?.recordHoldEnd(`outer:note:${note.midi}`);
+          }
           circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
         },
@@ -250,11 +315,13 @@ export function createUiCompositeDebugMode(): ModeDefinition {
           log("circle.onSecondaryPressStart", chord);
           suppressNextTapPlayback = true;
           const chordMidis = getCircleChordMidis(chord);
+          circleRecorder?.recordHoldStart(`secondary:${chord.label}`, chordMidis);
           circleUi?.holdChord(chordMidis);
           void guitarPlayer.startSustainChord(chordMidis);
         },
         onSecondaryPressEnd: (chord) => {
           log("circle.onSecondaryPressEnd", chord);
+          circleRecorder?.recordHoldEnd(`secondary:${chord.label}`);
           circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
         },
@@ -267,16 +334,18 @@ export function createUiCompositeDebugMode(): ModeDefinition {
         onNoteBarTap: (note) => {
           log("circle.onNoteBarTap", note);
           suppressNextTapPlayback = false;
-          void playPrimary(note.midi);
+          void playPrimary(note.midi, true);
         },
         onNoteBarPressStart: (note) => {
           log("circle.onNoteBarPressStart", note);
           suppressNextTapPlayback = true;
+          circleRecorder?.recordHoldStart(`note-bar:${note.midi}`, [note.midi]);
           circleUi?.holdNote(note.midi);
           void guitarPlayer.startSustainMidi(note.midi);
         },
         onNoteBarPressEnd: (note) => {
           log("circle.onNoteBarPressEnd", note);
+          circleRecorder?.recordHoldEnd(`note-bar:${note.midi}`);
           circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
         },
@@ -303,6 +372,9 @@ export function createUiCompositeDebugMode(): ModeDefinition {
       circleUi?.releaseHeldNotes();
       circleUi?.destroy();
       circleUi = null;
+      looperUi?.destroy();
+      looperUi = null;
+      circleRecordable.setLooperRecorder(null);
       guitarPlayer.stopSustain();
       guitarPlayer.stopAll();
       drumUi?.exit();

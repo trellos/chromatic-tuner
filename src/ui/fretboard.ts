@@ -69,6 +69,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const hiddenSummaryButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-summary]");
   const hideableSections = rootEl.querySelectorAll<HTMLElement>("[data-fretboard-hideable]");
   const controls = rootEl.querySelector<HTMLElement>(".fretboard-controls");
+  const layout = rootEl.querySelector<HTMLElement>(".fretboard-layout");
 
   let uiAbort: AbortController | null = null;
   let state: FretboardState = { ...options.initialState };
@@ -127,6 +128,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
       hideButton.setAttribute("aria-pressed", String(controlsHidden));
     }
     rootEl.classList.toggle("fretboard-controls-hidden", controlsHidden);
+    layout?.classList.toggle("fretboard-controls-hidden", controlsHidden);
   };
 
   const setSummaryText = (): void => {

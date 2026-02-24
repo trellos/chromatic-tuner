@@ -5,7 +5,8 @@ export type ModeId =
   | "circle-of-fifths"
   | "drum-machine"
   | "wild-tuna"
-  | "ui-composite-debug";
+  | "ui-composite-debug"
+  | "fretboard-composite";
 
 // A mode is the high-level object that encapsulates one app screen's
 // identity, capabilities, and lifecycle behavior (enter/exit callbacks).

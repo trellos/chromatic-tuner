@@ -42,6 +42,8 @@ export type DrumMachineUiOptions = {
     beatHasSound: boolean;
     soundingBeatIndices: number[];
     beatsPerBar: number;
+    scheduledTimeSec: number;
+    scheduledPerfMs: number;
   }) => void;
 };
 
@@ -49,6 +51,8 @@ export type DrumMachineUi = {
   enter: () => Promise<void>;
   exit: () => void;
   getShareUrl: () => string;
+  getBpm: () => number;
+  isPlaying: () => boolean;
   destroy: () => void;
 };
 
@@ -721,11 +725,16 @@ export function createDrumMachineUi(
           beatsPerBar,
           stepsPerBeat
         );
+        const scheduledPerfMs =
+          performance.now() +
+          Math.max(0, (nextStepTime - audioContext.currentTime) * 1000);
         options.onBeatBoundary?.({
           beatIndex,
           beatHasSound,
           soundingBeatIndices,
           beatsPerBar,
+          scheduledTimeSec: nextStepTime,
+          scheduledPerfMs,
         });
       }
       currentStep = (currentStep + 1) % stepsPerBar;
@@ -960,6 +969,8 @@ export function createDrumMachineUi(
     enter,
     exit,
     getShareUrl,
+    getBpm: () => bpm,
+    isPlaying: () => isPlaying,
     destroy() {
       exit();
     },

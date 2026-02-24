@@ -110,6 +110,19 @@ test("ui composite debug mode appears with debug query and fits without scrollba
   expect(fits).toBeTruthy();
 });
 
+test("fretboard composite mode appears with debug query and shows drum, fretboard, and looper", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "Fretboard Composite" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="fretboard-composite"]');
+  await expect(panel).toHaveClass(/is-active/);
+  await expect(panel.locator(".drum-mock")).toBeVisible();
+  await expect(panel.locator(".fretboard-board")).toBeVisible();
+  await expect(panel.locator(".ui-composite-looper")).toBeVisible();
+});
+
 test("ui composite debug circle supports chord mode zoom and outside-tap exit", async ({ page }) => {
   await page.goto("/?debug=1");
   await page.getByRole("tab", { name: "UI Composite Debug" }).click();
@@ -123,6 +136,69 @@ test("ui composite debug circle supports chord mode zoom and outside-tap exit", 
   await expect(circle).toHaveClass(/is-chord-mode/);
   await panel.locator(".cof-svg").click({ position: { x: 4, y: 4 }, force: true });
   await expect(circle).not.toHaveClass(/is-chord-mode/);
+});
+
+test("ui composite debug looper renders REC control with four measure slots", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
+  const looper = panel.locator(".ui-composite-looper");
+  const recButton = looper.locator("[data-looper-rec]");
+  const playButton = looper.locator("[data-looper-play]");
+  const measures = looper.locator("[data-looper-measure]");
+  await expect(looper).toBeVisible();
+  await expect(recButton).toHaveText("REC");
+  await expect(playButton).toHaveText("PLAY");
+  await expect(playButton).toBeDisabled();
+  await expect(measures).toHaveCount(4);
+  await expect(looper).toHaveAttribute("data-looper-state", "idle");
+  await expect(measures.nth(0)).toHaveClass(/is-guide/);
+  await expect(measures.nth(1)).not.toHaveClass(/is-guide/);
+});
+
+test("ui composite debug looper auto-stops after four recorded measures and enters play mode", async ({
+  page,
+}) => {
+  await page.goto("/?debug=1");
+  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
+  const looper = panel.locator(".ui-composite-looper");
+  const recButton = looper.locator("[data-looper-rec]");
+  const looperPlayButton = looper.locator("[data-looper-play]");
+  const drumPlayButton = panel.locator("#drum-play-toggle");
+  const measureSlots = looper.locator("[data-looper-measure]");
+  await expect(looper).toBeVisible();
+
+  await drumPlayButton.click();
+  await page.waitForTimeout(200);
+  const started = ((await drumPlayButton.textContent()) ?? "").trim() === "Stop";
+  if (!started) {
+    return;
+  }
+
+  await recButton.click();
+  await expect
+    .poll(async () => looper.getAttribute("data-looper-state"), { timeout: 1200 })
+    .toMatch(/^(armed|recording)$/);
+  await expect
+    .poll(async () => looper.getAttribute("data-looper-state"), { timeout: 4500 })
+    .toBe("recording");
+
+  await panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
+
+  await expect
+    .poll(async () => looper.getAttribute("data-looper-state"), { timeout: 10500 })
+    .toBe("idle");
+
+  await expect(measureSlots).toHaveCount(4);
+  await expect(measureSlots.first()).toHaveClass(/is-stored/);
+  await expect(looper).toHaveClass(/has-recording/);
+  await expect(looper).toHaveClass(/is-play-mode/);
+  await expect(looperPlayButton).toBeEnabled();
 });
 
 test("seigaiha debug override starts disabled and shows editable detune mapping", async ({
@@ -1034,6 +1110,23 @@ test('tuner status toggle is not duplicated after mode re-entry', async ({ page 
     target?.dispatchEvent(new Event('touchend', { bubbles: true }));
   });
   await expect(page.locator('body')).toHaveClass(/status-hidden/);
+});
+
+test("mobile Safari fretboard KEY tap does not trigger mode swipe to metronome", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage only.");
+
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard" }).click();
+  const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
+  const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
+  await expect(fretboardScreen).toHaveClass(/is-active/);
+
+  const keyButton = fretboardScreen.locator('[data-fretboard-display="key"]');
+  await keyButton.click();
+  await expect(fretboardScreen).toHaveClass(/is-active/);
+  await expect(metronomeScreen).not.toHaveClass(/is-active/);
 });
 
 

@@ -159,7 +159,7 @@ async function installFretboardAudioAttemptTracker(
 
 test("fretboard mode defaults to C major scale with note labels", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const fretboard = page.locator('.mode-screen[data-mode="fretboard"]');
   await expect(fretboard).toHaveClass(/is-active/);
@@ -213,7 +213,7 @@ test("fretboard key tap on C high-e plays 3 on G and 5 on B", async () => {
 
 test("fretboard interaction updates characteristic options and degree labels", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   await page.locator('[data-fretboard-display="chord"]').click();
   await expect(page.locator('#fretboard-characteristic option[value="suspended-fourth"]')).toHaveCount(1);
@@ -248,7 +248,7 @@ test("fretboard interaction updates characteristic options and degree labels", a
 
 test("fretboard hide button replaces selectors with a tappable summary field", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const hideButton = page.locator("[data-fretboard-hide]");
   const summary = page.locator("[data-fretboard-summary]");
@@ -263,18 +263,24 @@ test("fretboard hide button replaces selectors with a tappable summary field", a
   await expect(summary).toHaveText("A Major");
   await expect(page.locator(".fretboard-note-selector")).toHaveAttribute("hidden", "");
   await expect(page.locator(".fretboard-characteristic")).toHaveAttribute("hidden", "");
+  await expect(page.locator(".fretboard-actions")).toHaveAttribute("hidden", "");
+  const rotated = await summary.evaluate(
+    (el) => getComputedStyle(el as HTMLElement).transform !== "none"
+  );
+  expect(rotated).toBeTruthy();
 
   await summary.click();
   await expect(summary).toBeHidden();
   await expect(page.locator(".fretboard-note-selector")).not.toHaveAttribute("hidden", "");
   await expect(page.locator(".fretboard-characteristic")).not.toHaveAttribute("hidden", "");
+  await expect(page.locator(".fretboard-actions")).not.toHaveAttribute("hidden", "");
 });
 
 test("fretboard key mode shows seven modes with major/minor labels and diatonic notes", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   await page.locator('[data-fretboard-display="key"]').click();
   await expect(page.locator('[data-fretboard-display="key"]')).toHaveClass(/is-active/);
@@ -303,7 +309,7 @@ test("fretboard key mode shows seven modes with major/minor labels and diatonic 
 
 test("fretboard note dots expose midi metadata and are tappable", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const firstDot = page.locator(".fretboard-dot").first();
   await expect(firstDot).toHaveAttribute("data-midi", /^\d+$/);
@@ -318,7 +324,7 @@ test("fretboard note dots expose midi metadata and are tappable", async ({ page 
 
 test("fretboard open-string indicators expose midi metadata and are tappable", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const firstOpen = page.locator(".fretboard-open-indicator").first();
   await expect(firstOpen).toHaveAttribute("data-midi", /^\d+$/);
@@ -336,7 +342,7 @@ test("fretboard play button ramps seigaiha randomness and returns to zero", asyn
 }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "debug randomness assertion is Chromium-only");
   await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
   await page.locator('[data-fretboard-display="chord"]').click();
 
   const playButton = page.locator("[data-fretboard-play]");
@@ -371,7 +377,7 @@ test("fretboard mobile portrait fits all controls and reaches fret 12", async ({
   test.skip(testInfo.project.name !== "Mobile Safari", "mobile portrait coverage only");
 
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
   await expect(fretboardScreen).toHaveClass(/is-active/);
@@ -414,7 +420,7 @@ test("fretboard UI stays fully visible across desktop and portrait aspect ratios
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.getByRole("tab", { name: "Fretboard" }).click();
+    await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
     const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
     await expect(fretboardScreen).toHaveClass(/is-active/);
@@ -455,7 +461,7 @@ test("fretboard taps play guitar sample across browser engines", async ({ page, 
 
   await installFretboardAudioCounters(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => {
@@ -493,7 +499,7 @@ test("fretboard chord taps play triads rooted on tapped string", async ({ page, 
 
   await installFretboardAudioCounters(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
   await page.locator('[data-fretboard-display="chord"]').click();
 
   const tappedLowE = page.locator('.fretboard-dot[data-string-index="0"]').first();
@@ -521,7 +527,7 @@ test("fretboard key taps play diatonic triads including top-string voicings", as
 
   await installFretboardAudioCounters(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
   await page.locator('[data-fretboard-display="key"]').click();
 
   const lowStringDot = page.locator('.fretboard-dot[data-string-index="0"]').first();
@@ -559,7 +565,7 @@ test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
 
   await installFretboardAudioAttemptTracker(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
 
   const hasAudioApi = await page.evaluate(
     () => Boolean((window as any).AudioContext || (window as any).webkitAudioContext)
@@ -608,3 +614,4 @@ test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
 
   expect(pageErrors).toEqual([]);
 });
+
