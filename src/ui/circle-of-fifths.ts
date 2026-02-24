@@ -36,6 +36,7 @@ export type CircleOfFifthsUiOptions = {
   onBackgroundTap?: () => void;
   onBackgroundPulseRequest?: () => void;
   onBackgroundRandomnessRequest?: (randomness: number) => void;
+  onChordModeChange?: (enabled: boolean) => void;
 };
 
 export type CircleChordModeOptions = {
@@ -916,7 +917,9 @@ export function createCircleOfFifthsUi(
       options.onBackgroundPulseRequest?.();
       options.onBackgroundRandomnessRequest?.(0.75);
       if (chordModeEnabled) return;
+      const isRetap = index === primaryIndex;
       setPrimaryIndex(index);
+      if (isRetap) enterChordModeInternal();
       if (selection) options.onPrimaryTap?.(selection);
     };
 
@@ -1185,6 +1188,7 @@ export function createCircleOfFifthsUi(
     lastBackgroundTapAt = now;
     lastBackgroundTapX = clientX;
     lastBackgroundTapY = clientY;
+    exitChordModeInternal();
     options.onBackgroundTap?.();
   };
 
@@ -1310,6 +1314,28 @@ export function createCircleOfFifthsUi(
     minorModeEnabled = enabled;
     showInnerCircleIndicator(enabled ? "minor" : "MAJOR");
     if (primaryIndex !== null) setPrimaryIndex(primaryIndex);
+  };
+
+  const enterChordModeInternal = (): void => {
+    chordZoomPrimaryIndex = null;
+    if (chordModeEnabled) return;
+    chordModeEnabled = true;
+    showInnerCircleIndicator("CHORD");
+    updateOuterChordModeLabels();
+    applyChordZoom();
+    options.onChordModeChange?.(true);
+  };
+
+  const exitChordModeInternal = (): void => {
+    chordZoomPrimaryIndex = null;
+    if (!chordModeEnabled) return;
+    heldNoteSemitones.forEach((semitone) => { finishNoteVisual(semitone); });
+    heldNoteSemitones.clear();
+    chordModeEnabled = false;
+    showInnerCircleIndicator("NOTE");
+    updateOuterChordModeLabels();
+    applyChordZoom();
+    options.onChordModeChange?.(false);
   };
 
   updateInstrumentLabelPlacement();

@@ -204,11 +204,16 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
         onPrimaryTap: (selection) => {
           void playCircleMidis([selection.primaryMidi], 380, true);
         },
-        onOuterTap: (note) => {
-          void playCircleMidis(getCircleMajorChordMidis(note.midi), 640, true);
+        onSecondaryPressStart: (chord) => {
+          const chordMidis = getCircleChordMidis(chord);
+          circleLooper?.recordHoldStart(`circle-secondary-${chord.rootMidi}`, chordMidis);
+          circleUi?.holdChord(chordMidis);
+          void guitarPlayer.startSustainChord(chordMidis);
         },
-        onSecondaryTap: (chord) => {
-          void playCircleMidis(getCircleChordMidis(chord), 640, true);
+        onSecondaryPressEnd: (chord) => {
+          circleLooper?.recordHoldEnd(`circle-secondary-${chord.rootMidi}`);
+          circleUi?.releaseHeldNotes();
+          guitarPlayer.stopSustain();
         },
         onOuterPressStart: (note) => {
           const midis = getCircleMajorChordMidis(note.midi);

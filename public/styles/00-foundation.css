@@ -394,23 +394,21 @@ body.drum-fullscreen .mode-stage {
 }
 
 .wild-tuna-pane {
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   position: relative;
 }
 
 .wild-tuna-pane--drum {
-  grid-column: 1;
   grid-row: 1;
 }
 
 .wild-tuna-pane--circle {
-  grid-column: 1;
   grid-row: 2;
 }
 
 .wild-tuna-pane--fretboard {
-  grid-column: 1;
   grid-row: 3;
 }
 
@@ -433,18 +431,15 @@ body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
   box-shadow: none;
 }
 
-body.wild-tuna-fullscreen .wild-tuna-title {
-  opacity: 0;
-}
-
+body.wild-tuna-fullscreen .wild-tuna-title,
 body.wild-tuna-fullscreen .wild-tuna-card {
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(0.9);
+  display: none;
 }
 
 body.wild-tuna-fullscreen .wild-tuna-composite {
   display: grid;
+  flex: 1;
+  min-height: 0;
 }
 
 body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
@@ -457,6 +452,8 @@ body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
 }
 
 body.wild-tuna-fullscreen .wild-tuna-mode-shell {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   max-width: 100%;
   width: 100%;

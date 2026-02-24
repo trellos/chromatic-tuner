@@ -11,15 +11,13 @@
 }
 
 .wild-tuna-pane--fretboard .fretboard-layout {
-  align-items: start;
-  gap: 14px;
-  grid-template-columns: minmax(340px, 1.25fr) minmax(260px, 1fr);
+  align-items: stretch;
   height: 100%;
+  padding-left: 16px;
 }
 
 .wild-tuna-pane--fretboard .fretboard-board {
-  max-width: none;
-  min-height: 260px;
+  min-height: 300px;
 }
 
 .wild-tuna-pane--fretboard .fretboard-controls {
@@ -441,6 +439,10 @@
     grid-template-columns: 1fr;
   }
 
+  .wild-tuna-pane--fretboard .fretboard-layout {
+    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+  }
+
   .fretboard-board {
     max-width: 260px;
     min-height: 430px;
@@ -476,10 +478,6 @@
   .fretboard-looper-slot {
     top: calc(100% - 90px);
     width: min(180px, 54%);
-  }
-
-  .wild-tuna-pane--fretboard .fretboard-layout {
-    grid-template-columns: minmax(180px, 0.9fr) minmax(170px, 1fr);
   }
 
   .wild-tuna-pane--fretboard .fretboard-board {

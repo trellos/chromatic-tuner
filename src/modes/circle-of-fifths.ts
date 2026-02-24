@@ -184,15 +184,24 @@ export function createCircleOfFifthsMode(
           const clamped = Math.min(1, Math.max(0, randomness));
           triggerPlaybackRandomness(clamped >= 0.75 ? 650 : 420);
         },
+        onChordModeChange: (enabled) => {
+          // The UI self-manages chord mode entry (retap detection); sync mode state here.
+          if (chordModeActive === enabled) return;
+          chordModeActive = enabled;
+          if (enabled) {
+            startChordModeOscillation();
+          } else {
+            easeOutToZero();
+          }
+        },
         onPrimaryTap: (selection) => {
           // Tap flow:
           // - first tap on a primary: select + single-note playback
-          // - retap same primary: enter chord mode + play primary major triad
+          // - retap same primary: UI enters chord mode (onChordModeChange fires first), play major triad
           const isPrimaryRetap = selection.primaryLabel === lastPrimaryLabel;
           lastPrimaryLabel = selection.primaryLabel;
           const skipPlayback = shouldSuppressTapPlayback();
           if (isPrimaryRetap) {
-            setChordMode(true);
             if (!skipPlayback) {
               if (shouldDebounceTapPlayback(`maj:${selection.primaryMidi}`)) return;
               void playMajorChord(selection.primaryMidi);
@@ -212,10 +221,7 @@ export function createCircleOfFifthsMode(
           void playMajorChord(note.midi);
         },
         onBackgroundTap: () => {
-          if (!chordModeActive) return;
-          circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
-          setChordMode(false);
         },
         onOuterDoubleTap: (note) => {
           if (!chordModeActive || !note.isPrimary) return;
