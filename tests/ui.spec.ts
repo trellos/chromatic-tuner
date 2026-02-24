@@ -89,116 +89,103 @@ test("seigaiha background: single static traditional layer", async ({ page }) =>
   }
 });
 
-test("ui composite debug mode is hidden without debug query", async ({ page }) => {
+test("wild tuna fullscreen renders drum, circle, fretboard, and independent loopers", async ({
+  page,
+}) => {
   await page.goto("/");
-  await expect(page.getByRole("tab", { name: "UI Composite Debug" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Wild Tuna" }).click();
+  await page.locator("[data-wild-tuna-fullscreen]").click();
+
+  const panel = page.locator('.mode-screen[data-mode="wild-tuna"]');
+  await expect(page.locator("body")).toHaveClass(/wild-tuna-fullscreen/);
+  await expect(panel.locator("[data-wild-tuna-drum] .drum-mock")).toBeVisible();
+  await expect(panel.locator("[data-wild-tuna-circle] .cof")).toBeVisible();
+  await expect(panel.locator("[data-wild-tuna-fretboard] .fretboard-board")).toBeVisible();
+  await expect(panel.locator("[data-wild-tuna-circle-looper] .ui-composite-looper")).toBeVisible();
+  await expect(panel.locator("[data-wild-tuna-fretboard] .fretboard-looper-slot .ui-composite-looper")).toBeVisible();
 });
 
-test("ui composite debug mode appears with debug query and fits without scrollbars", async ({
+test("wild tuna fullscreen keeps drum, circle, and fretboard fully visible", async ({
   page,
 }) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Wild Tuna" }).click();
+  await page.locator("[data-wild-tuna-fullscreen]").click();
 
-  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
-  await expect(panel).toHaveClass(/is-active/);
-  await expect(panel.locator(".drum-mock")).toBeVisible();
-  await expect(panel.locator(".cof")).toBeVisible();
-  await expect(panel.locator(".drum-ui #drum-share-button")).toHaveCount(0);
-  await expect(panel.locator("[data-debug-drum-share]")).toHaveCount(0);
-  const fits = await panel.evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
-  expect(fits).toBeTruthy();
-});
+  await expect(page.locator("body")).toHaveClass(/wild-tuna-fullscreen/);
 
-test("fretboard composite mode appears with debug query and shows drum, fretboard, and looper", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Fretboard Composite" }).click();
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
 
-  const panel = page.locator('.mode-screen[data-mode="fretboard-composite"]');
-  await expect(panel).toHaveClass(/is-active/);
-  await expect(panel.locator(".drum-mock")).toBeVisible();
-  await expect(panel.locator(".fretboard-board")).toBeVisible();
-  await expect(panel.locator(".ui-composite-looper")).toBeVisible();
-});
+  const assertFullyVisible = async (selector: string, minWidth: number, minHeight: number) => {
+    const locator = page.locator(selector);
+    await expect(locator).toBeVisible();
+    const box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+    if (!box) return;
+    expect(box.width).toBeGreaterThanOrEqual(minWidth);
+    expect(box.height).toBeGreaterThanOrEqual(minHeight);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  };
 
-test("ui composite debug circle supports chord mode zoom and outside-tap exit", async ({ page }) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
-  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
-  const circle = panel.locator(".cof");
-  const cWedge = circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
-  await cWedge.click({ force: true });
-  await cWedge.click({ force: true });
-  await expect(circle).toHaveClass(/is-chord-mode/);
-  await cWedge.dblclick({ force: true });
-  await expect(circle).toHaveClass(/is-chord-mode/);
-  await panel.locator(".cof-svg").click({ position: { x: 4, y: 4 }, force: true });
-  await expect(circle).not.toHaveClass(/is-chord-mode/);
-});
+  await assertFullyVisible(".wild-tuna-pane--drum .drum-mock", 520, 150);
+  await assertFullyVisible(".wild-tuna-pane--circle .cof", 260, 180);
+  await assertFullyVisible(".wild-tuna-pane--fretboard .fretboard-board", 300, 180);
 
-test("ui composite debug looper renders REC control with four measure slots", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
+  const circlePrimaryWedges = page.locator(".wild-tuna-pane--circle .cof-outer .cof-wedge");
+  await expect(circlePrimaryWedges).toHaveCount(12);
+  const wedgeVisibility = await circlePrimaryWedges.evaluateAll((elements) => {
+    return elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+  });
+  wedgeVisibility.forEach((rect) => {
+    expect(rect.width).toBeGreaterThan(6);
+    expect(rect.height).toBeGreaterThan(6);
+    expect(rect.left).toBeGreaterThanOrEqual(0);
+    expect(rect.top).toBeGreaterThanOrEqual(0);
+    expect(rect.right).toBeLessThanOrEqual(viewport.width);
+    expect(rect.bottom).toBeLessThanOrEqual(viewport.height);
+  });
 
-  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
-  const looper = panel.locator(".ui-composite-looper");
-  const recButton = looper.locator("[data-looper-rec]");
-  const playButton = looper.locator("[data-looper-play]");
-  const measures = looper.locator("[data-looper-measure]");
-  await expect(looper).toBeVisible();
-  await expect(recButton).toHaveText("REC");
-  await expect(playButton).toHaveText("PLAY");
-  await expect(playButton).toBeDisabled();
-  await expect(measures).toHaveCount(4);
-  await expect(looper).toHaveAttribute("data-looper-state", "idle");
-  await expect(measures.nth(0)).toHaveClass(/is-guide/);
-  await expect(measures.nth(1)).not.toHaveClass(/is-guide/);
-});
-
-test("ui composite debug looper auto-stops after four recorded measures and enters play mode", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "UI Composite Debug" }).click();
-
-  const panel = page.locator('.mode-screen[data-mode="ui-composite-debug"]');
-  const looper = panel.locator(".ui-composite-looper");
-  const recButton = looper.locator("[data-looper-rec]");
-  const looperPlayButton = looper.locator("[data-looper-play]");
-  const drumPlayButton = panel.locator("#drum-play-toggle");
-  const measureSlots = looper.locator("[data-looper-measure]");
-  await expect(looper).toBeVisible();
-
-  await drumPlayButton.click();
-  await page.waitForTimeout(200);
-  const started = ((await drumPlayButton.textContent()) ?? "").trim() === "Stop";
-  if (!started) {
-    return;
-  }
-
-  await recButton.click();
-  await expect
-    .poll(async () => looper.getAttribute("data-looper-state"), { timeout: 1200 })
-    .toMatch(/^(armed|recording)$/);
-  await expect
-    .poll(async () => looper.getAttribute("data-looper-state"), { timeout: 4500 })
-    .toBe("recording");
-
-  await panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-
-  await expect
-    .poll(async () => looper.getAttribute("data-looper-state"), { timeout: 10500 })
-    .toBe("idle");
-
-  await expect(measureSlots).toHaveCount(4);
-  await expect(measureSlots.first()).toHaveClass(/is-stored/);
-  await expect(looper).toHaveClass(/has-recording/);
-  await expect(looper).toHaveClass(/is-play-mode/);
-  await expect(looperPlayButton).toBeEnabled();
+  const fretboardButtons = page.locator(
+    "[data-wild-tuna-fretboard] button:not([hidden]):not([disabled])"
+  );
+  const buttonRects = await fretboardButtons.evaluateAll((buttons) => {
+    return buttons.map((button) => {
+      const rect = button.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
+  });
+  expect(buttonRects.length).toBeGreaterThan(0);
+  buttonRects.forEach((rect) => {
+    expect(rect.width).toBeGreaterThan(8);
+    expect(rect.height).toBeGreaterThan(8);
+    expect(rect.left).toBeGreaterThanOrEqual(0);
+    expect(rect.top).toBeGreaterThanOrEqual(0);
+    expect(rect.right).toBeLessThanOrEqual(viewport.width);
+    expect(rect.bottom).toBeLessThanOrEqual(viewport.height);
+  });
 });
 
 test("seigaiha debug override starts disabled and shows editable detune mapping", async ({

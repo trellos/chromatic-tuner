@@ -2,53 +2,30 @@
   overflow: hidden;
 }
 
-.mode-screen[data-mode="fretboard-composite"] {
-  overflow: hidden;
-}
-
-.fretboard-composite-shell {
-  display: grid;
-  gap: 10px;
-  grid-template-rows: minmax(0, 0.78fr) minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
-
-.fretboard-composite-pane {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.fretboard-composite-pane--drum .drum-mock {
-  height: 100%;
-}
-
-.fretboard-composite-pane--fretboard {
-  position: relative;
-}
-
-.fretboard-composite-pane--fretboard .fretboard-layout {
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
-  height: 100%;
-}
-
-.fretboard-composite-pane--fretboard .fretboard-board {
-  min-height: 0;
-}
-
-.fretboard-composite-looper-host {
-  left: 8px;
-  position: absolute;
-  top: 8px;
-  z-index: 8;
-}
-
 .fretboard-layout {
   align-items: start;
   display: grid;
   gap: 24px;
   grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   position: relative;
+}
+
+.wild-tuna-pane--fretboard .fretboard-layout {
+  align-items: start;
+  gap: 14px;
+  grid-template-columns: minmax(340px, 1.25fr) minmax(260px, 1fr);
+  height: 100%;
+}
+
+.wild-tuna-pane--fretboard .fretboard-board {
+  max-width: none;
+  min-height: 260px;
+}
+
+.wild-tuna-pane--fretboard .fretboard-controls {
+  align-content: start;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .fretboard-board {
@@ -307,6 +284,16 @@
   width: 100%;
 }
 
+.fretboard-looper-slot {
+  left: 79%;
+  pointer-events: auto;
+  position: absolute;
+  top: calc(100% - 104px);
+  transform: translate(-50%, 0);
+  width: min(220px, 48%);
+  z-index: 9;
+}
+
 .fretboard-play-action {
   background: linear-gradient(135deg, var(--tuna-pink), var(--tuna-aqua));
   border: 1px solid rgba(12, 16, 32, 0.2);
@@ -380,6 +367,10 @@
   position: static;
 }
 
+.fretboard-layout.fretboard-controls-hidden .fretboard-controls[data-controls-hidden] > *:not(.fretboard-hidden-summary) {
+  display: none !important;
+}
+
 .fretboard-layout.fretboard-controls-hidden .fretboard-hidden-summary {
   left: 268px;
   max-width: 240px;
@@ -446,18 +437,6 @@
 }
 
 @media (max-width: 900px) {
-  .fretboard-composite-shell {
-    grid-template-rows: minmax(0, 0.88fr) minmax(0, 1fr);
-  }
-
-  .fretboard-composite-pane--fretboard .fretboard-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .fretboard-composite-pane--fretboard .fretboard-board {
-    min-height: 360px;
-  }
-
   .fretboard-layout {
     grid-template-columns: 1fr;
   }
@@ -474,15 +453,6 @@
 }
 
 @media (max-width: 600px) {
-  .fretboard-composite-shell {
-    gap: 8px;
-  }
-
-  .fretboard-composite-looper-host {
-    left: 5px;
-    top: 5px;
-  }
-
   .fretboard-layout {
     align-items: stretch;
     gap: 8px;
@@ -501,6 +471,19 @@
     left: 190px;
     top: 26px;
     width: 150px;
+  }
+
+  .fretboard-looper-slot {
+    top: calc(100% - 90px);
+    width: min(180px, 54%);
+  }
+
+  .wild-tuna-pane--fretboard .fretboard-layout {
+    grid-template-columns: minmax(180px, 0.9fr) minmax(170px, 1fr);
+  }
+
+  .wild-tuna-pane--fretboard .fretboard-board {
+    min-height: 220px;
   }
 }
 

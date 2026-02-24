@@ -205,6 +205,17 @@
   text-anchor: middle;
 }
 
+.wild-tuna-pane--circle .circle-mode-layout {
+  height: 100%;
+  place-items: center;
+  width: 100%;
+}
+
+.wild-tuna-pane--circle .cof {
+  max-height: 100%;
+  width: min(100%, 620px);
+}
+
 .cof-instrument-label-layer {
   pointer-events: none;
 }
@@ -580,53 +591,6 @@
   }
 }
 
-.mode-screen[data-mode="ui-composite-debug"] {
-  overflow: hidden;
-  padding: 10px 10px 12px;
-}
-
-.ui-composite-debug-shell {
-  display: grid;
-  gap: 8px;
-  grid-template-areas:
-    "fullscreen"
-    "drum"
-    "circle";
-  grid-template-rows: auto minmax(0, 0.8fr) minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
-
-.ui-composite-debug-fullscreen-btn {
-  grid-area: fullscreen;
-  justify-self: end;
-  min-height: 30px;
-  padding: 6px 10px;
-  z-index: 4;
-}
-
-.ui-composite-debug-pane {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.ui-composite-debug-pane--drum {
-  grid-area: drum;
-}
-
-.ui-composite-debug-pane--circle {
-  display: grid;
-  grid-area: circle;
-  place-items: center;
-  position: relative;
-}
-
-.ui-composite-debug-looper-host {
-  left: 8px;
-  position: absolute;
-  top: 8px;
-  z-index: 7;
-}
 
 .ui-composite-looper {
   background: rgba(20, 31, 56, 0.66);
@@ -775,89 +739,7 @@
   }
 }
 
-.ui-composite-debug-pane--drum .drum-mock {
-  height: 100%;
-}
-
-.ui-composite-debug-pane--circle .circle-mode-layout {
-  height: 100%;
-  max-width: 100%;
-  width: 100%;
-}
-
-.ui-composite-debug-pane--circle .cof {
-  max-height: calc(100vh - 314px);
-  width: min(100%, calc((100vh - 314px) * 0.82), 390px);
-}
-
-body.ui-composite-debug-fullscreen .app-header,
-body.ui-composite-debug-fullscreen .carousel,
-body.ui-composite-debug-fullscreen .carousel-show,
-body.ui-composite-debug-fullscreen .mode-dots,
-body.ui-composite-debug-fullscreen .seigaiha-debug-control {
-  display: none;
-}
-
-body.ui-composite-debug-fullscreen {
-  padding: 0;
-}
-
-body.ui-composite-debug-fullscreen main,
-body.ui-composite-debug-fullscreen .app,
-body.ui-composite-debug-fullscreen .mode-stage {
-  height: 100vh;
-  max-width: 100%;
-  width: 100%;
-}
-
-body.ui-composite-debug-fullscreen .mode-stage {
-  min-height: 100vh;
-}
-
-body.ui-composite-debug-fullscreen .mode-screen[data-mode="ui-composite-debug"] {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  height: 100vh;
-  overflow: hidden;
-  padding: 8px 10px 10px;
-  width: 100vw;
-}
-
-body.ui-composite-debug-fullscreen .ui-composite-debug-fullscreen-btn {
-  display: none;
-}
-
-body.ui-composite-debug-fullscreen .ui-composite-debug-shell {
-  gap: 6px;
-  grid-template-areas:
-    "drum"
-    "circle";
-  grid-template-rows: minmax(0, 0.82fr) minmax(0, 1fr);
-}
-
-body.ui-composite-debug-fullscreen .ui-composite-debug-pane--circle .cof {
-  max-height: calc(100vh - 242px);
-  width: min(100%, calc((100vh - 242px) * 0.86), 470px);
-}
-
-body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-grids,
-body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
-  background: rgba(255, 255, 255, 0.8);
-}
-
-body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-grids,
-body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
-  border-color: rgba(12, 16, 32, 0.14);
-}
-
-
 @media (max-width: 900px) {
-  .ui-composite-debug-looper-host {
-    top: 6px;
-  }
-
   .ui-composite-looper {
     padding: 7px;
     width: 130px;
@@ -865,11 +747,6 @@ body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
 
   .ui-composite-looper-btn {
     min-height: 32px;
-  }
-
-  .ui-composite-debug-pane--circle .cof {
-    max-height: calc(100vh - 320px);
-    width: min(100%, calc((100vh - 320px) * 0.8), 360px);
   }
 
   .cof {
@@ -890,11 +767,6 @@ body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
 }
 
 @media (max-width: 600px) and (orientation: portrait) {
-  .ui-composite-debug-looper-host {
-    left: 5px;
-    top: 5px;
-  }
-
   .ui-composite-looper {
     gap: 6px;
     padding: 6px;
@@ -914,33 +786,6 @@ body.ui-composite-debug-fullscreen .ui-composite-debug-pane--drum .drum-ui {
   .ui-composite-looper-measure {
     border-radius: 5px;
     height: 11px;
-  }
-
-  .mode-screen[data-mode="ui-composite-debug"] {
-    padding: 8px;
-  }
-
-  .ui-composite-debug-shell {
-    gap: 6px;
-    grid-template-rows: auto minmax(0, 0.92fr) minmax(0, 1fr);
-  }
-
-  .ui-composite-debug-pane--circle .cof {
-    max-height: calc(100vh - 304px);
-    width: min(100%, calc((100vh - 304px) * 0.78), 320px);
-  }
-
-  body.ui-composite-debug-fullscreen .mode-screen[data-mode="ui-composite-debug"] {
-    padding: 6px;
-  }
-
-  body.ui-composite-debug-fullscreen .ui-composite-debug-shell {
-    grid-template-rows: minmax(0, 0.95fr) minmax(0, 1fr);
-  }
-
-  body.ui-composite-debug-fullscreen .ui-composite-debug-pane--circle .cof {
-    max-height: calc(100vh - 286px);
-    width: min(100%, calc((100vh - 286px) * 0.8), 360px);
   }
 
   .mode-screen[data-mode="circle-of-fifths"] {

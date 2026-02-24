@@ -55,6 +55,7 @@ export type FretboardUi = {
   exit: () => void;
   render: (nextState: FretboardState) => void;
   pulseTargets: (targets: FretboardPlaybackTarget[], durationMs?: number) => void;
+  setLooperElement: (looperEl: HTMLElement | null) => void;
 };
 
 export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptions): FretboardUi {
@@ -70,6 +71,14 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const hideableSections = rootEl.querySelectorAll<HTMLElement>("[data-fretboard-hideable]");
   const controls = rootEl.querySelector<HTMLElement>(".fretboard-controls");
   const layout = rootEl.querySelector<HTMLElement>(".fretboard-layout");
+  let looperSlot = rootEl.querySelector<HTMLElement>(".fretboard-looper-slot");
+  if (!looperSlot && layout) {
+    looperSlot = document.createElement("div");
+    looperSlot.className = "fretboard-looper-slot";
+    looperSlot.setAttribute("aria-label", "Fretboard looper host");
+    looperSlot.hidden = true;
+    layout.appendChild(looperSlot);
+  }
 
   let uiAbort: AbortController | null = null;
   let state: FretboardState = { ...options.initialState };
@@ -129,6 +138,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     }
     rootEl.classList.toggle("fretboard-controls-hidden", controlsHidden);
     layout?.classList.toggle("fretboard-controls-hidden", controlsHidden);
+    controls?.toggleAttribute("data-controls-hidden", controlsHidden);
   };
 
   const setSummaryText = (): void => {
@@ -373,5 +383,16 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     rootEl.querySelectorAll(".fretboard-dot-pulse").forEach((pulse) => pulse.remove());
   };
 
-  return { enter, exit, render, pulseTargets };
+  const setLooperElement = (looperEl: HTMLElement | null): void => {
+    if (!looperSlot) return;
+    looperSlot.replaceChildren();
+    if (looperEl) {
+      looperSlot.hidden = false;
+      looperSlot.appendChild(looperEl);
+      return;
+    }
+    looperSlot.hidden = true;
+  };
+
+  return { enter, exit, render, pulseTargets, setLooperElement };
 }

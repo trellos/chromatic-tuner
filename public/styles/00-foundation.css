@@ -383,6 +383,44 @@ body.drum-fullscreen .mode-stage {
   width: 44px;
 }
 
+.wild-tuna-composite {
+  display: none;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.wild-tuna-pane {
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.wild-tuna-pane--drum {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.wild-tuna-pane--circle {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.wild-tuna-pane--fretboard {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.wild-tuna-circle-looper {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 8;
+}
+
 body.wild-tuna-fullscreen .app-header,
 body.wild-tuna-fullscreen .carousel,
 body.wild-tuna-fullscreen .carousel-show {
@@ -403,6 +441,32 @@ body.wild-tuna-fullscreen .wild-tuna-card {
   opacity: 0;
   pointer-events: none;
   transform: scale(0.9);
+}
+
+body.wild-tuna-fullscreen .wild-tuna-composite {
+  display: grid;
+}
+
+body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
+  height: 100vh;
+  max-height: 100vh;
+  max-width: none;
+  overflow: hidden;
+  padding: 8px;
+  width: 100vw;
+}
+
+body.wild-tuna-fullscreen .wild-tuna-mode-shell {
+  height: 100%;
+  max-width: 100%;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .wild-tuna-composite {
+    gap: 10px;
+    grid-template-rows: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  }
 }
 
 body.wild-tuna-enter-fullscreen .wild-tuna-card {

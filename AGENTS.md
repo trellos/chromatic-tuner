@@ -23,6 +23,9 @@
 - Open-string membership is shown as small hollow indicators above strings.
 - In mobile portrait, keep fretboard + controls visible together without internal panel scrolling.
 - Chord aliases are normalized in helper logic (for example `sus4` and `Suspended Fourth`).
+- `HIDE` collapses all controls to a single summary button; no selector/action rows should remain visible while hidden.
+- Hidden summary appears rotated near the high-E side of the board and restores controls on tap.
+- `createFretboardUi` supports `setLooperElement(...)`; attached looper UI is rendered in the board looper slot (under the 12th-fret area), not over the controls.
 
 ## Circle of Fifths notes
 - Shared UI implementation: `src/ui/circle-of-fifths.ts`.
