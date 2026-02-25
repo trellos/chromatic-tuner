@@ -1,9 +1,6 @@
 import { DRUM_MACHINE_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import { WOODBLOCK_SAMPLE_URLS } from "../audio/woodblock-samples.js";
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+import { clamp } from "../utils.js";
 
 export function getDrumSoundingBeatIndicesFromFlags(
   beatHasSoundByBeat: boolean[]

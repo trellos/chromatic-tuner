@@ -1,4 +1,5 @@
 import type { LooperRecorder } from "./looper-recordable.js";
+import { clamp } from "../utils.js";
 
 const TOTAL_MEASURES = 4;
 const STEPS_PER_MEASURE = 16;
@@ -46,10 +47,6 @@ export type CompositeLooper = LooperRecorder & {
   onBeatBoundary: (event: CompositeLooperBeatBoundaryEvent) => void;
   destroy: () => void;
 };
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function sanitizeMidis(midis: number[]): number[] {
   return midis

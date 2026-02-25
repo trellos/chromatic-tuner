@@ -4,67 +4,25 @@ import {
   getChordTapPlaybackTargets,
   getKeyTapPlaybackTargets,
   getIntervals,
-  type CharacteristicType,
+  NOTE_TO_SEMITONE,
+  FRETBOARD_DEFAULT_STATE,
   type FretboardPlaybackTarget,
   type FretboardState,
-  type NoteName,
-} from "./fretboard-logic.js";
+} from "../fretboard-logic.js";
+import {
+  FRETBOARD_SAMPLE_BASE_MIDI,
+  FRETBOARD_SAMPLE_GAIN,
+  fetchFretboardSample,
+  preloadFretboardSampleBytes,
+} from "../audio/fretboard-sample.js";
+import { getOrCreateAudioContext } from "../utils.js";
 
-const DEFAULT_STATE: FretboardState = {
-  root: "C",
-  display: "scale",
-  characteristic: "major",
-  annotation: "notes",
-};
-const GUITAR_SAMPLE_URL = "assets/audio/fretboard/guitar-acoustic-c4.mp3";
-const GUITAR_SAMPLE_BASE_MIDI = 60;
-const FRETBOARD_NOTE_GAIN = 0.84;
+export { preloadFretboardSampleBytes as preloadFretboardAudioAssets };
+
 const PLAY_CHORD_DURATION_MS = 1000;
 const PLAY_SCALE_STEP_MS = 180;
 const PLAY_SCALE_NOTE_DURATION_MS = 160;
 const PLAY_RANDOMNESS_PEAK = 0.8;
-
-const NOTE_TO_SEMITONE: Record<NoteName, number> = {
-  A: 9,
-  "A#": 10,
-  B: 11,
-  C: 0,
-  "C#": 1,
-  D: 2,
-  "D#": 3,
-  E: 4,
-  F: 5,
-  "F#": 6,
-  G: 7,
-  "G#": 8,
-};
-let cachedGuitarSampleBytes: ArrayBuffer | null = null;
-let cachedGuitarSampleBuffer: AudioBuffer | null = null;
-let cachedGuitarSampleFetchPromise: Promise<ArrayBuffer | null> | null = null;
-let cachedGuitarSampleDecodePromise: Promise<AudioBuffer | null> | null = null;
-
-async function fetchGuitarSampleBytes(): Promise<ArrayBuffer | null> {
-  if (cachedGuitarSampleBytes) return cachedGuitarSampleBytes;
-  if (cachedGuitarSampleFetchPromise) return cachedGuitarSampleFetchPromise;
-  cachedGuitarSampleFetchPromise = (async () => {
-    try {
-      const response = await fetch(GUITAR_SAMPLE_URL);
-      if (!response.ok) return null;
-      const bytes = await response.arrayBuffer();
-      cachedGuitarSampleBytes = bytes;
-      return bytes;
-    } catch {
-      return null;
-    } finally {
-      cachedGuitarSampleFetchPromise = null;
-    }
-  })();
-  return cachedGuitarSampleFetchPromise;
-}
-
-export function preloadFretboardAudioAssets(): void {
-  void fetchGuitarSampleBytes();
-}
 
 type FretboardModeOptions = {
   onRandomnessChange?: (randomness: number | null) => void;
@@ -74,7 +32,7 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="fretboard"]');
   const ui = modeEl
     ? createFretboardUi(modeEl, {
-        initialState: DEFAULT_STATE,
+        initialState: FRETBOARD_DEFAULT_STATE,
         showControls: true,
         onStateChange: (nextState) => {
           state = nextState;
@@ -108,74 +66,23 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
       })
     : null;
 
-  let state: FretboardState = { ...DEFAULT_STATE };
+  let state: FretboardState = { ...FRETBOARD_DEFAULT_STATE };
   let audioContext: AudioContext | null = null;
   let guitarSampleBuffer: AudioBuffer | null = null;
-  let guitarSampleLoadPromise: Promise<AudioBuffer | null> | null = null;
   let playEndTimer: number | null = null;
   let playRandomnessRaf: number | null = null;
   const visualPulseTimers = new Set<number>();
   const activeSources = new Set<AudioScheduledSourceNode>();
 
-  const getAudioContextCtor = ():
-    | (typeof AudioContext)
-    | (new (contextOptions?: AudioContextOptions) => AudioContext)
-    | null => {
-    return window.AudioContext ?? ((window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ?? null);
-  };
-
   const ensureAudioContext = async (): Promise<AudioContext | null> => {
-    if (audioContext && audioContext.state !== "closed") {
-      await audioContext.resume();
-      return audioContext;
-    }
-    const AudioCtx = getAudioContextCtor();
-    if (!AudioCtx) return null;
-    audioContext = new AudioCtx({ latencyHint: "interactive" });
-    await audioContext.resume();
+    audioContext = await getOrCreateAudioContext(audioContext);
     return audioContext;
   };
 
   const ensureGuitarSample = async (ctx: AudioContext): Promise<AudioBuffer | null> => {
     if (guitarSampleBuffer) return guitarSampleBuffer;
-    if (cachedGuitarSampleBuffer) {
-      guitarSampleBuffer = cachedGuitarSampleBuffer;
-      return guitarSampleBuffer;
-    }
-    if (guitarSampleLoadPromise) {
-      return guitarSampleLoadPromise;
-    }
-    guitarSampleLoadPromise = (async () => {
-      try {
-        const bytes = await fetchGuitarSampleBytes();
-        if (!bytes) return null;
-        if (cachedGuitarSampleBuffer) {
-          guitarSampleBuffer = cachedGuitarSampleBuffer;
-          return guitarSampleBuffer;
-        }
-        if (!cachedGuitarSampleDecodePromise) {
-          cachedGuitarSampleDecodePromise = (async () => {
-            try {
-              const decoded = await ctx.decodeAudioData(bytes.slice(0));
-              cachedGuitarSampleBuffer = decoded;
-              return decoded;
-            } catch {
-              return null;
-            } finally {
-              cachedGuitarSampleDecodePromise = null;
-            }
-          })();
-        }
-        const decoded = await cachedGuitarSampleDecodePromise;
-        guitarSampleBuffer = decoded;
-        return decoded;
-      } catch {
-        return null;
-      } finally {
-        guitarSampleLoadPromise = null;
-      }
-    })();
-    return guitarSampleLoadPromise;
+    guitarSampleBuffer = await fetchFretboardSample(ctx);
+    return guitarSampleBuffer;
   };
 
   const setPlayButtonState = (playing: boolean): void => {
@@ -292,9 +199,9 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
   ): void => {
     const source = ctx.createBufferSource();
     source.buffer = sample;
-    source.playbackRate.value = Math.pow(2, (midi - GUITAR_SAMPLE_BASE_MIDI) / 12);
+    source.playbackRate.value = Math.pow(2, (midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(FRETBOARD_NOTE_GAIN, startTimeSec);
+    gain.gain.setValueAtTime(FRETBOARD_SAMPLE_GAIN, startTimeSec);
     source.connect(gain);
     gain.connect(ctx.destination);
     registerSource(source);
@@ -343,7 +250,7 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
     if (intervals.length === 0) return;
 
     const rootSemitone = NOTE_TO_SEMITONE[state.root] ?? 0;
-    const rootMidi = GUITAR_SAMPLE_BASE_MIDI + rootSemitone;
+    const rootMidi = FRETBOARD_SAMPLE_BASE_MIDI + rootSemitone;
 
     const ctx = await ensureAudioContext();
     if (!ctx) return;
@@ -410,7 +317,6 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
     }
     audioContext = null;
     guitarSampleBuffer = null;
-    guitarSampleLoadPromise = null;
   };
 
   return {

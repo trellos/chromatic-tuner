@@ -9,6 +9,7 @@ import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretbo
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { createWildTunaMode } from "./modes/wild-tuna.js";
 import { runModeTransition } from "./mode-transition.js";
+import { clamp } from "./utils.js";
 import { createCircleOfFifthsUi } from "./ui/circle-of-fifths.js";
 import { createDrumMachineUi } from "./ui/drum-machine.js";
 import {
@@ -61,9 +62,6 @@ let metronomeRandomnessParams: MetronomeRandomnessParams = {
 };
 let drumRandomnessTarget = DEFAULT_DRUM_RANDOMNESS_TARGET;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 const MODE_REGISTRY: ModeDefinition[] = [
   createTunerMode({

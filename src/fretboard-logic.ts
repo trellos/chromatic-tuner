@@ -74,7 +74,7 @@ const CHROMATIC_BY_SEMITONE = [
   "B",
 ] as const;
 
-const NOTE_TO_SEMITONE: Record<NoteName, number> = {
+export const NOTE_TO_SEMITONE: Record<NoteName, number> = {
   A: 9,
   "A#": 10,
   B: 11,
@@ -87,6 +87,14 @@ const NOTE_TO_SEMITONE: Record<NoteName, number> = {
   "F#": 6,
   G: 7,
   "G#": 8,
+};
+
+// Default fretboard state: C major scale with note annotations.
+export const FRETBOARD_DEFAULT_STATE: FretboardState = {
+  root: "C",
+  display: "scale",
+  characteristic: "major",
+  annotation: "notes",
 };
 
 const SCALE_INTERVALS: Record<ScaleType, readonly number[]> = {

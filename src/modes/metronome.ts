@@ -1,6 +1,7 @@
 import { METRONOME_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import { WOODBLOCK_SAMPLE_URLS } from "../audio/woodblock-samples.js";
 import type { ModeDefinition } from "./types.js";
+import { clamp } from "../utils.js";
 
 let sessionBpm = 120;
 
@@ -124,9 +125,6 @@ export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDef
       bpm = clamp(parsed, BPM_MIN, BPM_MAX);
     }
   };
-
-  const clamp = (value: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, value));
 
   const getRandomnessParams = (): MetronomeRandomnessParams =>
     options.getRandomnessParams?.() ?? {

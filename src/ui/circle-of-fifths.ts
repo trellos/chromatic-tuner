@@ -1,4 +1,6 @@
-﻿export type CircleQuality = "minor" | "diminished";
+﻿import { clamp } from "../utils.js";
+
+export type CircleQuality = "minor" | "diminished";
 
 export type CircleChordSpec = {
   label: string;
@@ -124,10 +126,6 @@ const OUTER_NOTES: CircleNote[] = [
 
 const SEMITONE_TO_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const SEMITONE_TO_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function normalizeDegrees(value: number): number {
   return ((value % 360) + 360) % 360;

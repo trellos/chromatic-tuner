@@ -3,6 +3,7 @@ import {
   type SeigaihaRendererBackend,
   type SeigaihaWebGlRenderer,
 } from "./seigaihaWebglRenderer.js";
+import { clamp } from "../utils.js";
 
 function svgToDataUrl(svg: string): string {
   const encoded = encodeURIComponent(svg)
@@ -19,10 +20,6 @@ function semiAnnulusPath(cx: number, cy: number, rOuter: number, rInner: number)
     `A ${rInner} ${rInner} 0 0 0 ${cx - rInner} ${cy}`,
     "Z",
   ].join(" ");
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 function hash01(x: number, y: number, seed: number): number {

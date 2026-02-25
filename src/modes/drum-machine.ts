@@ -4,6 +4,7 @@ import {
   getDrumSoundingBeatIndicesFromFlags,
 } from "../ui/drum-machine.js";
 import type { ModeDefinition } from "./types.js";
+import { clamp } from "../utils.js";
 
 export { getDrumRandomnessForBeat, getDrumSoundingBeatIndicesFromFlags };
 
@@ -13,10 +14,6 @@ type DrumMachineModeOptions = {
   onRequestFullscreen?: () => void;
   onExitFullscreen?: () => void;
 };
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 const DEFAULT_RANDOMNESS_TARGET = 0.9;
 

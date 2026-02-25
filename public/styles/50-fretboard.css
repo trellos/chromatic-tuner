@@ -179,13 +179,13 @@
   color: var(--ink);
 }
 
-.fretboard-dot.is-juicing,
-.fretboard-open-indicator.is-juicing {
+.fretboard-dot.is-pulsing,
+.fretboard-open-indicator.is-pulsing {
   animation: fretboard-dot-pulse 240ms cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
-.fretboard-dot.is-juicing-root,
-.fretboard-open-indicator.is-juicing-root {
+.fretboard-dot.is-pulsing-root,
+.fretboard-open-indicator.is-pulsing-root {
   animation: fretboard-dot-pulse-root 280ms cubic-bezier(0.14, 0.92, 0.28, 1.3);
 }
 

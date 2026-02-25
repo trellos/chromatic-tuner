@@ -5,59 +5,25 @@ import { createFretboardUi } from "../ui/fretboard.js";
 import {
   getChordTapPlaybackTargets,
   getKeyTapPlaybackTargets,
+  NOTE_TO_SEMITONE,
+  FRETBOARD_DEFAULT_STATE,
   type CharacteristicType,
   type FretboardPlaybackTarget,
   type FretboardState,
-} from "./fretboard-logic.js";
-import { createUiCompositeLooper } from "./ui-composite-looper.js";
+} from "../fretboard-logic.js";
+import {
+  FRETBOARD_SAMPLE_BASE_MIDI,
+  FRETBOARD_SAMPLE_GAIN,
+  fetchFretboardSample,
+} from "../audio/fretboard-sample.js";
+import { createUiCompositeLooper } from "../ui/ui-composite-looper.js";
+import { getOrCreateAudioContext } from "../utils.js";
 import type { ModeDefinition } from "./types.js";
-
-const FRETBOARD_DEFAULT_STATE: FretboardState = {
-  root: "C",
-  display: "scale",
-  characteristic: "major",
-  annotation: "notes",
-};
-const FRETBOARD_SAMPLE_URL = "assets/audio/fretboard/guitar-acoustic-c4.mp3";
-const FRETBOARD_SAMPLE_BASE_MIDI = 60;
-const FRETBOARD_GAIN = 0.84;
 
 type WildTunaModeOptions = {
   onRandomnessChange?: (randomness: number | null) => void;
 };
 
-function createFretboardMarkup(): string {
-  return `
-    <div class="fretboard-layout">
-      <div class="fretboard-board" aria-label="Guitar fretboard">
-        <div class="fretboard-string-labels" aria-hidden="true"><span>E</span><span>A</span><span>D</span><span>G</span><span>B</span><span>E</span></div>
-        <div class="fretboard-open-indicators" aria-hidden="true"></div>
-        <div class="fretboard-frets" aria-hidden="true"></div>
-        <div class="fretboard-strings" aria-hidden="true"></div>
-        <div class="fretboard-inlays" aria-hidden="true">
-          <span class="fretboard-inlay" style="--fret-index: 3" data-fret="3"></span>
-          <span class="fretboard-inlay" style="--fret-index: 5" data-fret="5"></span>
-          <span class="fretboard-inlay" style="--fret-index: 7" data-fret="7"></span>
-          <span class="fretboard-inlay" style="--fret-index: 9" data-fret="9"></span>
-          <span class="fretboard-inlay fretboard-inlay--double-left" style="--fret-index: 12" data-fret="12"></span>
-          <span class="fretboard-inlay fretboard-inlay--double-right" style="--fret-index: 12" data-fret="12"></span>
-        </div>
-        <div class="fretboard-dots" aria-live="polite"></div>
-      </div>
-      <div class="fretboard-controls">
-        <div class="fretboard-note-selector" role="radiogroup" aria-label="Root note" data-fretboard-hideable>
-          <button type="button" data-fretboard-root="A">A</button><button type="button" data-fretboard-root="A#">A#</button><button type="button" data-fretboard-root="B">B</button><button type="button" data-fretboard-root="C">C</button><button type="button" data-fretboard-root="C#">C#</button><button type="button" data-fretboard-root="D">D</button><button type="button" data-fretboard-root="D#">D#</button><button type="button" data-fretboard-root="E">E</button><button type="button" data-fretboard-root="F">F</button><button type="button" data-fretboard-root="F#">F#</button><button type="button" data-fretboard-root="G">G</button><button type="button" data-fretboard-root="G#">G#</button>
-        </div>
-        <div class="fretboard-segmented" data-fretboard-hideable><button type="button" data-fretboard-display="chord">Chord</button><button type="button" data-fretboard-display="scale">Scale</button><button type="button" data-fretboard-display="key">Key</button></div>
-        <label class="fretboard-characteristic-label" for="fretboard-characteristic" data-fretboard-hideable>Characteristic</label>
-        <select id="fretboard-characteristic" class="fretboard-characteristic" data-fretboard-hideable></select>
-        <div class="fretboard-segmented" data-fretboard-hideable><button type="button" data-fretboard-annotation="notes">Notes</button><button type="button" data-fretboard-annotation="degrees">Degrees</button></div>
-        <div class="fretboard-actions" data-fretboard-hideable><button type="button" class="fretboard-play-action" data-fretboard-play>Play</button><button type="button" class="fretboard-hide-action" data-fretboard-hide>Hide</button></div>
-        <button type="button" class="fretboard-hidden-summary" data-fretboard-summary hidden aria-label="Show fretboard selectors"></button>
-      </div>
-    </div>
-  `;
-}
 
 export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefinition {
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="wild-tuna"]');
@@ -78,39 +44,16 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
   const guitarPlayer = createCircleGuitarPlayer();
   let audioContext: AudioContext | null = null;
   let fretSample: AudioBuffer | null = null;
-  let fretSampleLoadPromise: Promise<AudioBuffer | null> | null = null;
 
   const ensureAudioContext = async (): Promise<AudioContext | null> => {
-    if (audioContext && audioContext.state !== "closed") {
-      await audioContext.resume();
-      return audioContext;
-    }
-    const AudioCtor =
-      window.AudioContext ??
-      ((window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ?? null);
-    if (!AudioCtor) return null;
-    audioContext = new AudioCtor({ latencyHint: "interactive" });
-    await audioContext.resume();
+    audioContext = await getOrCreateAudioContext(audioContext);
     return audioContext;
   };
 
   const ensureFretSample = async (ctx: AudioContext): Promise<AudioBuffer | null> => {
     if (fretSample) return fretSample;
-    if (fretSampleLoadPromise) return fretSampleLoadPromise;
-    fretSampleLoadPromise = (async () => {
-      try {
-        const response = await fetch(FRETBOARD_SAMPLE_URL);
-        if (!response.ok) return null;
-        const bytes = await response.arrayBuffer();
-        fretSample = await ctx.decodeAudioData(bytes);
-        return fretSample;
-      } catch {
-        return null;
-      } finally {
-        fretSampleLoadPromise = null;
-      }
-    })();
-    return fretSampleLoadPromise;
+    fretSample = await fetchFretboardSample(ctx);
+    return fretSample;
   };
 
   const playFretTargets = async (targets: FretboardPlaybackTarget[], durationMs: number, shouldRecord: boolean): Promise<void> => {
@@ -126,7 +69,7 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
         source.buffer = sample;
         source.playbackRate.value = Math.pow(2, (target.midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
         const gain = ctx.createGain();
-        gain.gain.value = FRETBOARD_GAIN;
+        gain.gain.value = FRETBOARD_SAMPLE_GAIN;
         source.connect(gain);
         gain.connect(ctx.destination);
         source.start(startAt);
@@ -167,7 +110,10 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
       if (drumTemplate instanceof HTMLElement) {
         drumHost.appendChild(drumTemplate);
       }
-      fretboardHost.innerHTML = createFretboardMarkup();
+      const fretboardTemplate = document.querySelector<HTMLTemplateElement>("#fretboard-template");
+      fretboardHost.replaceChildren(
+        fretboardTemplate ? fretboardTemplate.content.cloneNode(true) : document.createDocumentFragment()
+      );
 
       circleLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
@@ -235,7 +181,7 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
           fretboardState = nextState;
         },
         onPlayPress: () => {
-          const rootMidi = 60;
+          const rootMidi = FRETBOARD_SAMPLE_BASE_MIDI + (NOTE_TO_SEMITONE[fretboardState.root] ?? 0);
           void playFretTargets([{ midi: rootMidi, stringIndex: 0, isRoot: true }], 360, true);
         },
         onFretPress: ({ midi, stringIndex, fret }) => {

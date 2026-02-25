@@ -10,7 +10,7 @@ import {
   type FretboardState,
   type KeyModeType,
   type ScaleType,
-} from "../modes/fretboard-logic.js";
+} from "../fretboard-logic.js";
 
 const SCALE_OPTIONS: Array<{ value: ScaleType; label: string }> = [
   { value: "major", label: "Major" },
@@ -83,7 +83,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   let uiAbort: AbortController | null = null;
   let state: FretboardState = { ...options.initialState };
   let controlsHidden = false;
-  const juiceTimeouts = new WeakMap<HTMLElement, number>();
+  const markerPulseTimeouts = new WeakMap<HTMLElement, number>();
 
   const showControls = options.showControls ?? true;
   controls?.toggleAttribute("hidden", !showControls);
@@ -146,21 +146,21 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     hiddenSummaryButton.textContent = `${state.root} ${getCharacteristicLabel(state.characteristic)}`;
   };
 
-  const clearMarkerJuice = (marker: HTMLElement): void => {
-    const timeoutId = juiceTimeouts.get(marker);
+  const clearMarkerPulse = (marker: HTMLElement): void => {
+    const timeoutId = markerPulseTimeouts.get(marker);
     if (timeoutId !== undefined) {
       window.clearTimeout(timeoutId);
-      juiceTimeouts.delete(marker);
+      markerPulseTimeouts.delete(marker);
     }
-    marker.classList.remove("is-juicing", "is-juicing-root");
+    marker.classList.remove("is-pulsing", "is-pulsing-root");
   };
 
-  const triggerMarkerJuice = (marker: HTMLElement, isRoot: boolean, durationMs: number): void => {
-    clearMarkerJuice(marker);
-    void marker.getBoundingClientRect();
-    marker.classList.add("is-juicing");
+  const triggerMarkerPulse = (marker: HTMLElement, isRoot: boolean, durationMs: number): void => {
+    clearMarkerPulse(marker);
+    void marker.getBoundingClientRect(); // Force reflow so the browser registers class removal before re-adding, restarting the CSS animation.
+    marker.classList.add("is-pulsing");
     if (isRoot) {
-      marker.classList.add("is-juicing-root");
+      marker.classList.add("is-pulsing-root");
     }
 
     const pulse = document.createElement("span");
@@ -176,10 +176,10 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     );
 
     const timeoutId = window.setTimeout(() => {
-      marker.classList.remove("is-juicing", "is-juicing-root");
-      juiceTimeouts.delete(marker);
+      marker.classList.remove("is-pulsing", "is-pulsing-root");
+      markerPulseTimeouts.delete(marker);
     }, Math.max(180, durationMs));
-    juiceTimeouts.set(marker, timeoutId);
+    markerPulseTimeouts.set(marker, timeoutId);
   };
 
   const resolveTargetElements = (target: FretboardPlaybackTarget): HTMLElement[] => {
@@ -200,7 +200,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     targets.forEach((target) => {
       const elements = resolveTargetElements(target);
       elements.forEach((marker) => {
-        triggerMarkerJuice(marker, Boolean(target.isRoot), durationMs);
+        triggerMarkerPulse(marker, Boolean(target.isRoot), durationMs);
       });
     });
   };
@@ -377,9 +377,9 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     uiAbort?.abort();
     uiAbort = null;
     const lingering = rootEl.querySelectorAll<HTMLElement>(
-      ".fretboard-dot.is-juicing, .fretboard-open-indicator.is-juicing"
+      ".fretboard-dot.is-pulsing, .fretboard-open-indicator.is-pulsing"
     );
-    lingering.forEach((marker) => clearMarkerJuice(marker));
+    lingering.forEach((marker) => clearMarkerPulse(marker));
     rootEl.querySelectorAll(".fretboard-dot-pulse").forEach((pulse) => pulse.remove());
   };
 

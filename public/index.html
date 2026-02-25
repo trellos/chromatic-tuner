@@ -239,6 +239,38 @@
               ></button>
             </div>
           </div>
+
+          <!-- Template used by Wild Tuna to clone a fretboard into its composite layout. -->
+          <template id="fretboard-template">
+            <div class="fretboard-layout">
+              <div class="fretboard-board" aria-label="Guitar fretboard">
+                <div class="fretboard-string-labels" aria-hidden="true"><span>E</span><span>A</span><span>D</span><span>G</span><span>B</span><span>E</span></div>
+                <div class="fretboard-open-indicators" aria-hidden="true"></div>
+                <div class="fretboard-frets" aria-hidden="true"></div>
+                <div class="fretboard-strings" aria-hidden="true"></div>
+                <div class="fretboard-inlays" aria-hidden="true">
+                  <span class="fretboard-inlay" style="--fret-index: 3" data-fret="3"></span>
+                  <span class="fretboard-inlay" style="--fret-index: 5" data-fret="5"></span>
+                  <span class="fretboard-inlay" style="--fret-index: 7" data-fret="7"></span>
+                  <span class="fretboard-inlay" style="--fret-index: 9" data-fret="9"></span>
+                  <span class="fretboard-inlay fretboard-inlay--double-left" style="--fret-index: 12" data-fret="12"></span>
+                  <span class="fretboard-inlay fretboard-inlay--double-right" style="--fret-index: 12" data-fret="12"></span>
+                </div>
+                <div class="fretboard-dots" aria-live="polite"></div>
+              </div>
+              <div class="fretboard-controls">
+                <div class="fretboard-note-selector" role="radiogroup" aria-label="Root note" data-fretboard-hideable>
+                  <button type="button" data-fretboard-root="A">A</button><button type="button" data-fretboard-root="A#">A#</button><button type="button" data-fretboard-root="B">B</button><button type="button" data-fretboard-root="C">C</button><button type="button" data-fretboard-root="C#">C#</button><button type="button" data-fretboard-root="D">D</button><button type="button" data-fretboard-root="D#">D#</button><button type="button" data-fretboard-root="E">E</button><button type="button" data-fretboard-root="F">F</button><button type="button" data-fretboard-root="F#">F#</button><button type="button" data-fretboard-root="G">G</button><button type="button" data-fretboard-root="G#">G#</button>
+                </div>
+                <div class="fretboard-segmented" data-fretboard-hideable><button type="button" data-fretboard-display="chord">Chord</button><button type="button" data-fretboard-display="scale">Scale</button><button type="button" data-fretboard-display="key">Key</button></div>
+                <label class="fretboard-characteristic-label" for="fretboard-characteristic" data-fretboard-hideable>Characteristic</label>
+                <select id="fretboard-characteristic" class="fretboard-characteristic" data-fretboard-hideable></select>
+                <div class="fretboard-segmented" data-fretboard-hideable><button type="button" data-fretboard-annotation="notes">Notes</button><button type="button" data-fretboard-annotation="degrees">Degrees</button></div>
+                <div class="fretboard-actions" data-fretboard-hideable><button type="button" class="fretboard-play-action" data-fretboard-play>Play</button><button type="button" class="fretboard-hide-action" data-fretboard-hide>Hide</button></div>
+                <button type="button" class="fretboard-hidden-summary" data-fretboard-summary hidden aria-label="Show fretboard selectors"></button>
+              </div>
+            </div>
+          </template>
         </article>
 
         <article
