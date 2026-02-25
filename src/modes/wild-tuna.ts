@@ -177,6 +177,7 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
 
       fretboardUi = createFretboardUi(fretboardHost, {
         initialState: FRETBOARD_DEFAULT_STATE,
+        controlsHidden: true,
         onStateChange: (nextState) => {
           fretboardState = nextState;
         },

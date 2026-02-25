@@ -387,7 +387,7 @@ body.drum-fullscreen .mode-stage {
   display: none;
   gap: 12px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(150px, 0.9fr) minmax(300px, 1fr) minmax(180px, 1fr);
   height: 100%;
   min-height: 0;
   width: 100%;
@@ -444,11 +444,15 @@ body.wild-tuna-fullscreen .wild-tuna-composite {
 
 body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
   height: 100vh;
+  left: 0;
   max-height: 100vh;
   max-width: none;
   overflow: hidden;
   padding: 8px;
+  position: fixed;
+  top: 0;
   width: 100vw;
+  z-index: 100;
 }
 
 body.wild-tuna-fullscreen .wild-tuna-mode-shell {
@@ -459,10 +463,14 @@ body.wild-tuna-fullscreen .wild-tuna-mode-shell {
   width: 100%;
 }
 
+body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-board {
+  min-height: 0;
+}
+
 @media (max-width: 900px) {
   .wild-tuna-composite {
     gap: 10px;
-    grid-template-rows: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-rows: minmax(150px, 0.85fr) minmax(300px, 1fr) minmax(180px, 1.1fr);
   }
 }
 

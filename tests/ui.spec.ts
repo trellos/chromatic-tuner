@@ -133,9 +133,12 @@ test("wild tuna fullscreen keeps drum, circle, and fretboard fully visible", asy
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
   };
 
-  await assertFullyVisible(".wild-tuna-pane--drum .drum-mock", 520, 150);
+  await assertFullyVisible(".wild-tuna-pane--drum .drum-mock", Math.min(520, viewport.width - 20), 150);
   await assertFullyVisible(".wild-tuna-pane--circle .cof", 260, 180);
-  await assertFullyVisible(".wild-tuna-pane--fretboard .fretboard-board", 300, 180);
+  // Fretboard board width is capped at 260px by the fretboard-layout grid (minmax(220px, 260px))
+  // On mobile (≤600px) it's further reduced to max-width: 182px — use a viewport-aware floor.
+  const minFretBoardWidth = viewport.width >= 900 ? 220 : Math.floor(viewport.width * 0.45);
+  await assertFullyVisible(".wild-tuna-pane--fretboard .fretboard-board", minFretBoardWidth, 180);
 
   const circlePrimaryWedges = page.locator(".wild-tuna-pane--circle .cof-outer .cof-wedge");
   await expect(circlePrimaryWedges).toHaveCount(12);

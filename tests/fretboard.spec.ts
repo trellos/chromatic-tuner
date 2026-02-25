@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { getChordTapPlaybackTargets, getKeyTapPlaybackTargets } from "../src/modes/fretboard-logic.js";
+import { getChordTapPlaybackTargets, getKeyTapPlaybackTargets } from "../src/fretboard-logic.js";
 
 async function assertElementFullyInViewport(
   page: import("@playwright/test").Page,

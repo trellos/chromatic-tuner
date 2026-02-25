@@ -45,6 +45,7 @@ const KEY_MODE_OPTIONS: Array<{ value: KeyModeType; label: string }> = [
 export type FretboardUiOptions = {
   initialState: FretboardState;
   showControls?: boolean;
+  controlsHidden?: boolean;
   onStateChange?: (nextState: FretboardState) => void;
   onPlayPress?: () => void;
   onFretPress?: (event: { midi: number; stringIndex: number; fret: number }) => void;
@@ -82,7 +83,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
 
   let uiAbort: AbortController | null = null;
   let state: FretboardState = { ...options.initialState };
-  let controlsHidden = false;
+  let controlsHidden = options.controlsHidden ?? false;
   const markerPulseTimeouts = new WeakMap<HTMLElement, number>();
 
   const showControls = options.showControls ?? true;
@@ -129,6 +130,10 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const applyControlVisibility = (): void => {
     hideableSections.forEach((section) => {
       section.toggleAttribute("hidden", controlsHidden);
+      // Ensure hidden controls are also excluded by selectors like `button:not([hidden])`.
+      section.querySelectorAll<HTMLElement>("button, select, label").forEach((el) => {
+        el.toggleAttribute("hidden", controlsHidden);
+      });
     });
     hiddenSummaryButton?.toggleAttribute("hidden", !controlsHidden);
     hideButton?.classList.toggle("is-active", controlsHidden);

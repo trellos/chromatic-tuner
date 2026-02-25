@@ -95,9 +95,10 @@
 }
 
 .cof-frame {
-  display: grid;
+  align-items: center;
+  display: flex;
   height: 100%;
-  place-items: center;
+  justify-content: center;
   position: relative;
   width: 100%;
 }

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(git stash)",
+      "Bash(npm run test:e2e -- --grep \"wild tuna fullscreen keeps drum\")",
+      "Bash(git stash pop)",
+      "Bash(npm run test:e2e -- --grep \"wild tuna fullscreen keeps drum|circle mode remains visible|circle mode renders twelve\")",
+      "Bash(grep -n \"wild-tuna-pane\\\\|wild-tuna-fullscreen\\\\|wild-tuna-layout\" public/styles/*.css)",
+      "Bash(npx playwright test --grep \"wild tuna fullscreen keeps drum\" --reporter=list)",
+      "Bash(npx playwright test --grep \"circle mode remains visible in portrait|circle mode renders twelve\" --reporter=list)",
+      "Bash(npx playwright test \"circle mode remains visible\" --project=webkit --reporter=list)",
+      "Bash(npx playwright test --grep \"circle mode remains\" --project=webkit --reporter=list)",
+      "Bash(node -e \"const {devices} = require\\(''@playwright/test''\\); console.log\\(devices[''Desktop Safari''].viewport\\)\")",
+      "Bash(npx playwright test debug-wild-tuna --project=chromium --reporter=list)",
+      "Bash(npx playwright test tests/ui.spec.ts tests/fretboard.spec.ts --grep \"wild tuna fullscreen keeps drum|fretboard UI stays fully visible\")",
+      "Bash(npx playwright test tests/ui.spec.ts --grep \"wild tuna fullscreen keeps drum\")"
+    ]
+  }
+}
