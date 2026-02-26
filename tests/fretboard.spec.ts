@@ -615,3 +615,50 @@ test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
   expect(pageErrors).toEqual([]);
 });
 
+
+test("mobile safari taps every fretboard control button without mode-swiping to metronome", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage only");
+
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+
+  const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
+  const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
+  await expect(fretboardScreen).toHaveClass(/is-active/);
+
+  const buttonLabels = [
+    "A",
+    "A#",
+    "B",
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "CHORD",
+    "SCALE",
+    "KEY",
+    "NOTES",
+    "DEGREES",
+    "PLAY",
+    "HIDE",
+  ];
+
+  for (const label of buttonLabels) {
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await expect(fretboardScreen).toHaveClass(/is-active/);
+    await expect(metronomeScreen).not.toHaveClass(/is-active/);
+  }
+
+  const summary = page.locator("[data-fretboard-summary]");
+  await expect(summary).toBeVisible();
+  await summary.click();
+  await expect(fretboardScreen).toHaveClass(/is-active/);
+  await expect(metronomeScreen).not.toHaveClass(/is-active/);
+});
