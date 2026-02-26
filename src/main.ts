@@ -560,9 +560,15 @@ function getModeByOffset(offset: number): ModeId | null {
 
 
 function isSwipeGestureExcludedTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false;
+  const elementTarget =
+    target instanceof Element
+      ? target
+      : target instanceof Node
+        ? target.parentElement
+        : null;
+  if (!elementTarget) return false;
   return Boolean(
-    target.closest(
+    elementTarget.closest(
       [
         "button",
         "input",

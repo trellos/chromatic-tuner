@@ -776,3 +776,87 @@ test("inner detail rotates to the new primary note", async ({ page }) => {
 });
 
 
+
+test("outer wedges start hold on pointerdown and stop on pointerup in note and chord mode", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+
+  for (let index = 0; index < 12; index += 1) {
+    const wedge = panel.locator(`.cof-wedge[data-index="${index}"]`);
+    await wedge.dispatchEvent("pointerdown", { pointerId: 100 + index, bubbles: true });
+    await expect(wedge).toHaveClass(/is-holding/);
+    await wedge.dispatchEvent("pointerup", { pointerId: 100 + index, bubbles: true });
+    await expect(wedge).not.toHaveClass(/is-holding/);
+  }
+
+  const primaryPath = panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
+  await primaryPath.click({ force: true });
+  await primaryPath.click({ force: true });
+  await expect(panel.locator(".cof")).toHaveClass(/is-chord-mode/);
+
+  for (let index = 0; index < 12; index += 1) {
+    const wedge = panel.locator(`.cof-wedge[data-index="${index}"]`);
+    await wedge.dispatchEvent("pointerdown", { pointerId: 200 + index, bubbles: true });
+    await expect(wedge).toHaveClass(/is-holding/);
+    await wedge.dispatchEvent("pointerup", { pointerId: 200 + index, bubbles: true });
+    await expect(wedge).not.toHaveClass(/is-holding/);
+  }
+});
+
+test("inner-circle wedges start hold on pointerdown and stop on pointerup in chord mode", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const primaryPath = panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
+  await primaryPath.click({ force: true });
+  await primaryPath.click({ force: true });
+  await expect(panel.locator(".cof")).toHaveClass(/is-chord-mode/);
+
+  for (const degree of ["ii", "iii", "vi"]) {
+    const cell = panel.locator(`.cof-secondary-cell[data-degree="${degree}"]`);
+    await cell.dispatchEvent("pointerdown", { pointerId: 300, bubbles: true });
+    await expect(cell).toHaveClass(/is-holding/);
+    await cell.dispatchEvent("pointerup", { pointerId: 300, bubbles: true });
+    await expect(cell).not.toHaveClass(/is-holding/);
+  }
+
+  const dimCell = panel.locator('.cof-dim-cell[data-degree="vii"]');
+  await dimCell.dispatchEvent("pointerdown", { pointerId: 400, bubbles: true });
+  await expect(dimCell).toHaveClass(/is-holding/);
+  await dimCell.dispatchEvent("pointerup", { pointerId: 400, bubbles: true });
+  await expect(dimCell).not.toHaveClass(/is-holding/);
+});
+
+test("double-tapping inside cycles through all circle instruments", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const svg = panel.locator(".cof-svg");
+  const instrumentLabel = panel.locator(".cof-instrument-label");
+  const svgBox = await svg.boundingBox();
+  expect(svgBox).not.toBeNull();
+
+  const expected = [
+    "ACOUSTIC GUITAR",
+    "ELECTRIC GUITAR",
+    "SPANISH GUITAR",
+    "PIPE ORGAN",
+    "HOUSE ORGAN",
+    "ACOUSTIC GUITAR",
+  ];
+
+  await expect(instrumentLabel).toContainText(expected[0] ?? "");
+  for (const next of expected.slice(1)) {
+    await svg.dblclick({
+      position: { x: (svgBox?.width ?? 0) / 2, y: (svgBox?.height ?? 0) / 2 },
+      force: true,
+    });
+    await expect(instrumentLabel).toContainText(next);
+  }
+});
