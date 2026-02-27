@@ -616,7 +616,7 @@ test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
 });
 
 
-test("mobile safari taps every fretboard control button without mode-swiping to metronome", async ({
+test("mobile safari KEY tap enters key mode without mode-swiping to metronome", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage only");
@@ -626,41 +626,18 @@ test("mobile safari taps every fretboard control button without mode-swiping to 
 
   const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
   const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
+  const keyButton = page.getByRole("button", { name: "KEY", exact: true });
+
   await expect(fretboardScreen).toHaveClass(/is-active/);
+  await expect(page.locator('[data-fretboard-display="scale"]')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-fretboard-display="key"]')).not.toHaveClass(/is-active/);
 
-  const buttonLabels = [
-    "A",
-    "A#",
-    "B",
-    "C",
-    "C#",
-    "D",
-    "D#",
-    "E",
-    "F",
-    "F#",
-    "G",
-    "G#",
-    "CHORD",
-    "SCALE",
-    "KEY",
-    "NOTES",
-    "DEGREES",
-    "PLAY",
-    "HIDE",
-  ];
+  await expect(keyButton).toBeVisible();
+  await keyButton.click({ force: true });
 
-  for (const label of buttonLabels) {
-    const button = page.getByRole("button", { name: label, exact: true });
-    await expect(button).toBeVisible();
-    await button.click({ force: true });
-    await expect(fretboardScreen).toHaveClass(/is-active/);
-    await expect(metronomeScreen).not.toHaveClass(/is-active/);
-  }
-
-  const summary = page.locator("[data-fretboard-summary]");
-  await expect(summary).toBeVisible();
-  await summary.click();
+  await expect(page.locator('[data-fretboard-display="key"]')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-fretboard-display="scale"]')).not.toHaveClass(/is-active/);
+  await expect(page.locator('#fretboard-characteristic option')).toHaveCount(7);
   await expect(fretboardScreen).toHaveClass(/is-active/);
   await expect(metronomeScreen).not.toHaveClass(/is-active/);
 });
