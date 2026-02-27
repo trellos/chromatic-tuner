@@ -138,7 +138,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     hiddenSummaryButton?.toggleAttribute("hidden", !controlsHidden);
     hideButton?.classList.toggle("is-active", controlsHidden);
     if (hideButton) {
-      hideButton.textContent = controlsHidden ? "Show" : "Hide";
+      hideButton.textContent = controlsHidden ? "SHOW" : "HIDE";
       hideButton.setAttribute("aria-pressed", String(controlsHidden));
     }
     rootEl.classList.toggle("fretboard-controls-hidden", controlsHidden);

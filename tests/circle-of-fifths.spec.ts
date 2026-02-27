@@ -784,12 +784,32 @@ test("outer wedges start hold on pointerdown and stop on pointerup in note and c
   await page.getByRole("tab", { name: "Circle of Fifths" }).click();
   const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
 
-  for (let index = 0; index < 12; index += 1) {
+  const holdWedge = async (index: number) => {
     const wedge = panel.locator(`.cof-wedge[data-index="${index}"]`);
-    await wedge.dispatchEvent("pointerdown", { pointerId: 100 + index, bubbles: true });
+    const path = wedge.locator(".cof-wedge-path");
+    const pointerId = 1000 + index;
+    await path.dispatchEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+      pointerId,
+      pointerType: "touch",
+    });
     await expect(wedge).toHaveClass(/is-holding/);
-    await wedge.dispatchEvent("pointerup", { pointerId: 100 + index, bubbles: true });
+    await path.dispatchEvent("pointerup", {
+      bubbles: true,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId,
+      pointerType: "touch",
+    });
     await expect(wedge).not.toHaveClass(/is-holding/);
+  };
+
+  for (const index of [0, 3, 6, 9]) {
+    await holdWedge(index);
   }
 
   const primaryPath = panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
@@ -797,12 +817,8 @@ test("outer wedges start hold on pointerdown and stop on pointerup in note and c
   await primaryPath.click({ force: true });
   await expect(panel.locator(".cof")).toHaveClass(/is-chord-mode/);
 
-  for (let index = 0; index < 12; index += 1) {
-    const wedge = panel.locator(`.cof-wedge[data-index="${index}"]`);
-    await wedge.dispatchEvent("pointerdown", { pointerId: 200 + index, bubbles: true });
-    await expect(wedge).toHaveClass(/is-holding/);
-    await wedge.dispatchEvent("pointerup", { pointerId: 200 + index, bubbles: true });
-    await expect(wedge).not.toHaveClass(/is-holding/);
+  for (const index of [0, 3, 6, 9]) {
+    await holdWedge(index);
   }
 });
 

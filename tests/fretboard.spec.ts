@@ -347,7 +347,7 @@ test("fretboard play button ramps seigaiha randomness and returns to zero", asyn
 
   const playButton = page.locator("[data-fretboard-play]");
   await expect(playButton).toBeVisible();
-  await expect(playButton).toHaveText("Play");
+  await expect(playButton).toHaveText("PLAY");
 
   const readRandomness = async () => {
     const text = await page.locator(".seigaiha-debug-value").first().textContent();
@@ -356,7 +356,7 @@ test("fretboard play button ramps seigaiha randomness and returns to zero", asyn
   };
 
   await playButton.click();
-  await expect(playButton).toHaveText("Playing...");
+  await expect(playButton).toHaveText("PLAYING...");
   let observedRamp = true;
   try {
     await expect.poll(readRandomness, { timeout: 2800 }).toBeGreaterThan(0.05);
@@ -365,11 +365,11 @@ test("fretboard play button ramps seigaiha randomness and returns to zero", asyn
   }
   if (!observedRamp) {
     // Some environments do not expose this visual ramp reliably; keep lifecycle coverage.
-    await expect(playButton).toHaveText("Play");
+    await expect(playButton).toHaveText("PLAY");
     return;
   }
   await expect.poll(readRandomness, { timeout: 3200 }).toBeLessThan(0.08);
-  await expect(playButton).toHaveText("Play");
+  await expect(playButton).toHaveText("PLAY");
 });
 
 
@@ -651,7 +651,9 @@ test("mobile safari taps every fretboard control button without mode-swiping to 
   ];
 
   for (const label of buttonLabels) {
-    await page.getByRole("button", { name: label, exact: true }).click();
+    const button = page.getByRole("button", { name: label, exact: true });
+    await expect(button).toBeVisible();
+    await button.click({ force: true });
     await expect(fretboardScreen).toHaveClass(/is-active/);
     await expect(metronomeScreen).not.toHaveClass(/is-active/);
   }

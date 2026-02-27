@@ -89,7 +89,7 @@ export function createFretboardMode(options: FretboardModeOptions = {}): ModeDef
     const playButton = modeEl?.querySelector<HTMLButtonElement>("[data-fretboard-play]");
     if (!playButton) return;
     playButton.classList.toggle("is-playing", playing);
-    playButton.textContent = playing ? "Playing..." : "Play";
+    playButton.textContent = playing ? "PLAYING..." : "PLAY";
   };
 
   const clearPlayEndTimer = (): void => {
