@@ -603,7 +603,6 @@ function clearSwipeState(): void {
   swipeDirection = null;
   swipeTargetMode = null;
   isSwipeDragging = false;
-  suppressSwipeUntilTouchEnd = false;
   if (modeStageEl) {
     modeStageEl.classList.remove("is-swiping");
   }
