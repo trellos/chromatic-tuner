@@ -553,6 +553,7 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 
 .mode-screen[data-mode="tuner"] {
   --tuner-dial-size: min(520px, calc(var(--mode-panel-height) - 140px), 90vw);
+  background: radial-gradient(ellipse 75% 55% at 50% 40%, rgba(14, 42, 130, 0.30) 0%, transparent 72%);
   overflow: hidden;
 }
 
