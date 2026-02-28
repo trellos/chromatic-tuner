@@ -45,6 +45,9 @@ const carouselShowEl = document.getElementById("carousel-show");
 const modeDots = document.querySelectorAll<HTMLButtonElement>(".mode-dot[data-mode]");
 const modeStageEl = document.querySelector<HTMLElement>(".mode-stage");
 const modeScreens = document.querySelectorAll<HTMLElement>(".mode-screen[data-mode]");
+const modeChipEl = document.getElementById("mode-chip");
+const modePickerEl = document.getElementById("mode-picker");
+const modePickerItems = document.querySelectorAll<HTMLButtonElement>(".mode-picker-item[data-mode]");
 
 const LAST_MODE_STORAGE_KEY = "tuna.lastMode";
 
@@ -53,6 +56,28 @@ let isSwitching = false;
 let syncDebugPanel: (() => void) | null = null;
 let carousel: CarouselController | null = null;
 let enterFullscreenAbort: AbortController | null = null;
+let isPickerOpen = false;
+
+function openModePicker(): void {
+  if (!modePickerEl || !modeChipEl) return;
+  isPickerOpen = true;
+  modePickerEl.classList.add("is-open");
+  modePickerEl.removeAttribute("aria-hidden");
+  modeChipEl.setAttribute("aria-expanded", "true");
+  modePickerItems.forEach((item) => {
+    const active = item.dataset.mode === activeModeId;
+    item.classList.toggle("is-active", active);
+    item.setAttribute("aria-selected", String(active));
+  });
+}
+
+function closeModePicker(): void {
+  if (!modePickerEl || !modeChipEl) return;
+  isPickerOpen = false;
+  modePickerEl.classList.remove("is-open");
+  modePickerEl.setAttribute("aria-hidden", "true");
+  modeChipEl.setAttribute("aria-expanded", "false");
+}
 
 // Keeps drum-fullscreen / wild-tuna-fullscreen body classes in sync whenever
 // either the carousel-hidden state or the active mode changes.
@@ -144,6 +169,7 @@ async function switchMode(id: ModeId): Promise<void> {
       applyUiState: () => {
         activeModeId = id;
         writeLastModeId(activeModeId);
+        closeModePicker();
         carousel?.updateCarouselState();
         carousel?.setActiveScreen(id);
         const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
@@ -178,6 +204,45 @@ window.addEventListener("DOMContentLoaded", async () => {
     const target = event.target as HTMLElement | null;
     if (!target) return;
     if (target.closest<HTMLButtonElement>("button")) pulseSeigaihaRandomness();
+  });
+
+  // Mode chip → toggle picker open/closed.
+  modeChipEl?.addEventListener("click", () => {
+    if (isPickerOpen) {
+      closeModePicker();
+    } else {
+      openModePicker();
+    }
+  });
+
+  // Picker item click → switch mode + close picker.
+  modePickerItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const modeId = item.dataset.mode as ModeId | undefined;
+      if (!modeId) return;
+      closeModePicker();
+      void switchMode(modeId);
+    });
+  });
+
+  // Click outside the chip/picker → close picker.
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!isPickerOpen) return;
+      const target = event.target as Node | null;
+      if (modeChipEl?.contains(target) || modePickerEl?.contains(target)) return;
+      closeModePicker();
+    },
+    { capture: true }
+  );
+
+  // Escape key → close picker.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isPickerOpen) {
+      closeModePicker();
+      modeChipEl?.focus();
+    }
   });
 
   // Wire the debug panel — it needs callbacks to read/write debug-params.

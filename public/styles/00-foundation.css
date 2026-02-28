@@ -10,6 +10,60 @@
   --panel-strong: #ffffff;
   --stroke: rgba(12, 16, 32, 0.12);
 
+  /* Mode-specific accent — overridden per body[data-active-mode] */
+  --mode-accent: var(--tuna-aqua);
+  --mode-accent-border: rgba(0, 245, 212, 0.4);
+  --mode-accent-glow: rgba(0, 245, 212, 0.16);
+  --mode-accent-dot-glow: rgba(0, 245, 212, 0.35);
+}
+
+body[data-active-mode="tuner"] {
+  --mode-accent: var(--tuna-pink);
+  --mode-accent-border: rgba(255, 107, 214, 0.4);
+  --mode-accent-glow: rgba(255, 107, 214, 0.16);
+  --mode-accent-dot-glow: rgba(255, 107, 214, 0.35);
+}
+
+body[data-active-mode="metronome"] {
+  --mode-accent: var(--tuna-gold);
+  --mode-accent-border: rgba(255, 158, 0, 0.4);
+  --mode-accent-glow: rgba(255, 158, 0, 0.16);
+  --mode-accent-dot-glow: rgba(255, 158, 0, 0.35);
+}
+
+body[data-active-mode="fretboard"] {
+  --mode-accent: var(--tuna-aqua);
+  --mode-accent-border: rgba(0, 245, 212, 0.4);
+  --mode-accent-glow: rgba(0, 245, 212, 0.16);
+  --mode-accent-dot-glow: rgba(0, 245, 212, 0.35);
+}
+
+body[data-active-mode="circle-of-fifths"] {
+  --mode-accent: var(--tuna-purple);
+  --mode-accent-border: rgba(124, 58, 237, 0.55);
+  --mode-accent-glow: rgba(124, 58, 237, 0.22);
+  --mode-accent-dot-glow: rgba(124, 58, 237, 0.45);
+}
+
+body[data-active-mode="drum-machine"] {
+  --mode-accent: var(--tuna-sunset);
+  --mode-accent-border: rgba(255, 61, 129, 0.4);
+  --mode-accent-glow: rgba(255, 61, 129, 0.16);
+  --mode-accent-dot-glow: rgba(255, 61, 129, 0.35);
+}
+
+body[data-active-mode="extra-jimmy"] {
+  --mode-accent: #a3e635;
+  --mode-accent-border: rgba(163, 230, 53, 0.4);
+  --mode-accent-glow: rgba(163, 230, 53, 0.16);
+  --mode-accent-dot-glow: rgba(163, 230, 53, 0.35);
+}
+
+body[data-active-mode="wild-tuna"] {
+  --mode-accent: #38bdf8;
+  --mode-accent-border: rgba(56, 189, 248, 0.4);
+  --mode-accent-glow: rgba(56, 189, 248, 0.16);
+  --mode-accent-dot-glow: rgba(56, 189, 248, 0.35);
 }
 
 html {
@@ -528,23 +582,30 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 .mode-chip-bar {
   display: flex;
   justify-content: center;
+  position: relative;
   width: 100%;
 }
 
 .mode-chip {
+  align-items: center;
+  appearance: none;
   background: rgba(11, 16, 32, 0.82);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 245, 212, 0.4);
+  border: 1px solid var(--mode-accent-border);
   border-radius: 999px;
-  box-shadow: 0 0 18px rgba(0, 245, 212, 0.16), 0 4px 16px rgba(4, 8, 16, 0.55);
+  box-shadow: 0 0 18px var(--mode-accent-glow), 0 4px 16px rgba(4, 8, 16, 0.55);
+  cursor: pointer;
+  display: inline-flex;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   font-size: 11px;
   font-weight: 700;
+  gap: 6px;
   letter-spacing: 0.22em;
-  padding: 7px 20px;
+  padding: 7px 16px 7px 20px;
   position: relative;
   text-transform: uppercase;
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
   white-space: nowrap;
   z-index: 10;
 }
@@ -554,6 +615,73 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.mode-chip-caret {
+  color: var(--mode-accent);
+  font-size: 10px;
+  opacity: 0.75;
+  transition: transform 0.2s ease, color 0.35s ease;
+}
+
+.mode-chip[aria-expanded="true"] .mode-chip-caret {
+  transform: rotate(180deg);
+}
+
+/* Mode Picker overlay */
+.mode-picker {
+  background: rgba(11, 16, 32, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--mode-accent-border);
+  border-radius: 16px;
+  bottom: calc(100% + 10px);
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.5), 0 0 16px var(--mode-accent-glow);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  left: 50%;
+  min-width: 200px;
+  opacity: 0;
+  padding: 6px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%) translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+  z-index: 100;
+}
+
+.mode-picker.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.mode-picker-item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: rgba(226, 232, 240, 0.55);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 9px 14px;
+  text-align: left;
+  text-transform: uppercase;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.mode-picker-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.mode-picker-item.is-active {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--mode-accent);
 }
 
 body.wild-tuna-fullscreen .mode-chip-bar,

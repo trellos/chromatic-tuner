@@ -1,23 +1,41 @@
 .mode-dots {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   justify-content: center;
 }
 
 .mode-dot {
-  background: transparent;
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  align-items: center;
+  background: rgba(11, 16, 32, 0.35);
+  border: 1.5px solid rgba(226, 232, 240, 0.2);
   border-radius: 50%;
+  color: rgba(226, 232, 240, 0.35);
   cursor: pointer;
-  height: 10px;
-  width: 10px;
+  display: flex;
+  height: 32px;
+  justify-content: center;
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  width: 32px;
+}
+
+.mode-dot:hover {
+  border-color: rgba(226, 232, 240, 0.5);
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.mode-dot svg {
+  flex-shrink: 0;
+  height: 16px;
+  width: 16px;
 }
 
 .mode-dot.is-active {
-  background: linear-gradient(135deg, var(--tuna-pink), var(--tuna-aqua));
-  border-color: rgba(0, 245, 212, 0.8);
-  box-shadow: 0 0 10px rgba(0, 245, 212, 0.35);
+  background: rgba(11, 16, 32, 0.55);
+  border-color: var(--mode-accent);
+  box-shadow: 0 0 10px var(--mode-accent-dot-glow);
+  color: var(--mode-accent);
+  transition: border-color 0.35s ease, color 0.35s ease, box-shadow 0.35s ease;
 }
 
 .fullscreen-icon {
