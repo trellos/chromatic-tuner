@@ -312,6 +312,74 @@
 
           <div data-drum-host></div>
         </article>
+
+        <article
+          id="mode-screen-extra-jimmy"
+          class="mode-screen"
+          data-mode="extra-jimmy"
+          role="tabpanel"
+          aria-hidden="true"
+        >
+          <div class="ej-shell">
+            <div class="ej-neck ej-neck--low" data-ej-neck="low" aria-label="Low neck">
+              <div class="ej-neck-label" aria-hidden="true">LOW</div>
+              <div class="ej-neck-viewport"></div>
+            </div>
+
+            <div class="ej-controls">
+              <div class="ej-controls-inner">
+                <label class="ej-control-label" for="ej-harmony-select">Harmony</label>
+                <select id="ej-harmony-select" class="ej-select" data-ej-harmony>
+                  <option value="1">2nd</option>
+                  <option value="2" selected>3rd</option>
+                  <option value="3">4th</option>
+                  <option value="4">5th</option>
+                  <option value="5">6th</option>
+                  <option value="6">7th</option>
+                  <option value="7">Oct</option>
+                  <option value="8">9th</option>
+                  <option value="10">11th</option>
+                </select>
+
+                <label class="ej-control-label">Key</label>
+                <div class="ej-key-chip">
+                  <button type="button" class="ej-key-btn" data-ej-key-trigger
+                    aria-haspopup="true" aria-expanded="false" aria-label="Select key: C">C</button>
+                  <div class="ej-key-popup" data-ej-key-popup hidden role="menu">
+                    <button type="button" role="menuitem" data-ej-key-note="C">C</button>
+                    <button type="button" role="menuitem" data-ej-key-note="C#">C#</button>
+                    <button type="button" role="menuitem" data-ej-key-note="D">D</button>
+                    <button type="button" role="menuitem" data-ej-key-note="D#">D#</button>
+                    <button type="button" role="menuitem" data-ej-key-note="E">E</button>
+                    <button type="button" role="menuitem" data-ej-key-note="F">F</button>
+                    <button type="button" role="menuitem" data-ej-key-note="F#">F#</button>
+                    <button type="button" role="menuitem" data-ej-key-note="G">G</button>
+                    <button type="button" role="menuitem" data-ej-key-note="G#">G#</button>
+                    <button type="button" role="menuitem" data-ej-key-note="A">A</button>
+                    <button type="button" role="menuitem" data-ej-key-note="A#">A#</button>
+                    <button type="button" role="menuitem" data-ej-key-note="B">B</button>
+                  </div>
+                </div>
+
+                <label class="ej-control-label" for="ej-scale-select">Scale</label>
+                <select id="ej-scale-select" class="ej-select" data-ej-scale>
+                  <option value="ionian-major">Major</option>
+                  <option value="aeolian-minor">Minor</option>
+                  <option value="dorian">Dorian</option>
+                  <option value="mixolydian">Mixolyd.</option>
+                  <option value="phrygian">Phrygian</option>
+                  <option value="lydian">Lydian</option>
+                  <option value="locrian">Locrian</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="ej-neck ej-neck--high" data-ej-neck="high" aria-label="High neck">
+              <div class="ej-neck-label" aria-hidden="true">HIGH</div>
+              <div class="ej-neck-viewport"></div>
+            </div>
+          </div>
+        </article>
       </section>
 
       <div class="carousel">
@@ -321,6 +389,7 @@
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-fretboard" data-mode="fretboard" aria-label="Fretboard" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-circle-of-fifths" data-mode="circle-of-fifths" aria-label="Circle of Fifths" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-drum-machine" data-mode="drum-machine" aria-label="Drum Machine" type="button"></button>
+          <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-extra-jimmy" data-mode="extra-jimmy" aria-label="Extra Jimmy" type="button"></button>
           <button class="mode-dot" role="tab" aria-selected="false" aria-controls="mode-screen-wild-tuna" data-mode="wild-tuna" aria-label="Wild Tuna" type="button"></button>
         </div>
       </div>

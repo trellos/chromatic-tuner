@@ -1,0 +1,160 @@
+/* Override mode-screen defaults for this layout */
+.mode-screen[data-mode="extra-jimmy"] {
+  overflow: hidden;
+  padding: 12px;
+}
+
+.mode-screen[data-mode="extra-jimmy"].is-active {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Three-column shell */
+.ej-shell {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  gap: 12px;
+}
+
+/* Neck columns — flex-grow is the animation target */
+.ej-neck {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Fretboard viewport - normal orientation */
+.ej-neck-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+
+.ej-neck-viewport .fretboard-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+}
+
+.ej-neck-viewport .fretboard-board {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.ej-neck-viewport .fretboard-controls {
+  display: none;
+}
+
+/* Controls column */
+.ej-controls {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  justify-content: center;
+  overflow: auto;
+  width: 80px;
+  gap: 8px;
+}
+
+.ej-controls-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ej-control-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.ej-select {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(0, 245, 212, 0.45);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 4px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Key button */
+.ej-key-chip {
+  position: relative;
+}
+
+.ej-key-btn {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(12, 16, 32, 0.2);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  height: 44px;
+  width: 100%;
+}
+
+.ej-key-btn.is-open {
+  box-shadow: inset 0 0 0 3px rgba(0, 245, 212, 0.48), 0 0 0 1px rgba(0, 245, 212, 0.72);
+}
+
+/* Key popup */
+.ej-key-popup {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(0, 245, 212, 0.45);
+  border-radius: 12px;
+  bottom: calc(100% + 6px);
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, 1fr);
+  left: 50%;
+  padding: 8px;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 160px;
+  z-index: 20;
+}
+
+.ej-key-popup[hidden] {
+  display: none;
+}
+
+.ej-key-popup button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(226, 232, 240, 0.2);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 0;
+}
+
+.ej-key-popup button.is-active {
+  background: rgba(0, 245, 212, 0.22);
+  border-color: rgba(0, 245, 212, 0.7);
+}
+
+.ej-neck-label {
+  display: none;
+}

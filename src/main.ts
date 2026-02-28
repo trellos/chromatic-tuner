@@ -4,6 +4,7 @@ import { createMetronomeMode } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretboard.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
+import { createExtraJimmyMode } from "./modes/extra-jimmy.js";
 import { createWildTunaMode } from "./modes/wild-tuna.js";
 import { runModeTransition } from "./mode-transition.js";
 import { createCircleOfFifthsUi } from "./ui/circle-of-fifths.js";
@@ -36,6 +37,7 @@ const MODE_REGISTRY: ModeDefinition[] = [
   createFretboardMode(),
   createCircleOfFifthsMode(),
   createDrumMachineMode(),
+  createExtraJimmyMode(),
   createWildTunaMode(),
 ];
 
