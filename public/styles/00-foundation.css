@@ -74,11 +74,10 @@ html {
 body {
   align-items: center;
   background:
-    radial-gradient(92% 70% at 50% 110%, rgba(156, 232, 255, 1) 0%, rgba(126, 206, 255, 0.72) 28%, rgba(72, 138, 244, 0.34) 52%, transparent 74%),
-    radial-gradient(70% 58% at 8% 10%, rgba(184, 126, 255, 0.82) 0%, rgba(132, 92, 240, 0.42) 36%, transparent 74%),
-    radial-gradient(72% 56% at 6% 100%, rgba(206, 178, 255, 0.82) 0%, rgba(150, 132, 255, 0.38) 44%, transparent 76%),
-    linear-gradient(180deg, #061343 0%, #174abf 44%, #1b57cb 66%, #0e327f 100%);
-  background-color: #12398f;
+    radial-gradient(70% 55% at 50% 110%, rgba(18, 55, 140, 0.22) 0%, transparent 65%),
+    radial-gradient(55% 45% at 6% 8%, rgba(55, 28, 130, 0.16) 0%, transparent 65%),
+    linear-gradient(170deg, #030a1e 0%, #060f2a 45%, #07122f 70%, #020710 100%);
+  background-color: #050c20;
   color: #f8fafc;
   display: flex;
   font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
@@ -342,16 +341,14 @@ body.drum-fullscreen .mode-stage {
 
 .mode-screen {
   backdrop-filter: none;
-  background: var(--panel);
+  background: transparent;
   background-clip: padding-box;
-
-  background-color: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: none;
   border-radius: 28px;
-  box-shadow: 0 30px 60px rgba(4, 8, 16, 0.45);
+  box-shadow: none;
   box-sizing: border-box;
-  color: var(--ink);
-  contain: paint;
+  color: rgba(220, 235, 255, 0.9);
+  contain: layout style;
   display: none;
   height: var(--mode-panel-height);
   isolation: isolate;
