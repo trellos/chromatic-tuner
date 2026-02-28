@@ -51,6 +51,7 @@ export type DrumMachineUi = {
   getBpm: () => number;
   isPlaying: () => boolean;
   destroy: () => void;
+  rootEl: HTMLElement;
 };
 
 // Icons from Heroicons (MIT): https://heroicons.com
@@ -66,10 +67,195 @@ const DRUM_STOP_ICON_SVG = `
   </svg>
 `;
 
+// Creates the full drum machine DOM. All class names are preserved for CSS.
+function buildDrumDOM() {
+  const drumMockEl = document.createElement("div");
+  drumMockEl.className = "drum-mock";
+  drumMockEl.dataset.signature = "4/4";
+
+  const rotatorEl = document.createElement("div");
+  rotatorEl.className = "drum-rotator";
+
+  // ── Controls bar ────────────────────────────────────────────────────────────
+  const drumUiEl = document.createElement("div");
+  drumUiEl.className = "drum-ui";
+
+  // Tempo
+  const tempoEl = document.createElement("div");
+  tempoEl.className = "drum-tempo";
+  const tempoDownBtn = document.createElement("button");
+  tempoDownBtn.className = "ghost-btn";
+  tempoDownBtn.type = "button";
+  tempoDownBtn.dataset.tempo = "down";
+  tempoDownBtn.textContent = "-";
+  const tempoUpBtn = document.createElement("button");
+  tempoUpBtn.className = "ghost-btn";
+  tempoUpBtn.type = "button";
+  tempoUpBtn.dataset.tempo = "up";
+  tempoUpBtn.textContent = "+";
+  const tempoInfoEl = document.createElement("div");
+  const tempoValueEl = document.createElement("div");
+  tempoValueEl.id = "drum-tempo-value";
+  tempoValueEl.className = "tempo-value";
+  tempoValueEl.textContent = "120";
+  const tempoLabelEl = document.createElement("div");
+  tempoLabelEl.className = "tempo-label";
+  tempoLabelEl.textContent = "BPM";
+  tempoInfoEl.appendChild(tempoValueEl);
+  tempoInfoEl.appendChild(tempoLabelEl);
+  tempoEl.appendChild(tempoDownBtn);
+  tempoEl.appendChild(tempoInfoEl);
+  tempoEl.appendChild(tempoUpBtn);
+
+  // Beat picker
+  const beatPickerEl = document.createElement("div");
+  beatPickerEl.className = "drum-beat-picker";
+  const beatButton = document.createElement("button");
+  beatButton.id = "drum-beat-button";
+  beatButton.className = "ghost-btn drum-random";
+  beatButton.type = "button";
+  beatButton.setAttribute("aria-haspopup", "menu");
+  beatButton.setAttribute("aria-expanded", "false");
+  beatButton.textContent = "Beat";
+  const beatMenu = document.createElement("div");
+  beatMenu.id = "drum-beat-menu";
+  beatMenu.className = "option-menu";
+  beatMenu.setAttribute("role", "menu");
+  for (const [id, label] of [
+    ["rock", "Rock"], ["shuffle", "Shuffle"], ["disco", "Disco"],
+    ["half-time", "Half-Time"], ["breakbeat", "Breakbeat"],
+    ["afrobeat", "Afrobeat"], ["minimal", "Minimal"],
+  ] as const) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "menuitem");
+    btn.dataset.beat = id;
+    btn.textContent = label;
+    beatMenu.appendChild(btn);
+  }
+  beatPickerEl.appendChild(beatButton);
+  beatPickerEl.appendChild(beatMenu);
+
+  // Kit picker
+  const kitPickerEl = document.createElement("div");
+  kitPickerEl.className = "drum-beat-picker";
+  const kitButton = document.createElement("button");
+  kitButton.id = "drum-kit-button";
+  kitButton.className = "ghost-btn drum-random drum-kit-trigger";
+  kitButton.type = "button";
+  kitButton.setAttribute("aria-haspopup", "menu");
+  kitButton.setAttribute("aria-expanded", "false");
+  const kitLabel = document.createElement("span");
+  kitLabel.id = "drum-kit-label";
+  kitLabel.textContent = "Rock";
+  kitButton.append("Kit: ");
+  kitButton.appendChild(kitLabel);
+  const kitMenu = document.createElement("div");
+  kitMenu.id = "drum-kit-menu";
+  kitMenu.className = "option-menu";
+  kitMenu.setAttribute("role", "menu");
+  for (const [id, label] of [
+    ["rock", "Rock Drums"], ["electro", "Electro Drum Machine"],
+    ["house", "House Drums"], ["lofi", "Lo-Fi Pocket"],
+    ["latin", "Latin Percussion"], ["woodblock", "Woodblock Ensemble"],
+  ] as const) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "menuitem");
+    btn.dataset.kit = id;
+    btn.textContent = label;
+    kitMenu.appendChild(btn);
+  }
+  kitPickerEl.appendChild(kitButton);
+  kitPickerEl.appendChild(kitMenu);
+
+  // Share button
+  const shareButton = document.createElement("button");
+  shareButton.id = "drum-share-button";
+  shareButton.className = "drum-share-button";
+  shareButton.type = "button";
+  shareButton.setAttribute("aria-label", "Share track");
+  shareButton.setAttribute("data-drum-share", "");
+  shareButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M12 3L8.2 6.8a1 1 0 0 0 1.4 1.4L11 6.8V14a1 1 0 1 0 2 0V6.8l1.4 1.4a1 1 0 1 0 1.4-1.4L12 3z" />
+    <path d="M7 11a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2.2a1 1 0 0 0 0 2H17v6H7v-6h2.2a1 1 0 1 0 0-2H7z" />
+  </svg>`;
+
+  // Play/stop button
+  const playButton = document.createElement("button");
+  playButton.id = "drum-play-toggle";
+  playButton.className = "primary-btn drum-play";
+  playButton.type = "button";
+  playButton.textContent = "Play";
+
+  drumUiEl.appendChild(tempoEl);
+  drumUiEl.appendChild(beatPickerEl);
+  drumUiEl.appendChild(kitPickerEl);
+  drumUiEl.appendChild(shareButton);
+  drumUiEl.appendChild(playButton);
+
+  // ── Grid area ────────────────────────────────────────────────────────────────
+  const drumGridsEl = document.createElement("div");
+  drumGridsEl.className = "drum-grids";
+
+  const playheadEl = document.createElement("div");
+  playheadEl.className = "drum-playhead";
+  playheadEl.setAttribute("aria-hidden", "true");
+
+  const drumGrid44 = document.createElement("div");
+  drumGrid44.className = "drum-grid";
+  drumGrid44.dataset.signature = "4/4";
+
+  for (const [voice, voiceLabel] of [
+    ["kick", "Kick"], ["snare", "Snare"], ["hat", "Hat"], ["perc", "Perc"],
+  ] as const) {
+    const rowEl = document.createElement("div");
+    rowEl.className = "drum-row";
+    rowEl.dataset.voice = voice;
+    const labelEl = document.createElement("div");
+    labelEl.className = "drum-label";
+    labelEl.textContent = voiceLabel;
+    const stepsEl = document.createElement("div");
+    stepsEl.className = "drum-steps";
+    for (let i = 0; i < 16; i++) {
+      const step = document.createElement("button");
+      step.className = "step";
+      step.type = "button";
+      stepsEl.appendChild(step);
+    }
+    rowEl.appendChild(labelEl);
+    rowEl.appendChild(stepsEl);
+    drumGrid44.appendChild(rowEl);
+  }
+
+  drumGridsEl.appendChild(playheadEl);
+  drumGridsEl.appendChild(drumGrid44);
+
+  rotatorEl.appendChild(drumUiEl);
+  rotatorEl.appendChild(drumGridsEl);
+  drumMockEl.appendChild(rotatorEl);
+
+  const tempoButtons = drumMockEl.querySelectorAll<HTMLButtonElement>("[data-tempo]");
+
+  return {
+    drumMockEl,
+    drumGridsEl,
+    playheadEl,
+    playButton,
+    beatButton,
+    beatMenu,
+    kitButton,
+    kitMenu,
+    kitLabel,
+    tempoValueEl,
+    tempoButtons,
+  };
+}
+
 // Reusable Drum Machine UI object: pattern editing, transport scheduling,
-// kit loading, and lifecycle-managed listener wiring for a host element.
+// kit loading, and lifecycle-managed listener wiring.
+// Creates and owns its own DOM — append drumUi.rootEl to your host element.
 export function createDrumMachineUi(
-  rootEl: HTMLElement,
   options: DrumMachineUiOptions = {}
 ): DrumMachineUi {
   // Lifecycle overview:
@@ -77,18 +263,19 @@ export function createDrumMachineUi(
   // 2) UI interactions mutate pattern/tempo/kit and can start/stop transport.
   // 3) `startTransport` owns scheduler startup; `scheduleSteps` drives playback.
   // 4) `exitMode` stops transport and tears down observers/listeners.
-  const drumMockEl = rootEl.querySelector<HTMLElement>(".drum-mock");
-  const drumGridsEl = drumMockEl?.querySelector<HTMLElement>(".drum-grids") ?? null;
-  const playheadEl = drumMockEl?.querySelector<HTMLElement>(".drum-playhead") ?? null;
-  const playButton = rootEl.querySelector<HTMLButtonElement>("#drum-play-toggle");
-  const beatButton = rootEl.querySelector<HTMLButtonElement>("#drum-beat-button");
-  const beatMenu = rootEl.querySelector<HTMLElement>("#drum-beat-menu");
-  const kitButton = rootEl.querySelector<HTMLButtonElement>("#drum-kit-button");
-  const kitMenu = rootEl.querySelector<HTMLElement>("#drum-kit-menu");
-  const kitLabel = rootEl.querySelector<HTMLElement>("#drum-kit-label");
-  const tempoValueEl = rootEl.querySelector<HTMLElement>("#drum-tempo-value");
-  const tempoButtons =
-    drumMockEl?.querySelectorAll<HTMLButtonElement>("[data-tempo]") ?? [];
+  const {
+    drumMockEl,
+    drumGridsEl,
+    playheadEl,
+    playButton,
+    beatButton,
+    beatMenu,
+    kitButton,
+    kitMenu,
+    kitLabel,
+    tempoValueEl,
+    tempoButtons,
+  } = buildDrumDOM();
 
   const BPM_MIN = 60;
   const BPM_MAX = 180;
@@ -963,6 +1150,7 @@ export function createDrumMachineUi(
   };
 
   return {
+    rootEl: drumMockEl,
     enter,
     exit,
     getShareUrl,

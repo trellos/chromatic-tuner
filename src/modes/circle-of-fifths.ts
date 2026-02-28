@@ -1,4 +1,5 @@
 import { createCircleGuitarPlayer } from "../audio/circle-guitar-player.js";
+import { seigaihaBridge } from "../app/seigaiha-bridge.js";
 import {
   createCircleOfFifthsUi,
   getCircleChordMidis,
@@ -8,20 +9,17 @@ import {
 } from "../ui/circle-of-fifths.js";
 import type { ModeDefinition } from "./types.js";
 
-type CircleOfFifthsModeOptions = {
-  onRandomnessChange?: (randomness: number | null) => void;
-  onPulse?: () => void;
-};
-
 const CHORD_MODE_MIN_RANDOMNESS = 0.2;
 const CHORD_MODE_MAX_RANDOMNESS = 0.75;
 const CHORD_MODE_CYCLE_MS = 2000;
 const CHORD_MODE_EXIT_DECAY_MS = 500;
 const TAP_PLAYBACK_DEBOUNCE_MS = 440;
 
-export function createCircleOfFifthsMode(
-  options: CircleOfFifthsModeOptions = {}
-): ModeDefinition {
+export function createCircleOfFifthsMode(): ModeDefinition {
+  const options = {
+    onRandomnessChange: (r: number | null) => seigaihaBridge.setModeRandomness(r),
+    onPulse: () => seigaihaBridge.pulse(),
+  };
   const modeEl = document.querySelector<HTMLElement>(
     '.mode-screen[data-mode="circle-of-fifths"]'
   );

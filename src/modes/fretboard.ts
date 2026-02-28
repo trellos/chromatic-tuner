@@ -16,6 +16,7 @@ import {
   preloadFretboardSampleBytes,
 } from "../audio/fretboard-sample.js";
 import { getOrCreateAudioContext } from "../utils.js";
+import { seigaihaBridge } from "../app/seigaiha-bridge.js";
 
 export { preloadFretboardSampleBytes as preloadFretboardAudioAssets };
 
@@ -24,11 +25,8 @@ const PLAY_SCALE_STEP_MS = 180;
 const PLAY_SCALE_NOTE_DURATION_MS = 160;
 const PLAY_RANDOMNESS_PEAK = 0.8;
 
-type FretboardModeOptions = {
-  onRandomnessChange?: (randomness: number | null) => void;
-};
-
-export function createFretboardMode(options: FretboardModeOptions = {}): ModeDefinition {
+export function createFretboardMode(): ModeDefinition {
+  const options = { onRandomnessChange: (r: number | null) => seigaihaBridge.setModeRandomness(r) };
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="fretboard"]');
   const ui = modeEl
     ? createFretboardUi(modeEl, {

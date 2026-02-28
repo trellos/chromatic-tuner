@@ -2,6 +2,8 @@ import { METRONOME_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import { WOODBLOCK_SAMPLE_URLS } from "../audio/woodblock-samples.js";
 import type { ModeDefinition } from "./types.js";
 import { clamp } from "../utils.js";
+import { seigaihaBridge } from "../app/seigaiha-bridge.js";
+import { getMetronomeRandomnessParams } from "../app/debug-params.js";
 
 let sessionBpm = 120;
 
@@ -14,14 +16,13 @@ export type MetronomeRandomnessParams = {
   downCurve: number;
 };
 
-type MetronomeModeOptions = {
-  onRandomnessChange?: (randomness: number | null) => void;
-  getRandomnessParams?: () => MetronomeRandomnessParams;
-};
-
 // Mode factory for the metronome screen: tempo/time-signature controls,
 // click scheduling, and lifecycle-managed event wiring.
-export function createMetronomeMode(options: MetronomeModeOptions = {}): ModeDefinition {
+export function createMetronomeMode(): ModeDefinition {
+  const options = {
+    onRandomnessChange: (r: number | null) => seigaihaBridge.setModeRandomness(r),
+    getRandomnessParams: getMetronomeRandomnessParams,
+  };
   // Lifecycle overview:
   // 1) `enterMode` syncs persisted UI state and wires listeners.
   // 2) UI actions can start/stop transport and edit tempo/signature/sound.

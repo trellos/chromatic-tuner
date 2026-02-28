@@ -16,5 +16,8 @@
       "Bash(npx playwright test tests/ui.spec.ts tests/fretboard.spec.ts --grep \"wild tuna fullscreen keeps drum|fretboard UI stays fully visible\")",
       "Bash(npx playwright test tests/ui.spec.ts --grep \"wild tuna fullscreen keeps drum\")"
     ]
+  },
+  "enabledPlugins": {
+    "cook-en@claude-code-cookbook": true
   }
 }

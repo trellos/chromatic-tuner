@@ -19,13 +19,11 @@ import {
 import { createUiCompositeLooper } from "../ui/ui-composite-looper.js";
 import { getOrCreateAudioContext } from "../utils.js";
 import type { ModeDefinition } from "./types.js";
+import { seigaihaBridge } from "../app/seigaiha-bridge.js";
+import { setCarouselHidden } from "../app/carousel-bridge.js";
 
-type WildTunaModeOptions = {
-  onRandomnessChange?: (randomness: number | null) => void;
-};
-
-
-export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefinition {
+export function createWildTunaMode(): ModeDefinition {
+  const options = { onRandomnessChange: (r: number | null) => seigaihaBridge.setModeRandomness(r) };
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="wild-tuna"]');
   if (!modeEl) {
     return { id: "wild-tuna", title: "Wild Tuna", icon: "WT", preserveState: false, canFullscreen: true };
@@ -35,6 +33,8 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
   const circleHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-circle]");
   const circleLooperHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-circle-looper]");
   const fretboardHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-fretboard]");
+  const fullscreenTrigger = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-fullscreen]");
+  let modeAbort: AbortController | null = null;
   let drumUi: ReturnType<typeof createDrumMachineUi> | null = null;
   let circleUi: ReturnType<typeof createCircleOfFifthsUi> | null = null;
   let circleLooper: ReturnType<typeof createUiCompositeLooper> | null = null;
@@ -101,15 +101,13 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
     canFullscreen: true,
     onEnter: async () => {
       options.onRandomnessChange?.(0.25);
+      modeAbort?.abort();
+      modeAbort = new AbortController();
+      if (fullscreenTrigger) {
+        fullscreenTrigger.addEventListener("click", () => setCarouselHidden(true), { signal: modeAbort.signal });
+      }
       if (!drumHost || !circleHost || !circleLooperHost || !fretboardHost) return;
 
-      const drumTemplate = document
-        .querySelector<HTMLElement>('#mode-screen-drum-machine .drum-mock')
-        ?.cloneNode(true);
-      drumHost.replaceChildren();
-      if (drumTemplate instanceof HTMLElement) {
-        drumHost.appendChild(drumTemplate);
-      }
       const fretboardTemplate = document.querySelector<HTMLTemplateElement>("#fretboard-template");
       fretboardHost.replaceChildren(
         fretboardTemplate ? fretboardTemplate.content.cloneNode(true) : document.createDocumentFragment()
@@ -131,7 +129,8 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
         },
       });
 
-      drumUi = createDrumMachineUi(drumHost, {
+      // createDrumMachineUi generates its own DOM — no cloneNode hack needed.
+      drumUi = createDrumMachineUi({
         onTransportStart: () => {
           circleLooper?.onTransportStart();
           fretboardLooper?.onTransportStart();
@@ -145,6 +144,7 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
           fretboardLooper?.onBeatBoundary(event);
         },
       });
+      drumHost.replaceChildren(drumUi.rootEl);
 
       circleUi = createCircleOfFifthsUi(circleHost, {
         onPrimaryTap: (selection) => {
@@ -214,6 +214,8 @@ export function createWildTunaMode(options: WildTunaModeOptions = {}): ModeDefin
       await drumUi.enter();
     },
     onExit: () => {
+      modeAbort?.abort();
+      modeAbort = null;
       options.onRandomnessChange?.(null);
       guitarPlayer.stopSustain();
       guitarPlayer.stopAll();
