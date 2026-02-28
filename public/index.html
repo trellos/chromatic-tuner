@@ -14,6 +14,9 @@
         <div class="brand">
           <h1 class="hero-title" data-text="TUNA">TUNA</h1>
         </div>
+        <div class="mode-chip-bar">
+          <div class="mode-chip" id="mode-chip"><span>Chromatic Tuner</span></div>
+        </div>
       </header>
 
       <section class="mode-stage">
@@ -24,10 +27,6 @@
           role="tabpanel"
           aria-hidden="false"
         >
-          <div class="mode-header">
-            <div class="mode-title">Chromatic Tuner</div>
-          </div>
-
           <div class="tuner-visual-toggle" role="group" aria-label="Tuner visual mode" data-no-mode-swipe>
             <button type="button" class="is-active" data-tuner-visual="strobe" aria-pressed="true">Strobe</button>
             <button type="button" data-tuner-visual="circle" aria-pressed="false">Circle</button>
@@ -95,10 +94,6 @@
           role="tabpanel"
           aria-hidden="true"
         >
-          <div class="mode-header">
-            <div class="mode-title">Metronome</div>
-          </div>
-
           <div class="metronome-panel">
             <div
               id="tempo-dial"
@@ -160,10 +155,6 @@
           role="tabpanel"
           aria-hidden="true"
         >
-          <div class="mode-header">
-            <div class="mode-title">Fretboard</div>
-          </div>
-
           <div class="fretboard-layout">
             <div class="fretboard-board" aria-label="Guitar fretboard">
               <div class="fretboard-string-labels" aria-hidden="true">
@@ -280,10 +271,6 @@
           role="tabpanel"
           aria-hidden="true"
         >
-          <div class="mode-header">
-            <div class="mode-title">Circle of Fifths</div>
-          </div>
-
           <div class="circle-mode-layout" data-circle-host></div>
         </article>
 
@@ -297,18 +284,15 @@
           <button id="drum-exit" class="drum-exit" type="button" aria-label="Exit fullscreen">
             X
           </button>
-          <div class="mode-header">
-            <div class="mode-title">Drum Machine</div>
-            <button
-              id="carousel-toggle"
-              class="carousel-toggle drum-fullscreen-toggle"
-              type="button"
-              aria-label="Fullscreen"
-              disabled
-            >
-              <span class="fullscreen-icon" aria-hidden="true"></span>
-            </button>
-          </div>
+          <button
+            id="carousel-toggle"
+            class="carousel-toggle drum-fullscreen-toggle"
+            type="button"
+            aria-label="Fullscreen"
+            disabled
+          >
+            <span class="fullscreen-icon" aria-hidden="true"></span>
+          </button>
 
           <div data-drum-host></div>
         </article>

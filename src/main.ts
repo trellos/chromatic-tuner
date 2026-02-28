@@ -146,6 +146,8 @@ async function switchMode(id: ModeId): Promise<void> {
         writeLastModeId(activeModeId);
         carousel?.updateCarouselState();
         carousel?.setActiveScreen(id);
+        const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
+        if (chipSpan && nextMode?.title) chipSpan.textContent = nextMode.title;
         if (!nextMode?.canFullscreen) {
           // setCarouselHidden(false) fires onHiddenChange → syncFullscreenBodyClasses.
           carousel?.setCarouselHidden(false);
@@ -231,6 +233,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   syncDebugPanel?.();
 
   const initialMode = getModeById(activeModeId);
+  const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
+  if (chipSpan && initialMode?.title) chipSpan.textContent = initialMode.title;
   if (initialMode?.onEnter) {
     await initialMode.onEnter();
   }

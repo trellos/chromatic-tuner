@@ -186,7 +186,7 @@ main {
 }
 
 .app {
-  gap: 24px;
+  gap: 0;
 }
 
 .brand {
@@ -200,7 +200,8 @@ main {
   align-items: center;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  padding-bottom: 12px;
   width: 100%;
 }
 
@@ -209,6 +210,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 18px;
   width: 100%;
 }
 
@@ -272,6 +274,7 @@ body.drum-fullscreen .mode-stage {
   --mode-panel-height: 604px;
   display: flex;
   justify-content: center;
+  margin-top: -17px;
   min-height: var(--mode-panel-height);
   overflow: hidden;
   position: relative;
@@ -515,27 +518,47 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 }
 
 .mode-header {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: none;
 }
 
 .mode-title {
+  display: none;
+}
+
+.mode-chip-bar {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.mode-chip {
+  background: rgba(11, 16, 32, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 245, 212, 0.4);
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(0, 245, 212, 0.16), 0 4px 16px rgba(4, 8, 16, 0.55);
+  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  padding: 7px 20px;
+  position: relative;
+  text-transform: uppercase;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.mode-chip span {
   background: linear-gradient(90deg, var(--tuna-pink) 0%, var(--tuna-purple) 50%, var(--tuna-aqua) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: 0.26em;
-  text-align: center;
-  text-rendering: geometricPrecision;
-  text-transform: uppercase;
 }
 
-.mode-screen[data-mode="tuner"] .mode-header {
-  align-items: center;
+body.wild-tuna-fullscreen .mode-chip-bar,
+body.drum-fullscreen .mode-chip-bar {
+  display: none;
 }
 
 
@@ -546,7 +569,7 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 }
 
 h1 {
-  margin: 0 0 36px 0;
+  margin: 0;
   min-height: 34px;
   text-align: center;
 }
@@ -558,42 +581,21 @@ h1 {
   color: transparent;
   display: inline-block;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
-  font-size: 64px;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.26em;
   line-height: 1;
-  padding: 6px 10px 18px;
+  padding: 4px 8px;
   position: relative;
   text-rendering: geometricPrecision;
   text-transform: uppercase;
 }
 
 .hero-title::before {
-  color: #070b16;
-  content: attr(data-text);
-  left: 0;
-  position: absolute;
-  text-shadow:
-    1px 1px #ff6bd6,
-    2px 2px #ff3d81,
-    3px 3px #7c3aed,
-    4px 4px #00f5d4,
-    5px 5px #7df9ff,
-    6px 6px #c7f9ff,
-    7px 7px #e2f9ff;
-  top: 0;
-  z-index: -1;
+  content: none;
 }
 
 .hero-title::after {
-  color: rgba(226, 232, 240, 0.7);
-  content: "===[ T U N A ]===";
-  font-size: 12px;
-  left: 50%;
-  letter-spacing: 0.35em;
-  position: absolute;
-  top: 100%;
-  transform: translate(-50%, 8px);
-  white-space: pre;
+  content: none;
 }
 

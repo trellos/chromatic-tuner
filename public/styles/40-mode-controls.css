@@ -50,14 +50,14 @@
   right: -1px;
 }
 
-.mode-screen[data-mode="drum-machine"] .mode-header {
-  align-items: center;
-  flex-direction: row;
-  justify-content: space-between;
+.mode-screen[data-mode="drum-machine"] > .drum-fullscreen-toggle {
+  position: absolute;
+  right: 14px;
+  top: 14px;
 }
 
-.drum-fullscreen-toggle {
-  align-self: center;
+body.drum-fullscreen .drum-fullscreen-toggle {
+  display: none;
 }
 
 @supports not (height: 1svh) {
