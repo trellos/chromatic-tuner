@@ -488,3 +488,21 @@ export function getKeyTapPlaybackTargets(options: {
     { midi: thirdMidi, stringIndex: stringGroup[2] ?? 2 },
   ];
 }
+
+export function getDiatonicHarmonyMidi(
+  baseMidi: number,
+  stepsAbove: number,
+  keyRootSemitone: number,
+  modeIntervals: readonly number[]
+): number {
+  const basePitchClass = ((baseMidi % 12) - keyRootSemitone + 12) % 12;
+  const degreeIndex = modeIntervals.indexOf(basePitchClass);
+  if (degreeIndex === -1) return baseMidi + stepsAbove;
+  const scaleLen = modeIntervals.length;
+  const targetDegreeRaw = degreeIndex + stepsAbove;
+  const extraOctaves = Math.floor(targetDegreeRaw / scaleLen);
+  const wrappedDegree = ((targetDegreeRaw % scaleLen) + scaleLen) % scaleLen;
+  const semitoneTravel =
+    (modeIntervals[wrappedDegree] ?? 0) - (modeIntervals[degreeIndex] ?? 0) + 12 * extraOctaves;
+  return baseMidi + semitoneTravel;
+}

@@ -64,6 +64,25 @@
 - Inner detail rotation should always follow shortest angular path when primary changes.
 - Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
 
+## Extra Jimmy mode notes
+- Entry point: `src/modes/extra-jimmy.ts`.
+- Harmony calculation logic: `getDiatonicHarmonyMidi()` in `src/fretboard-logic.ts`.
+- Markup: `public/index.html` (mode screen article + carousel dot).
+- Styles: `public/styles/70-extra-jimmy.css`.
+- **Layout**: Three columns arranged horizontally — low fretboard (left, flex 1) | narrow controls (80px, fixed) | high fretboard (right, flex 1).
+- **Fretboards**: Two independent `createFretboardUi` instances, each cloned from the `#fretboard-template`. Both display in "key" mode (not scale/chord).
+- **Shared state**: Both fretboards always show the same key, scale, and harmony interval. Key changes and scale selection affect both boards simultaneously via `syncBoards()`.
+- **Harmony**: When tapping a note on one fretboard, plays both the tapped note and its diatonic harmony partner on the other fretboard. Harmony interval is 1–10 scale degrees (2nd through 11th). Calculation wraps scale degrees and respects octave boundaries.
+- **Tap behavior**: Tapping a note on the low fretboard plays the note + its harmony partner on the high fretboard (below the harmony interval). Tapping the high fretboard reverses the harmony direction (plays the note + its harmony partner below on the low fretboard).
+- **Audio**: Both notes play simultaneously from a single fretboard guitar sample, pitch-shifted to match MIDI values. Uses `fetchFretboardSample()` and Web Audio API.
+- **Controls**:
+  - Harmony select: 9 options (2nd–11th degrees).
+  - Key button: Opens a 3×4 grid popup to select the tonal root (C–B). Button text updates to show selected key.
+  - Scale select: 7 diatonic modes (Major, Minor, Dorian, Mixolydian, Phrygian, Lydian, Locrian).
+  - All controls are in the center column; per-fretboard controls (root note, display mode, annotations) are completely hidden.
+- **Resize handling**: Each fretboard viewport observes its parent container; the layout automatically sizes fretboards to fill available space.
+- **Cleanup**: On mode exit, disconnect resize observers, tear down UI instances, and close audio context.
+
 ## Testing expectations
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
