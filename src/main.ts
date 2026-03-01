@@ -48,6 +48,7 @@ const modeScreens = document.querySelectorAll<HTMLElement>(".mode-screen[data-mo
 const modeChipEl = document.getElementById("mode-chip");
 const modePickerEl = document.getElementById("mode-picker");
 const modePickerItems = document.querySelectorAll<HTMLButtonElement>(".mode-picker-item[data-mode]");
+const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
 
 const LAST_MODE_STORAGE_KEY = "tuna.lastMode";
 
@@ -66,10 +67,9 @@ function openModePicker(): void {
   modePickerEl.removeAttribute("inert");
   modeChipEl.setAttribute("aria-expanded", "true");
   modePickerItems.forEach((item) => {
-    const active = item.dataset.mode === activeModeId;
-    item.classList.toggle("is-active", active);
-    item.setAttribute("aria-selected", String(active));
+    item.classList.toggle("is-active", item.dataset.mode === activeModeId);
   });
+  modePickerItems[0]?.focus();
 }
 
 function closeModePicker(): void {
@@ -174,7 +174,6 @@ async function switchMode(id: ModeId): Promise<void> {
         closeModePicker();
         carousel?.updateCarouselState();
         carousel?.setActiveScreen(id);
-        const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
         if (chipSpan && nextMode?.title) chipSpan.textContent = nextMode.title;
         if (!nextMode?.canFullscreen) {
           // setCarouselHidden(false) fires onHiddenChange → syncFullscreenBodyClasses.
@@ -228,22 +227,36 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Click outside the chip/picker → close picker.
-  document.addEventListener(
-    "click",
-    (event) => {
-      if (!isPickerOpen) return;
-      const target = event.target as Node | null;
-      if (modeChipEl?.contains(target) || modePickerEl?.contains(target)) return;
-      closeModePicker();
-    },
-    { capture: true }
-  );
+  // Uses bubble phase (no capture) so the chip's own click handler fires first,
+  // preventing the open→close→reopen flicker that capture phase would cause.
+  document.addEventListener("click", (event) => {
+    if (!isPickerOpen) return;
+    const target = event.target as Node | null;
+    if (modeChipEl?.contains(target) || modePickerEl?.contains(target)) return;
+    closeModePicker();
+  });
 
-  // Escape key → close picker.
+  // Keyboard: Escape closes picker; arrow keys navigate items.
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && isPickerOpen) {
+    if (!isPickerOpen) return;
+    if (event.key === "Escape") {
       closeModePicker();
       modeChipEl?.focus();
+      return;
+    }
+    const itemsArray = Array.from(modePickerItems);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const currentIndex = itemsArray.findIndex((i) => i === document.activeElement);
+      const dir = event.key === "ArrowDown" ? 1 : -1;
+      const next = itemsArray[(currentIndex + dir + itemsArray.length) % itemsArray.length];
+      next?.focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      itemsArray[0]?.focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      itemsArray[itemsArray.length - 1]?.focus();
     }
   });
 
@@ -301,7 +314,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   syncDebugPanel?.();
 
   const initialMode = getModeById(activeModeId);
-  const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
   if (chipSpan && initialMode?.title) chipSpan.textContent = initialMode.title;
   if (initialMode?.onEnter) {
     await initialMode.onEnter();

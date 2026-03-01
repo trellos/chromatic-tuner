@@ -87,6 +87,7 @@ body {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   padding: 24px;
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   position: relative;
   -webkit-tap-highlight-color: transparent;
@@ -597,6 +598,7 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
   box-shadow: 0 0 18px var(--mode-accent-glow), 0 4px 16px rgba(4, 8, 16, 0.55);
   cursor: pointer;
   display: inline-flex;
+  min-height: 44px;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   font-size: 11px;
   font-weight: 700;
@@ -641,6 +643,7 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
   flex-direction: column;
   gap: 2px;
   left: 50%;
+  max-width: calc(100vw - 32px);
   min-width: 200px;
   opacity: 0;
   padding: 6px;
@@ -658,25 +661,30 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 }
 
 .mode-picker-item {
+  align-items: center;
   appearance: none;
   background: transparent;
   border: none;
   border-radius: 10px;
   color: rgba(226, 232, 240, 0.55);
   cursor: pointer;
+  display: flex;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.18em;
+  min-height: 44px;
   padding: 9px 14px;
   text-align: left;
   text-transform: uppercase;
   transition: background 0.1s ease, color 0.1s ease;
 }
 
-.mode-picker-item:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(226, 232, 240, 0.9);
+@media (hover: hover) {
+  .mode-picker-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(226, 232, 240, 0.9);
+  }
 }
 
 .mode-picker-item.is-active {
