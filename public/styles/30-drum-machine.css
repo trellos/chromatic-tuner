@@ -308,9 +308,6 @@ body.drum-fullscreen .mode-screen[data-mode="drum-machine"] {
   width: 100vw;
 }
 
-body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .mode-header {
-  display: none;
-}
 
 body.drum-fullscreen .drum-mock {
   box-sizing: border-box;
