@@ -20,7 +20,7 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.56.1",
     "@types/audioworklet": "^0.0.94",
     "@types/node": "^25.2.3",
     "chokidar": "^5.0.0",

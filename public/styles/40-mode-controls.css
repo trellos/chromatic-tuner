@@ -72,6 +72,7 @@
   position: absolute;
   right: 14px;
   top: 14px;
+  z-index: 5;
 }
 
 body.drum-fullscreen .drum-fullscreen-toggle {

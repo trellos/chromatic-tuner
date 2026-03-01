@@ -63,6 +63,7 @@ function openModePicker(): void {
   isPickerOpen = true;
   modePickerEl.classList.add("is-open");
   modePickerEl.removeAttribute("aria-hidden");
+  modePickerEl.removeAttribute("inert");
   modeChipEl.setAttribute("aria-expanded", "true");
   modePickerItems.forEach((item) => {
     const active = item.dataset.mode === activeModeId;
@@ -76,6 +77,7 @@ function closeModePicker(): void {
   isPickerOpen = false;
   modePickerEl.classList.remove("is-open");
   modePickerEl.setAttribute("aria-hidden", "true");
+  modePickerEl.setAttribute("inert", "");
   modeChipEl.setAttribute("aria-expanded", "false");
 }
 
@@ -264,6 +266,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     onSwitchRequest: (id) => void switchMode(id),
     // Own all mode-specific fullscreen body-class policy here, not in carousel.ts.
     onHiddenChange: (hidden) => {
+      if (hidden) closeModePicker();
       syncFullscreenBodyClasses(hidden);
       if (hidden && activeModeId === "wild-tuna") {
         triggerWildTunaJumpAnimation();

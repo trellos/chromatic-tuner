@@ -15,11 +15,11 @@
           <h1 class="hero-title" data-text="TUNA">TUNA</h1>
         </div>
         <div class="mode-chip-bar">
-          <button class="mode-chip" id="mode-chip" type="button" aria-expanded="false" aria-haspopup="listbox">
+          <button class="mode-chip" id="mode-chip" type="button" aria-expanded="false" aria-haspopup="listbox" aria-controls="mode-picker">
             <span>Chromatic Tuner</span>
             <span class="mode-chip-caret" aria-hidden="true">▾</span>
           </button>
-          <div class="mode-picker" id="mode-picker" role="listbox" aria-label="Switch mode" aria-hidden="true">
+          <div class="mode-picker" id="mode-picker" role="listbox" aria-label="Switch mode" aria-hidden="true" inert>
             <button class="mode-picker-item is-active" role="option" aria-selected="true" data-mode="tuner" type="button">Chromatic Tuner</button>
             <button class="mode-picker-item" role="option" aria-selected="false" data-mode="metronome" type="button">Metronome</button>
             <button class="mode-picker-item" role="option" aria-selected="false" data-mode="fretboard" type="button">Fretboard</button>
