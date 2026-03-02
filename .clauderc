@@ -1,0 +1,45 @@
+## Code quality and maintainability (non-negotiable)
+- Keep code human readable.
+- Comments:
+  - Comment rationale, invariants, and non-obvious constraints (serialization details, layout methods, performance/UX tradeoffs, edge cases).
+  - Do not narrate obvious code or restate types.
+  - Keep comments accurate when code changes; update or remove stale comments immediately.
+- Prune deprecated code/comments/files:
+  - Remove dead or superseded code and docs when features change.
+  - Before deleting: gather evidence (search for references; consider dynamic imports/config hooks) and ensure typecheck/tests pass.
+  - If uncertain, do not delete; leave a short TODO with evidence and risk.
+
+## Testing philosophy
+- Prefer testing in a harness outside production code. Runtime functions should not be aware they are being tested.
+- Do not add “test mode” branches or environment-conditionals inside runtime modules (e.g., process.env.TEST, isTest flags).
+  - Use dependency injection/adapters at module boundaries, or Playwright mocks/routes where appropriate.
+
+## TypeScript / Node / Playwright definition of done
+- Changes are not complete until:
+  - Type safety is maintained: run `npm run typecheck`.
+  - Playwright tests pass: `npm run test:e2e`.
+- If UI/visual behavior changes:
+  - Add/adjust Playwright coverage to exercise at least one mobile and one desktop viewport/project (or equivalent emulation).
+  - Prefer deterministic assertions (visibility/text/layout/CSS) over brittle pixel-perfect snapshots.
+  - Use screenshot tests only when stable; reduce flake (disable animations, avoid timing-based waits).
+
+## Workflow behavior
+- Make all required edits across all impacted files in one cohesive change. Avoid partial fixes.
+- When behavior is wrong, diagnose first: identify the failure mode, add a minimal repro or test, then fix.
+- Keep AGENTS.md up to date when workflow/commands/architecture change (install/dev/build/test, structure, pitfalls). Keep it concise and actionable.
+
+## Collaboration + out-of-band feedback (lightly theatrical, not fluffy)
+- If the user provides a reusable, high-leverage hint (a principle, constraint, naming convention, “core spirit,” or a testable definition of correctness), acknowledge it briefly and clearly. Thank the user for this, so he understands this is keeping the code base maintainable.
+  - Small hint: 1 short sentence.
+  - Strong design direction: 1–2 sentences stating what it clarified.
+  - High-leverage intent (“this is the point of the feature”): 2 sentences max stating how it will be encoded (tests/docs/comments).
+- Keep the vibe: a touch of theatricality is welcome (e.g., “Nice—this locks the intent in place”), but avoid excessive praise or filler.
+
+## Tradeoffs and pushback
+- If the user requests something that has meaningful tradeoffs or a high penalty for literal interpretation, call it out.
+  - Explain the cost succinctly and propose better alternatives.
+  - Proceed with the best maintainable default unless the user explicitly insists otherwise.
+
+## Response hygiene
+- Be concise. Prefer bullet points over long prose.
+- When making a non-trivial change, include a brief checklist of what was updated and what commands/tests were run or should be run.
