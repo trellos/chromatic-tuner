@@ -45,6 +45,10 @@ const carouselShowEl = document.getElementById("carousel-show");
 const modeDots = document.querySelectorAll<HTMLButtonElement>(".mode-dot[data-mode]");
 const modeStageEl = document.querySelector<HTMLElement>(".mode-stage");
 const modeScreens = document.querySelectorAll<HTMLElement>(".mode-screen[data-mode]");
+const modeChipEl = document.getElementById("mode-chip");
+const modePickerEl = document.getElementById("mode-picker");
+const modePickerItems = document.querySelectorAll<HTMLButtonElement>(".mode-picker-item[data-mode]");
+const chipSpan = document.querySelector<HTMLElement>("#mode-chip span");
 
 const LAST_MODE_STORAGE_KEY = "tuna.lastMode";
 
@@ -53,6 +57,29 @@ let isSwitching = false;
 let syncDebugPanel: (() => void) | null = null;
 let carousel: CarouselController | null = null;
 let enterFullscreenAbort: AbortController | null = null;
+let isPickerOpen = false;
+
+function openModePicker(): void {
+  if (!modePickerEl || !modeChipEl) return;
+  isPickerOpen = true;
+  modePickerEl.classList.add("is-open");
+  modePickerEl.removeAttribute("aria-hidden");
+  modePickerEl.removeAttribute("inert");
+  modeChipEl.setAttribute("aria-expanded", "true");
+  modePickerItems.forEach((item) => {
+    item.classList.toggle("is-active", item.dataset.mode === activeModeId);
+  });
+  modePickerItems[0]?.focus();
+}
+
+function closeModePicker(): void {
+  if (!modePickerEl || !modeChipEl) return;
+  isPickerOpen = false;
+  modePickerEl.classList.remove("is-open");
+  modePickerEl.setAttribute("aria-hidden", "true");
+  modePickerEl.setAttribute("inert", "");
+  modeChipEl.setAttribute("aria-expanded", "false");
+}
 
 // Keeps drum-fullscreen / wild-tuna-fullscreen body classes in sync whenever
 // either the carousel-hidden state or the active mode changes.
@@ -144,8 +171,10 @@ async function switchMode(id: ModeId): Promise<void> {
       applyUiState: () => {
         activeModeId = id;
         writeLastModeId(activeModeId);
+        closeModePicker();
         carousel?.updateCarouselState();
         carousel?.setActiveScreen(id);
+        if (chipSpan && nextMode?.title) chipSpan.textContent = nextMode.title;
         if (!nextMode?.canFullscreen) {
           // setCarouselHidden(false) fires onHiddenChange → syncFullscreenBodyClasses.
           carousel?.setCarouselHidden(false);
@@ -178,6 +207,59 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (target.closest<HTMLButtonElement>("button")) pulseSeigaihaRandomness();
   });
 
+  // Mode chip → toggle picker open/closed.
+  modeChipEl?.addEventListener("click", () => {
+    if (isPickerOpen) {
+      closeModePicker();
+    } else {
+      openModePicker();
+    }
+  });
+
+  // Picker item click → switch mode + close picker.
+  modePickerItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const modeId = item.dataset.mode as ModeId | undefined;
+      if (!modeId) return;
+      closeModePicker();
+      void switchMode(modeId);
+    });
+  });
+
+  // Click outside the chip/picker → close picker.
+  // Uses bubble phase (no capture) so the chip's own click handler fires first,
+  // preventing the open→close→reopen flicker that capture phase would cause.
+  document.addEventListener("click", (event) => {
+    if (!isPickerOpen) return;
+    const target = event.target as Node | null;
+    if (modeChipEl?.contains(target) || modePickerEl?.contains(target)) return;
+    closeModePicker();
+  });
+
+  // Keyboard: Escape closes picker; arrow keys navigate items.
+  document.addEventListener("keydown", (event) => {
+    if (!isPickerOpen) return;
+    if (event.key === "Escape") {
+      closeModePicker();
+      modeChipEl?.focus();
+      return;
+    }
+    const itemsArray = Array.from(modePickerItems);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const currentIndex = itemsArray.findIndex((i) => i === document.activeElement);
+      const dir = event.key === "ArrowDown" ? 1 : -1;
+      const next = itemsArray[(currentIndex + dir + itemsArray.length) % itemsArray.length];
+      next?.focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      itemsArray[0]?.focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      itemsArray[itemsArray.length - 1]?.focus();
+    }
+  });
+
   // Wire the debug panel — it needs callbacks to read/write debug-params.
   syncDebugPanel = bindSeigaihaDebugControl({
     getActiveModeId: () => activeModeId,
@@ -197,6 +279,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     onSwitchRequest: (id) => void switchMode(id),
     // Own all mode-specific fullscreen body-class policy here, not in carousel.ts.
     onHiddenChange: (hidden) => {
+      if (hidden) closeModePicker();
       syncFullscreenBodyClasses(hidden);
       if (hidden && activeModeId === "wild-tuna") {
         triggerWildTunaJumpAnimation();
@@ -231,6 +314,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   syncDebugPanel?.();
 
   const initialMode = getModeById(activeModeId);
+  if (chipSpan && initialMode?.title) chipSpan.textContent = initialMode.title;
   if (initialMode?.onEnter) {
     await initialMode.onEnter();
   }

@@ -41,6 +41,7 @@ export function bindModeSwipe(opts: SwipeGestureOptions): void {
 
   let swipeStartX = 0;
   let swipeStartY = 0;
+  let swipeStartTime = 0;
   let swipeDx = 0;
   let swipeDirection: 1 | -1 | null = null;
   let swipeActiveScreen: HTMLElement | null = null;
@@ -56,6 +57,7 @@ export function bindModeSwipe(opts: SwipeGestureOptions): void {
   function clearSwipeState(): void {
     swipeStartX = 0;
     swipeStartY = 0;
+    swipeStartTime = 0;
     swipeDx = 0;
     swipeDirection = null;
     swipeTargetMode = null;
@@ -140,6 +142,8 @@ export function bindModeSwipe(opts: SwipeGestureOptions): void {
     "touchstart",
     (event) => {
       suppressSwipeUntilTouchEnd = false;
+      // drum-fullscreen blocks all swipes. wild-tuna-fullscreen intentionally
+      // allows swipes — the carousel-hidden state handles mode-switch gating there.
       if (document.body.classList.contains("drum-fullscreen") || opts.getIsSwitching()) {
         clearSwipeState();
         return;
@@ -153,6 +157,7 @@ export function bindModeSwipe(opts: SwipeGestureOptions): void {
       if (!touch) return;
       swipeStartX = touch.clientX;
       swipeStartY = touch.clientY;
+      swipeStartTime = Date.now();
       swipeDx = 0;
       swipeDirection = null;
       swipeTargetMode = null;
@@ -230,7 +235,10 @@ export function bindModeSwipe(opts: SwipeGestureOptions): void {
       }
 
       const width = modeStageEl.getBoundingClientRect().width;
-      const shouldCommit = Math.abs(swipeDx) > width * 0.22;
+      const deltaTime = Date.now() - swipeStartTime;
+      const velocity = deltaTime > 0 ? Math.abs(swipeDx) / deltaTime : Infinity;
+      // Commit if the drag covered >22% of width OR was a fast flick (≥0.3 px/ms = 300 px/s).
+      const shouldCommit = Math.abs(swipeDx) > width * 0.22 || velocity >= 0.3;
       await animateSwipe(shouldCommit);
       const nextMode = shouldCommit ? swipeTargetMode : null;
       clearSwipeState();

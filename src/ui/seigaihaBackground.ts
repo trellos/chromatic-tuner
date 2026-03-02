@@ -460,9 +460,9 @@ function getOrCreateCachedPattern(randomness: number): CachedPattern {
 
   const { svg, tileWidth, tileHeight } = generateTraditionalSeigaihaSvg({
     radius: 40,
-    paperColor: "#315ecf",
-    inkColor: "#264eb9",
-    accentInkColor: "#7c3aed",
+    paperColor: "#1a2e58",
+    inkColor: "#0d1a3a",
+    accentInkColor: "#2a4278",
     randomness: key,
     seed: seigaihaState.seed,
   });

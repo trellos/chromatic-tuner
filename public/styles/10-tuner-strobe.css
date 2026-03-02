@@ -117,7 +117,7 @@
 }
 
 #note {
-  color: #0f172a;
+  color: rgba(228, 240, 255, 0.95);
   font-size: 48px;
   font-weight: 700;
   letter-spacing: -1px;
@@ -127,7 +127,7 @@
 }
 
 #cents {
-  color: rgba(15, 23, 42, 0.6);
+  color: rgba(175, 205, 245, 0.6);
   font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 20px;
   font-weight: 500;
@@ -139,9 +139,9 @@
 
 #status {
   align-items: center;
-  background-color: rgba(248, 250, 252, 0.7);
+  background-color: rgba(3, 8, 24, 0.55);
   border-radius: 6px;
-  color: rgba(15, 23, 42, 0.6);
+  color: rgba(175, 205, 245, 0.7);
   display: flex;
   font-size: 14px;
   justify-content: center;
