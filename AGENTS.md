@@ -40,7 +40,7 @@
 - The note grid keeps a tall `Clear` button aligned to the right of both rows.
 - Candidate rows should stay compact: key label + scale notes (no confidence progress bar).
 - In candidate scale note text, selected notes are visually emphasized; non-diatonic notes appear inline in parentheses as `non-diatonic`.
-- Candidate cards use a seigaiha-style colorful background; randomness increases as confidence drops (`100% => 0`, `66% => 0.3`) and must affect texture/noise only (no card tilt/rotation).
+- Candidate cards use a seigaiha-style colorful background; randomness increases as confidence drops (`100% => 0`, `66% => 0.3`) and must affect texture/noise only (no card tilt/rotation), with visible seigaiha arcs filling the card interior.
 - Tapping a candidate row updates a separate one-line hint listing related modal interpretations (the row itself should not expand).
 
 ## Circle of Fifths notes
