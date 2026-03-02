@@ -59,12 +59,19 @@ function randomnessFromConfidence(confidence: number): number {
   return Math.min(1, 0.3 + ((66 - confidence) / 66) * 0.7);
 }
 
-function applyCardPattern(card: HTMLElement, confidence: number): void {
-  const randomness = randomnessFromConfidence(confidence);
+function applyCardPattern(card: HTMLElement, candidate: KeyFinderCandidate): void {
+  const randomness = randomnessFromConfidence(candidate.confidence);
+  const outlierSeverity = Math.min(1, candidate.outliers.length / 3);
+
+  // Confidence keeps the original smooth gradient, while explicit non-diatonic
+  // count guarantees a visible visual jump from 0 to 3 outliers.
+  const visualIntensity = Math.max(randomness, outlierSeverity);
+
   card.style.setProperty("--kf-randomness", randomness.toFixed(3));
-  card.style.setProperty("--kf-noise-offset", `${Math.round(randomness * 24)}px`);
-  card.style.setProperty("--kf-desat", `${Math.round(randomness * 0.85 * 100)}%`);
-  card.style.setProperty("--kf-lift", `${Math.round(randomness * 4)}%`);
+  card.style.setProperty("--kf-intensity", visualIntensity.toFixed(3));
+  card.style.setProperty("--kf-noise-offset", `${Math.round(visualIntensity * 38)}px`);
+  card.style.setProperty("--kf-desat", `${Math.round(visualIntensity * 100)}%`);
+  card.style.setProperty("--kf-lift", `${Math.round(visualIntensity * 8)}%`);
 }
 
 export function createKeyFinderMode(): ModeDefinition {
@@ -126,7 +133,7 @@ export function createKeyFinderMode(): ModeDefinition {
         row.className = "key-finder-result";
         row.setAttribute("role", "button");
         row.tabIndex = 0;
-        applyCardPattern(row, candidate.confidence);
+        applyCardPattern(row, candidate);
 
         const header = document.createElement("header");
         header.className = "key-finder-result-header";

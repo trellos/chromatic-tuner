@@ -24,6 +24,32 @@ test.describe('key finder mode', () => {
     await expect(panel.locator('[data-key-finder-mode-hints]')).toBeHidden();
   });
 
+
+  test('increases card intensity clearly when three non-diatonic notes are present', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#mode-chip').click();
+    await page.getByRole('menuitem', { name: 'Key Finder' }).click();
+
+    const panel = page.locator('.mode-screen[data-mode="key-finder"]');
+
+    for (const pitchClass of [0, 2, 4, 5, 7, 9, 11]) {
+      await panel.locator(`.key-finder-note-btn[data-pitch-class="${pitchClass}"]`).click();
+    }
+
+    const cCard = panel
+      .locator('.key-finder-result', { has: panel.locator('.key-finder-result-header h4', { hasText: /^C$/ }) })
+      .first();
+
+    await expect(cCard).toBeVisible();
+    await expect(cCard).toHaveCSS('--kf-intensity', '0.000');
+
+    for (const pitchClass of [1, 3, 6]) {
+      await panel.locator(`.key-finder-note-btn[data-pitch-class="${pitchClass}"]`).click();
+    }
+
+    await expect(cCard).toHaveCSS('--kf-intensity', '1.000');
+  });
+
   test('shows non-diatonic notes inline in parentheses and updates mode hints on row click', async ({ page }) => {
     await page.goto('/');
     await page.locator('#mode-chip').click();
