@@ -1,6 +1,7 @@
 const SHARP_LABELS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
 const FLAT_LABELS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"] as const;
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11] as const;
+const MODE_NAMES = ["Ionian", "Dorian", "Phrygian", "Lydian", "Mixolydian", "Aeolian", "Locrian"] as const;
 
 export type NotationPreference = "sharp" | "flat";
 
@@ -40,6 +41,13 @@ function sortedUnique(input: number[]): number[] {
 
 function buildMajorScale(tonic: number): number[] {
   return MAJOR_SCALE_INTERVALS.map((interval) => wrapPitchClass(tonic + interval));
+}
+
+export function buildModeHintsForTonic(tonic: number, notation: NotationPreference): string[] {
+  const scale = buildMajorScale(tonic);
+  return scale
+    .slice(1)
+    .map((pitchClass, index) => `${pitchClassLabel(pitchClass, notation)} ${MODE_NAMES[index + 1]}`);
 }
 
 export function rankKeyFinderCandidates(

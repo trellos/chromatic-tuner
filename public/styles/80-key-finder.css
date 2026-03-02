@@ -43,7 +43,8 @@
   padding: 0 1rem;
 }
 
-.key-finder-empty {
+.key-finder-empty,
+.key-finder-mode-hints {
   color: rgb(181 192 225);
   margin: 0;
 }
@@ -54,12 +55,33 @@
 }
 
 .key-finder-result {
-  background: rgb(10 14 24 / 88%);
-  border: 1px solid rgb(88 103 144 / 60%);
+  --kf-randomness: 0;
+  --kf-rot: 0deg;
+  --kf-band: 22px;
+  --kf-hue: 220deg;
+  background:
+    radial-gradient(circle at 12% 112%, hsl(calc(var(--kf-hue) + 24deg) 90% 60% / 0.8) 0, transparent calc(var(--kf-band) * 1.05)),
+    radial-gradient(circle at 28% 112%, hsl(calc(var(--kf-hue) - 34deg) 85% 58% / 0.72) 0, transparent calc(var(--kf-band) * 1.06)),
+    radial-gradient(circle at 44% 112%, hsl(calc(var(--kf-hue) + 92deg) 88% 63% / 0.76) 0, transparent calc(var(--kf-band) * 1.07)),
+    linear-gradient(135deg, rgb(16 18 36 / 95%), rgb(23 20 44 / 92%));
+  background-size: calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%));
+  background-position: center;
+  border: 1px solid rgb(120 130 178 / 72%);
   border-radius: 0.75rem;
+  box-shadow: 0 10px 24px rgb(7 8 14 / 35%);
+  cursor: pointer;
   display: grid;
   gap: 0.25rem;
+  outline: none;
   padding: 0.5rem 0.65rem;
+  transform: rotate(var(--kf-rot));
+  transition: transform 160ms ease;
+}
+
+.key-finder-result:hover,
+.key-finder-result:focus-visible {
+  border-color: rgb(170 195 255 / 95%);
+  transform: rotate(var(--kf-rot)) translateY(-1px);
 }
 
 .key-finder-result-header {
@@ -75,21 +97,30 @@
 }
 
 .key-finder-result-header h4 {
-  font-size: 0.95rem;
+  color: rgb(244 249 255);
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  text-shadow:
+    -1px -1px 0 rgb(8 10 18 / 80%),
+    1px -1px 0 rgb(8 10 18 / 80%),
+    -1px 1px 0 rgb(8 10 18 / 80%),
+    1px 1px 0 rgb(8 10 18 / 80%);
 }
 
 .key-finder-result-notes {
-  color: rgb(181 192 225);
+  color: rgb(219 232 252);
   font-size: 0.88rem;
+  text-shadow: 0 1px 0 rgb(8 11 20 / 70%);
 }
 
 .key-finder-token.is-selected {
-  color: rgb(236 247 255);
+  color: rgb(255 255 255);
   font-weight: 700;
 }
 
 .key-finder-outliers-inline {
-  color: rgb(255 169 169 / 90%);
+  color: rgb(255 201 201 / 98%);
+  font-weight: 600;
 }
 
 @media (max-width: 820px) {
@@ -103,5 +134,14 @@
 
   .key-finder-clear {
     min-height: 2.2rem;
+  }
+
+  .key-finder-result {
+    transform: none;
+  }
+
+  .key-finder-result:hover,
+  .key-finder-result:focus-visible {
+    transform: translateY(-1px);
   }
 }

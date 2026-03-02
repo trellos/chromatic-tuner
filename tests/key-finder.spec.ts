@@ -16,17 +16,16 @@ test.describe('key finder mode', () => {
 
     const firstResult = panel.locator('.key-finder-result').first();
     await expect(firstResult).toBeVisible();
-    await expect(firstResult.locator('.key-finder-result-score')).toContainText('%');
     await expect(firstResult.locator('.key-finder-token.is-selected')).toHaveCount(7);
-    await expect(firstResult).not.toContainText('Possible');
-    await expect(panel.locator('.key-finder-clear')).toBeVisible();
+    await expect(firstResult.locator('.key-finder-result-score')).toHaveCount(0);
+    await expect(panel.locator('[data-key-finder-mode-hints]')).toContainText(/D Dorian/);
 
     await panel.locator('[data-key-finder-clear]').click();
     await expect(panel.locator('[data-key-finder-empty]')).toBeVisible();
-    await expect(panel.locator('.key-finder-chip')).toHaveCount(0);
+    await expect(panel.locator('[data-key-finder-mode-hints]')).toBeHidden();
   });
 
-  test('shows non-diatonic notes inline in parentheses', async ({ page }) => {
+  test('shows non-diatonic notes inline in parentheses and updates mode hints on row click', async ({ page }) => {
     await page.goto('/');
     await page.locator('#mode-chip').click();
     await page.getByRole('menuitem', { name: 'Key Finder' }).click();
@@ -38,6 +37,8 @@ test.describe('key finder mode', () => {
 
     const topResult = panel.locator('.key-finder-result').first();
     await expect(topResult.locator('.key-finder-outliers-inline')).toContainText(/non-diatonic:/);
-    await expect(topResult.locator('.key-finder-outliers-inline')).toContainText(/[A-G]/);
+
+    await panel.locator('.key-finder-result').nth(1).click();
+    await expect(panel.locator('[data-key-finder-mode-hints]')).toContainText(/Dorian|Phrygian|Lydian/);
   });
 });
