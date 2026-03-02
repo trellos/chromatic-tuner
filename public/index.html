@@ -285,26 +285,15 @@
           aria-hidden="true"
         >
           <section class="key-finder-layout">
-            <header class="key-finder-toolbar" data-no-mode-swipe>
-              <div class="key-finder-segment">
-                <button type="button" data-key-finder-input="notes" aria-pressed="true" class="is-active">Notes</button>
-                <button type="button" data-key-finder-input="fretboard" aria-pressed="false">Fretboard</button>
-              </div>
-              <div class="key-finder-segment">
-                <button type="button" data-key-finder-notation="sharp" aria-pressed="true" class="is-active">♯</button>
-                <button type="button" data-key-finder-notation="flat" aria-pressed="false">♭</button>
-              </div>
+            <div class="key-finder-input-row" data-no-mode-swipe>
+              <div class="key-finder-input key-finder-input--notes" data-key-finder-notes></div>
               <button type="button" class="key-finder-clear" data-key-finder-clear>Clear</button>
-            </header>
+            </div>
 
             <div class="key-finder-selected" data-key-finder-selected>No notes selected</div>
-            <div class="key-finder-input key-finder-input--notes" data-key-finder-notes></div>
-            <div class="key-finder-input key-finder-input--fretboard" data-key-finder-fretboard hidden></div>
-
             <p class="key-finder-status" data-key-finder-status></p>
             <p class="key-finder-empty" data-key-finder-empty>Select notes to begin.</p>
             <section class="key-finder-results" data-key-finder-results aria-live="polite"></section>
-            <section class="key-finder-circle" data-key-finder-circle></section>
           </section>
         </article>
 

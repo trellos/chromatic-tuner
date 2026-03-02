@@ -11,7 +11,6 @@ const MODE_INTERVALS = {
 } as const;
 
 export type NotationPreference = "sharp" | "flat";
-
 export type ModeName = keyof typeof MODE_INTERVALS;
 
 export type KeyFinderCandidate = {
@@ -20,12 +19,9 @@ export type KeyFinderCandidate = {
   mode: ModeName;
   label: string;
   confidence: number;
-  confidenceLabel: "Strong match" | "Possible" | "Loose fit";
-  coverageRatio: number;
   matched: number[];
   outliers: number[];
   scale: number[];
-  emphasizedScaleText: string;
 };
 
 export type KeyFinderRankedResult = {
@@ -50,12 +46,6 @@ function pitchClassLabel(pitchClass: number, notation: NotationPreference): stri
 
 function sortedUnique(input: number[]): number[] {
   return [...new Set(input.map(wrapPitchClass))].sort((a, b) => a - b);
-}
-
-function scoreLabel(value: number): "Strong match" | "Possible" | "Loose fit" {
-  if (value >= 80) return "Strong match";
-  if (value >= 55) return "Possible";
-  return "Loose fit";
 }
 
 function buildScale(tonic: number, mode: ModeName): number[] {
@@ -108,25 +98,15 @@ export function rankKeyFinderCandidates(
       const penalty = outliers.length / selected.length;
       const confidence = Math.max(0, Math.min(100, Math.round((coverage * 100) - (penalty * outlierPenalty))));
       const tonicLabel = pitchClassLabel(tonic, notation);
-      const emphasizedScaleText = scale
-        .map((pc, idx) => {
-          const label = pitchClassLabel(pc, notation);
-          return idx === 0 ? `*${label}*` : label;
-        })
-        .join(" ");
-
       candidates.push({
         id: `${tonic}-${mode}`,
         tonic,
         mode,
         label: `${tonicLabel} ${tonicDisplay(mode)} (${modeDisplay(mode)})`,
         confidence,
-        confidenceLabel: scoreLabel(confidence),
-        coverageRatio: coverage,
         matched,
         outliers,
         scale,
-        emphasizedScaleText,
       });
     });
   }
@@ -144,10 +124,6 @@ export function rankKeyFinderCandidates(
     isAmbiguous: top > 0 && Math.abs(top - second) <= 5,
     lowData: selected.length < 3,
   };
-}
-
-export function formatPitchClassList(values: number[], notation: NotationPreference): string {
-  return values.map((pc) => pitchClassLabel(pc, notation)).join(" ");
 }
 
 export function normalizePitchClassSet(values: number[]): number[] {

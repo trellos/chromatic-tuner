@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('key finder mode', () => {
-  test('ranks key candidates from selected notes and supports clear', async ({ page }) => {
+  test('ranks key candidates, highlights selected notes in scale, and supports clear', async ({ page }) => {
     await page.goto('/');
     await page.locator('.mode-dot[data-mode="key-finder"]').click();
 
@@ -16,28 +16,26 @@ test.describe('key finder mode', () => {
     const firstResult = panel.locator('.key-finder-result').first();
     await expect(firstResult).toBeVisible();
     await expect(firstResult.locator('.key-finder-result-score')).toContainText('%');
-    await expect(firstResult).toContainText(/(C Major|A Minor|Ionian|Aeolian)/);
+    await expect(firstResult.locator('.key-finder-token.is-selected')).toHaveCount(7);
+    await expect(firstResult).not.toContainText('Possible');
+    await expect(panel.locator('.key-finder-clear')).toBeVisible();
 
     await panel.locator('[data-key-finder-clear]').click();
     await expect(panel.locator('[data-key-finder-empty]')).toBeVisible();
     await expect(panel.locator('.key-finder-chip')).toHaveCount(0);
   });
 
-  test('supports fretboard input tab and visible preview button', async ({ page }) => {
+  test('shows non-diatonic notes inline in parentheses', async ({ page }) => {
     await page.goto('/');
     await page.locator('.mode-dot[data-mode="key-finder"]').click();
 
     const panel = page.locator('.mode-screen[data-mode="key-finder"]');
-    await panel.locator('[data-key-finder-input="fretboard"]').click();
+    for (const note of ['C', 'D', 'E', 'F#']) {
+      await panel.locator('.key-finder-note-btn', { hasText: new RegExp(`^${note}$`) }).click();
+    }
 
-    const fretButtons = panel.locator('.key-finder-fret-btn');
-    await expect(fretButtons.first()).toBeVisible();
-    await fretButtons.nth(0).click();
-    await fretButtons.nth(2).click();
-    await fretButtons.nth(4).click();
-
-    const firstResult = panel.locator('.key-finder-result').first();
-    await expect(firstResult).toBeVisible();
-    await expect(firstResult.locator('.key-finder-preview-btn')).toBeVisible();
+    const topResult = panel.locator('.key-finder-result').first();
+    await expect(topResult.locator('.key-finder-outliers-inline')).toContainText(/non-diatonic:/);
+    await expect(topResult.locator('.key-finder-outliers-inline')).toContainText(/[A-G]/);
   });
 });
