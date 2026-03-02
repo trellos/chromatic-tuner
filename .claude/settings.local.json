@@ -6,8 +6,13 @@
       "Bash(npm run:*)",
       "Bash(npx playwright:*)",
       "Bash(gh pr:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npm ls:*)"
+      "Bash(grep -n \"@media\\\\|max-width\\\\|min-width\\\\|orientation\\\\|prefers-reduced-motion\\\\|prefers-color-scheme\" public/styles/*.css)",
+      "Bash(git checkout claude/redesign-card-layout-3b9Vd)",
+      "Bash(git checkout -b fix/review-corrections)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(git add public/index.html public/styles/00-foundation.css src/main.ts src/ui/swipe-gesture.ts)",
+      "Bash(git commit:*)",
+      "Bash(git push -u origin fix/review-corrections)"
     ]
   }
 }
