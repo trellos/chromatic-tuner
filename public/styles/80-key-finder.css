@@ -60,11 +60,11 @@
   --kf-hue: 220deg;
   --kf-noise-offset: 0px;
   background:
-    radial-gradient(circle at 12% 112%, hsl(calc(var(--kf-hue) + 24deg) 90% 60% / 0.8) 0, transparent calc(var(--kf-band) * 1.05)),
-    radial-gradient(circle at 28% 112%, hsl(calc(var(--kf-hue) - 34deg) 85% 58% / 0.72) 0, transparent calc(var(--kf-band) * 1.06)),
-    radial-gradient(circle at 44% 112%, hsl(calc(var(--kf-hue) + 92deg) 88% 63% / 0.76) 0, transparent calc(var(--kf-band) * 1.07)),
-    repeating-radial-gradient(circle at 24px 120%, rgb(88 134 255 / 30%) 0 5px, transparent 5px 15px),
-    repeating-radial-gradient(circle at 60px 120%, rgb(88 134 255 / 24%) 0 5px, transparent 5px 15px),
+    radial-gradient(circle at 12% 112%, hsl(calc(var(--kf-hue) + 24deg) 90% 60% / 0.3) 0, transparent calc(var(--kf-band) * 1.05)),
+    radial-gradient(circle at 28% 112%, hsl(calc(var(--kf-hue) - 34deg) 85% 58% / 0.24) 0, transparent calc(var(--kf-band) * 1.06)),
+    radial-gradient(circle at 44% 112%, hsl(calc(var(--kf-hue) + 92deg) 88% 63% / 0.28) 0, transparent calc(var(--kf-band) * 1.07)),
+    repeating-radial-gradient(circle at 28px 118%, rgb(104 155 255 / 56%) 0 3px, transparent 3px 16px),
+    repeating-radial-gradient(circle at 64px 118%, rgb(78 124 232 / 42%) 0 3px, transparent 3px 16px),
     linear-gradient(135deg, rgb(16 18 36 / 95%), rgb(23 20 44 / 92%));
   background-position:
     calc(50% + var(--kf-noise-offset)) calc(50% - (var(--kf-noise-offset) * 0.5)),
@@ -77,8 +77,8 @@
     calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%)),
     calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%)),
     calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%)),
-    calc(120px + (var(--kf-randomness) * 90px)) calc(64px + (var(--kf-randomness) * 44px)),
-    calc(120px + (var(--kf-randomness) * 90px)) calc(64px + (var(--kf-randomness) * 44px)),
+    calc(108px + (var(--kf-randomness) * 52px)) calc(56px + (var(--kf-randomness) * 24px)),
+    calc(108px + (var(--kf-randomness) * 52px)) calc(56px + (var(--kf-randomness) * 24px)),
     100% 100%;
   border: 1px solid rgb(120 130 178 / 72%);
   border-radius: 0.75rem;
