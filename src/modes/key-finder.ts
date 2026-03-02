@@ -2,29 +2,35 @@ import {
   buildModeHintsForTonic,
   normalizePitchClassSet,
   rankKeyFinderCandidates,
+  chromaticLabelForKey,
   type KeyFinderCandidate,
   type NotationPreference,
 } from "./key-finder-logic.js";
 import type { ModeDefinition } from "./types.js";
 
-const NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTE_BUTTON_LABELS = [
+  "C",
+  "C#/Db",
+  "D",
+  "D#/Eb",
+  "E",
+  "F",
+  "F#/Gb",
+  "G",
+  "G#/Ab",
+  "A",
+  "A#/Bb",
+  "B",
+] as const;
 const DISPLAY_LIMIT = 6;
 
-function noteLabel(pitchClass: number, notation: NotationPreference): string {
-  return (notation === "sharp" ? NOTE_NAMES_SHARP : NOTE_NAMES_SHARP)[pitchClass] ?? "C";
-}
-
-function buildScaleTokens(
-  candidate: KeyFinderCandidate,
-  selected: Set<number>,
-  notation: NotationPreference
-): DocumentFragment {
+function buildScaleTokens(candidate: KeyFinderCandidate, selected: Set<number>): DocumentFragment {
   const fragment = document.createDocumentFragment();
   candidate.scale.forEach((pitchClass, index) => {
     const token = document.createElement("span");
     token.className = "key-finder-token";
     if (selected.has(pitchClass)) token.classList.add("is-selected");
-    token.textContent = noteLabel(pitchClass, notation);
+    token.textContent = candidate.scaleLabels[index] ?? chromaticLabelForKey(pitchClass, candidate);
     fragment.appendChild(token);
     if (index < candidate.scale.length - 1) fragment.appendChild(document.createTextNode(" "));
   });
@@ -34,7 +40,7 @@ function buildScaleTokens(
     const outlierText = document.createElement("span");
     outlierText.className = "key-finder-outliers-inline";
     outlierText.textContent = `(non-diatonic: ${candidate.outliers
-      .map((pitchClass) => noteLabel(pitchClass, notation))
+      .map((pitchClass) => chromaticLabelForKey(pitchClass, candidate))
       .join(" ")})`;
     fragment.appendChild(outlierText);
   }
@@ -56,9 +62,9 @@ function randomnessFromConfidence(confidence: number): number {
 function applyCardPattern(card: HTMLElement, confidence: number): void {
   const randomness = randomnessFromConfidence(confidence);
   card.style.setProperty("--kf-randomness", randomness.toFixed(3));
-  card.style.setProperty("--kf-band", `${Math.round(22 + randomness * 28)}px`);
-  card.style.setProperty("--kf-noise-offset", `${Math.round(randomness * 18)}px`);
-  card.style.setProperty("--kf-hue", `${Math.round(220 + randomness * 135)}deg`);
+  card.style.setProperty("--kf-noise-offset", `${Math.round(randomness * 24)}px`);
+  card.style.setProperty("--kf-desat", `${Math.round(randomness * 0.85 * 100)}%`);
+  card.style.setProperty("--kf-lift", `${Math.round(randomness * 4)}%`);
 }
 
 export function createKeyFinderMode(): ModeDefinition {
@@ -95,7 +101,7 @@ export function createKeyFinderMode(): ModeDefinition {
       button.className = "key-finder-note-btn";
       button.dataset.pitchClass = String(pitchClass);
       button.setAttribute("aria-pressed", "false");
-      button.textContent = noteLabel(pitchClass, notation);
+      button.textContent = NOTE_BUTTON_LABELS[pitchClass] ?? "C";
       button.addEventListener("click", () => togglePitchClass(pitchClass), { signal });
       notesContainer.appendChild(button);
     }
@@ -130,7 +136,7 @@ export function createKeyFinderMode(): ModeDefinition {
 
         const notesLine = document.createElement("p");
         notesLine.className = "key-finder-result-notes";
-        notesLine.appendChild(buildScaleTokens(candidate, selected, notation));
+        notesLine.appendChild(buildScaleTokens(candidate, selected));
 
         const activate = () => selectCandidate(candidate);
         row.addEventListener("click", activate, { signal: uiAbort!.signal });

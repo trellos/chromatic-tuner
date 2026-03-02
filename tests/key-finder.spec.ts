@@ -9,9 +9,8 @@ test.describe('key finder mode', () => {
     const panel = page.locator('.mode-screen[data-mode="key-finder"]');
     await expect(panel).toHaveClass(/is-active/);
 
-    const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-    for (const note of notes) {
-      await panel.locator('.key-finder-note-btn', { hasText: new RegExp(`^${note}$`) }).click();
+    for (const pitchClass of [0, 2, 4, 5, 7, 9, 11]) {
+      await panel.locator(`.key-finder-note-btn[data-pitch-class=\"${pitchClass}\"]`).click();
     }
 
     const firstResult = panel.locator('.key-finder-result').first();
@@ -31,8 +30,8 @@ test.describe('key finder mode', () => {
     await page.getByRole('menuitem', { name: 'Key Finder' }).click();
 
     const panel = page.locator('.mode-screen[data-mode="key-finder"]');
-    for (const note of ['C', 'D', 'E', 'F#']) {
-      await panel.locator('.key-finder-note-btn', { hasText: new RegExp(`^${note}$`) }).click();
+    for (const pitchClass of [0, 2, 4, 6]) {
+      await panel.locator(`.key-finder-note-btn[data-pitch-class=\"${pitchClass}\"]`).click();
     }
 
     const topResult = panel.locator('.key-finder-result').first();

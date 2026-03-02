@@ -5,16 +5,38 @@ const MODE_NAMES = ["Ionian", "Dorian", "Phrygian", "Lydian", "Mixolydian", "Aeo
 
 export type NotationPreference = "sharp" | "flat";
 
+type KeySpelling = {
+  tonicPitchClass: number;
+  label: string;
+  scaleLabels: [string, string, string, string, string, string, string];
+  useFlatsForChromatic: boolean;
+};
+
+const MAJOR_KEY_SPELLINGS: KeySpelling[] = [
+  { tonicPitchClass: 0, label: "C", scaleLabels: ["C", "D", "E", "F", "G", "A", "B"], useFlatsForChromatic: false },
+  { tonicPitchClass: 1, label: "Db", scaleLabels: ["Db", "Eb", "F", "Gb", "Ab", "Bb", "C"], useFlatsForChromatic: true },
+  { tonicPitchClass: 2, label: "D", scaleLabels: ["D", "E", "F#", "G", "A", "B", "C#"], useFlatsForChromatic: false },
+  { tonicPitchClass: 3, label: "Eb", scaleLabels: ["Eb", "F", "G", "Ab", "Bb", "C", "D"], useFlatsForChromatic: true },
+  { tonicPitchClass: 4, label: "E", scaleLabels: ["E", "F#", "G#", "A", "B", "C#", "D#"], useFlatsForChromatic: false },
+  { tonicPitchClass: 5, label: "F", scaleLabels: ["F", "G", "A", "Bb", "C", "D", "E"], useFlatsForChromatic: true },
+  { tonicPitchClass: 6, label: "F#", scaleLabels: ["F#", "G#", "A#", "B", "C#", "D#", "E#"], useFlatsForChromatic: false },
+  { tonicPitchClass: 7, label: "G", scaleLabels: ["G", "A", "B", "C", "D", "E", "F#"], useFlatsForChromatic: false },
+  { tonicPitchClass: 8, label: "Ab", scaleLabels: ["Ab", "Bb", "C", "Db", "Eb", "F", "G"], useFlatsForChromatic: true },
+  { tonicPitchClass: 9, label: "A", scaleLabels: ["A", "B", "C#", "D", "E", "F#", "G#"], useFlatsForChromatic: false },
+  { tonicPitchClass: 10, label: "Bb", scaleLabels: ["Bb", "C", "D", "Eb", "F", "G", "A"], useFlatsForChromatic: true },
+  { tonicPitchClass: 11, label: "B", scaleLabels: ["B", "C#", "D#", "E", "F#", "G#", "A#"], useFlatsForChromatic: false },
+];
+
 export type KeyFinderCandidate = {
   id: string;
   tonic: number;
-  // Display label is intentionally tonic-only (`C`, `F#`, `Bb`) to avoid
-  // mode clutter in the results list.
   label: string;
   confidence: number;
   matched: number[];
   outliers: number[];
   scale: number[];
+  scaleLabels: string[];
+  useFlatsForChromatic: boolean;
 };
 
 export type KeyFinderRankedResult = {
@@ -44,10 +66,9 @@ function buildMajorScale(tonic: number): number[] {
 }
 
 export function buildModeHintsForTonic(tonic: number, notation: NotationPreference): string[] {
-  const scale = buildMajorScale(tonic);
-  return scale
-    .slice(1)
-    .map((pitchClass, index) => `${pitchClassLabel(pitchClass, notation)} ${MODE_NAMES[index + 1]}`);
+  const key = MAJOR_KEY_SPELLINGS.find((item) => item.tonicPitchClass === tonic);
+  if (!key) return [];
+  return key.scaleLabels.slice(1).map((label, index) => `${label} ${MODE_NAMES[index + 1]}`);
 }
 
 export function rankKeyFinderCandidates(
@@ -62,8 +83,8 @@ export function rankKeyFinderCandidates(
   }
 
   const candidates: KeyFinderCandidate[] = [];
-  for (let tonic = 0; tonic < 12; tonic += 1) {
-    const scale = buildMajorScale(tonic);
+  for (const key of MAJOR_KEY_SPELLINGS) {
+    const scale = buildMajorScale(key.tonicPitchClass);
     const matched = selected.filter((pitchClass) => scale.includes(pitchClass));
     const outliers = selected.filter((pitchClass) => !scale.includes(pitchClass));
     const coverage = matched.length / selected.length;
@@ -71,17 +92,18 @@ export function rankKeyFinderCandidates(
     const confidence = Math.max(0, Math.min(100, Math.round((coverage * 100) - (penalty * outlierPenalty))));
 
     candidates.push({
-      id: String(tonic),
-      tonic,
-      label: pitchClassLabel(tonic, notation),
+      id: String(key.tonicPitchClass),
+      tonic: key.tonicPitchClass,
+      label: key.label,
       confidence,
       matched,
       outliers,
       scale,
+      scaleLabels: [...key.scaleLabels],
+      useFlatsForChromatic: key.useFlatsForChromatic,
     });
   }
 
-  // Deterministic ordering keeps result rows stable for repeated input.
   candidates.sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     if (b.matched.length !== a.matched.length) return b.matched.length - a.matched.length;
@@ -93,4 +115,8 @@ export function rankKeyFinderCandidates(
 
 export function normalizePitchClassSet(values: number[]): number[] {
   return sortedUnique(values);
+}
+
+export function chromaticLabelForKey(pitchClass: number, candidate: KeyFinderCandidate): string {
+  return pitchClassLabel(pitchClass, candidate.useFlatsForChromatic ? "flat" : "sharp");
 }

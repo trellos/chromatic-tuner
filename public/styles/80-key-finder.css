@@ -56,30 +56,26 @@
 
 .key-finder-result {
   --kf-randomness: 0;
-  --kf-band: 22px;
-  --kf-hue: 220deg;
   --kf-noise-offset: 0px;
+  --kf-desat: 0%;
+  --kf-lift: 0%;
   background:
-    radial-gradient(circle at 12% 112%, hsl(calc(var(--kf-hue) + 24deg) 90% 60% / 0.3) 0, transparent calc(var(--kf-band) * 1.05)),
-    radial-gradient(circle at 28% 112%, hsl(calc(var(--kf-hue) - 34deg) 85% 58% / 0.24) 0, transparent calc(var(--kf-band) * 1.06)),
-    radial-gradient(circle at 44% 112%, hsl(calc(var(--kf-hue) + 92deg) 88% 63% / 0.28) 0, transparent calc(var(--kf-band) * 1.07)),
-    repeating-radial-gradient(circle at 28px 118%, rgb(104 155 255 / 56%) 0 3px, transparent 3px 16px),
-    repeating-radial-gradient(circle at 64px 118%, rgb(78 124 232 / 42%) 0 3px, transparent 3px 16px),
-    linear-gradient(135deg, rgb(16 18 36 / 95%), rgb(23 20 44 / 92%));
-  background-position:
-    calc(50% + var(--kf-noise-offset)) calc(50% - (var(--kf-noise-offset) * 0.5)),
-    calc(50% + var(--kf-noise-offset)) calc(50% - (var(--kf-noise-offset) * 0.5)),
-    calc(50% + var(--kf-noise-offset)) calc(50% - (var(--kf-noise-offset) * 0.5)),
-    calc(50% + var(--kf-noise-offset)) calc(100% - (var(--kf-noise-offset) * 0.35)),
-    calc(50% - (var(--kf-noise-offset) * 0.65)) calc(100% + (var(--kf-noise-offset) * 0.2)),
-    center;
-  background-size:
-    calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%)),
-    calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%)),
-    calc(100% + (var(--kf-randomness) * 80%)) calc(100% + (var(--kf-randomness) * 40%)),
-    calc(108px + (var(--kf-randomness) * 52px)) calc(56px + (var(--kf-randomness) * 24px)),
-    calc(108px + (var(--kf-randomness) * 52px)) calc(56px + (var(--kf-randomness) * 24px)),
-    100% 100%;
+    repeating-linear-gradient(
+      135deg,
+      rgb(255 255 255 / calc(0.02 + (var(--kf-randomness) * 0.08))) 0 2px,
+      transparent 2px 9px
+    ),
+    radial-gradient(
+      circle at calc(14% + var(--kf-noise-offset)) 18%,
+      rgb(255 255 255 / calc(0.04 + (var(--kf-randomness) * 0.09))) 0,
+      transparent 44%
+    ),
+    linear-gradient(
+      150deg,
+      hsl(224deg 28% calc(18% + var(--kf-lift))) 0%,
+      hsl(230deg 22% calc(14% + var(--kf-lift))) 100%
+    );
+  filter: saturate(calc(1 - var(--kf-desat))) contrast(calc(1 - (var(--kf-randomness) * 0.08)));
   border: 1px solid rgb(120 130 178 / 72%);
   border-radius: 0.75rem;
   box-shadow: 0 10px 24px rgb(7 8 14 / 35%);
