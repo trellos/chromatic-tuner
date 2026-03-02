@@ -2,6 +2,7 @@ export type ModeId =
   | "tuner"
   | "metronome"
   | "fretboard"
+  | "key-finder"
   | "circle-of-fifths"
   | "drum-machine"
   | "extra-jimmy"

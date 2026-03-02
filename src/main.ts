@@ -3,6 +3,7 @@ import { createTunerMode } from "./modes/tuner.js";
 import { createMetronomeMode } from "./modes/metronome.js";
 import { createDrumMachineMode } from "./modes/drum-machine.js";
 import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretboard.js";
+import { createKeyFinderMode } from "./modes/key-finder.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { createExtraJimmyMode } from "./modes/extra-jimmy.js";
 import { createWildTunaMode } from "./modes/wild-tuna.js";
@@ -35,6 +36,7 @@ const MODE_REGISTRY: ModeDefinition[] = [
   createTunerMode(),
   createMetronomeMode(),
   createFretboardMode(),
+  createKeyFinderMode(),
   createCircleOfFifthsMode(),
   createDrumMachineMode(),
   createExtraJimmyMode(),

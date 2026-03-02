@@ -5,6 +5,7 @@ const MODE_TABS = [
   { label: 'Chromatic Tuner', id: 'tuner' },
   { label: 'Metronome', id: 'metronome' },
   { label: 'Fretboard', id: 'fretboard' },
+  { label: 'Key Finder', id: 'key-finder' },
   { label: 'Circle of Fifths', id: 'circle-of-fifths' },
   { label: 'Drum Machine', id: 'drum-machine' },
   { label: 'Wild Tuna', id: 'wild-tuna' },
