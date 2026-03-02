@@ -47,6 +47,7 @@ function randomnessFromConfidence(confidence: number): number {
   // - 100% match => 0 randomness (clean pattern)
   // - 66% match => 0.3 randomness
   // - below 66% ramps up toward 1.0
+  // Randomness is applied to the seigaiha texture/noise only (not card rotation).
   if (confidence >= 100) return 0;
   if (confidence >= 66) return ((100 - confidence) / 34) * 0.3;
   return Math.min(1, 0.3 + ((66 - confidence) / 66) * 0.7);
@@ -55,8 +56,8 @@ function randomnessFromConfidence(confidence: number): number {
 function applyCardPattern(card: HTMLElement, confidence: number): void {
   const randomness = randomnessFromConfidence(confidence);
   card.style.setProperty("--kf-randomness", randomness.toFixed(3));
-  card.style.setProperty("--kf-rot", `${Math.round(randomness * 38)}deg`);
   card.style.setProperty("--kf-band", `${Math.round(22 + randomness * 28)}px`);
+  card.style.setProperty("--kf-noise-offset", `${Math.round(randomness * 18)}px`);
   card.style.setProperty("--kf-hue", `${Math.round(220 + randomness * 135)}deg`);
 }
 
