@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 test.describe('key finder mode', () => {
   test('ranks key candidates, highlights selected notes in scale, and supports clear', async ({ page }) => {
     await page.goto('/');
-    await page.locator('.mode-dot[data-mode="key-finder"]').click();
+    await page.locator('#mode-chip').click();
+    await page.getByRole('menuitem', { name: 'Key Finder' }).click();
 
     const panel = page.locator('.mode-screen[data-mode="key-finder"]');
     await expect(panel).toHaveClass(/is-active/);
@@ -27,7 +28,8 @@ test.describe('key finder mode', () => {
 
   test('shows non-diatonic notes inline in parentheses', async ({ page }) => {
     await page.goto('/');
-    await page.locator('.mode-dot[data-mode="key-finder"]').click();
+    await page.locator('#mode-chip').click();
+    await page.getByRole('menuitem', { name: 'Key Finder' }).click();
 
     const panel = page.locator('.mode-screen[data-mode="key-finder"]');
     for (const note of ['C', 'D', 'E', 'F#']) {

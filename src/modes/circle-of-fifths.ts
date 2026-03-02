@@ -158,7 +158,6 @@ export function createCircleOfFifthsMode(): ModeDefinition {
   return {
     id: "circle-of-fifths",
     title: "Circle of Fifths",
-    icon: "CF",
     preserveState: false,
     canFullscreen: false,
     onEnter: () => {

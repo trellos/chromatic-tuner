@@ -21,7 +21,7 @@ export function createExtraJimmyMode(): ModeDefinition {
   // Find the mode container in the DOM. Return a stub if not present (fallback for tests/edge cases).
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="extra-jimmy"]');
   if (!modeEl)
-    return { id: "extra-jimmy", title: "Extra Jimmy", icon: "EJ" };
+    return { id: "extra-jimmy", title: "Extra Jimmy" };
 
   // Cache DOM references for both fretboards and all control elements.
   const lowViewport = modeEl.querySelector<HTMLElement>(
@@ -131,7 +131,6 @@ export function createExtraJimmyMode(): ModeDefinition {
   return {
     id: "extra-jimmy",
     title: "Extra Jimmy",
-    icon: "EJ",
     preserveState: false,
 
     onEnter: () => {

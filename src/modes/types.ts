@@ -14,7 +14,6 @@ export type ModeDefinition = {
   // Identity and display metadata used by mode selectors and labels.
   id: ModeId;
   title: string;
-  icon: string;
 
   // Capability flags that affect container behavior.
   preserveState?: boolean;

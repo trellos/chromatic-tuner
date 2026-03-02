@@ -507,7 +507,6 @@ export function createTunerMode(): ModeDefinition {
   return {
     id: "tuner",
     title: "Chromatic Tuner",
-    icon: "TU",
     preserveState: false,
     canFullscreen: false,
     onEnter: enterTunerMode,

@@ -43,22 +43,6 @@
   padding: 0 1rem;
 }
 
-.key-finder-selected {
-  color: rgb(181 192 225);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  min-height: 1.8rem;
-}
-
-.key-finder-chip {
-  background: rgb(16 19 30 / 92%);
-  border: 1px solid rgb(121 137 180 / 60%);
-  border-radius: 999px;
-  padding: 0.2rem 0.6rem;
-}
-
-.key-finder-status,
 .key-finder-empty {
   color: rgb(181 192 225);
   margin: 0;
@@ -92,19 +76,6 @@
 
 .key-finder-result-header h4 {
   font-size: 0.95rem;
-}
-
-.key-finder-result-bar {
-  background: rgb(46 55 80);
-  border-radius: 999px;
-  height: 0.27rem;
-  overflow: hidden;
-}
-
-.key-finder-result-bar span {
-  background: linear-gradient(90deg, rgb(56 189 248), rgb(74 222 128));
-  display: block;
-  height: 100%;
 }
 
 .key-finder-result-notes {
