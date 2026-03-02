@@ -5,6 +5,7 @@ const MODE_TABS = [
   { label: 'Chromatic Tuner', id: 'tuner' },
   { label: 'Metronome', id: 'metronome' },
   { label: 'Fretboard', id: 'fretboard' },
+  { label: 'Key Finder', id: 'key-finder' },
   { label: 'Circle of Fifths', id: 'circle-of-fifths' },
   { label: 'Drum Machine', id: 'drum-machine' },
   { label: 'Wild Tuna', id: 'wild-tuna' },
@@ -14,6 +15,11 @@ type PageIssueTracker = {
   pageErrors: string[];
   failedRequests: string[];
 };
+
+async function switchMode(page: Page, label: string): Promise<void> {
+  await page.locator('#mode-chip').click();
+  await page.getByRole('menuitem', { name: label }).click();
+}
 
 async function readTelemetryStats(page: Page): Promise<{
   fps: number;
@@ -600,10 +606,7 @@ test('app loads and key UI is visible with no runtime/network failures', async (
   await expect(page.locator('.app')).toBeVisible();
 
   await expect(page.locator('h1.hero-title')).toHaveText('TUNA');
-  await expect(page.getByRole('tab', { name: 'Chromatic Tuner' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Metronome' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Fretboard' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Drum Machine' })).toBeVisible();
+  await expect(page.locator('#mode-chip')).toBeVisible();
 
   await page.waitForTimeout(150);
 
@@ -649,7 +652,7 @@ test('mode switches keep stage size stable', async ({ page }) => {
   const tolerancePx = 2;
 
   for (const mode of MODE_TABS) {
-    await page.getByRole('tab', { name: mode.label }).click();
+    await switchMode(page, mode.label);
     await expect(page.locator(`.mode-screen[data-mode="${mode.id}"]`)).toHaveClass(/is-active/);
 
     const afterSwitch = await stage.boundingBox();
@@ -668,7 +671,7 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
   await page.goto('/');
 
   for (const mode of MODE_TABS) {
-    await page.getByRole('tab', { name: mode.label }).click();
+    await switchMode(page, mode.label);
     await expect(page.locator(`.mode-screen[data-mode="${mode.id}"]`)).toHaveClass(/is-active/);
     await assertNoOffscreenText(page);
   }
@@ -677,7 +680,7 @@ test('no visible text is clipped off-screen in each mode', async ({ page }) => {
 test('tuner mode does not need scrollbars in current project viewport', async ({ page }, testInfo) => {
   await page.goto('/');
 
-  await page.getByRole('tab', { name: 'Chromatic Tuner' }).click();
+  await switchMode(page, 'Chromatic Tuner');
   const tunerScreen = page.locator('.mode-screen[data-mode="tuner"]');
   await expect(tunerScreen).toHaveClass(/is-active/);
 
@@ -711,7 +714,7 @@ test('drum machine fullscreen layout is aspect-ratio aware on mobile', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
 
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
   const drumScreen = page.locator('.mode-screen[data-mode="drum-machine"]');
   const drumRotator = page.locator('.mode-screen[data-mode="drum-machine"] .drum-rotator');
   const drumGrid = page.locator('.mode-screen[data-mode="drum-machine"] .drum-grids');
@@ -745,7 +748,7 @@ test('drum machine fullscreen toggle keeps mobile orientation rules consistent',
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
 
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
   const drumScreen = page.locator('.mode-screen[data-mode="drum-machine"]');
   const drumRotator = page.locator('.mode-screen[data-mode="drum-machine"] .drum-rotator');
   await expect(drumScreen).toHaveClass(/is-active/);
@@ -768,7 +771,7 @@ test('drum machine fullscreen rotation is mobile-only', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
 
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
   await page.locator('#carousel-toggle').click();
   await expect(page.locator('body')).toHaveClass(/drum-fullscreen/);
 
@@ -789,7 +792,7 @@ test('drum machine toolbar wraps to two rows on mobile portrait so play is reach
     await page.setViewportSize(viewport);
     await page.goto('/');
 
-    await page.getByRole('tab', { name: 'Drum Machine' }).click();
+    await switchMode(page, 'Drum Machine');
     const drumUi = page.locator('.mode-screen[data-mode="drum-machine"] .drum-ui');
     const playButton = page.locator('#drum-play-toggle');
     await expect(drumUi).toBeVisible();
@@ -821,7 +824,7 @@ test('drum machine fullscreen keeps toolbar buttons visible and parallel to grid
   await page.setViewportSize({ width: 393, height: 852 });
   await page.goto('/');
 
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
   await page.locator('#carousel-toggle').click();
   await expect(page.locator('body')).toHaveClass(/drum-fullscreen/);
 
@@ -878,7 +881,7 @@ test('drum machine fullscreen keeps toolbar buttons visible and parallel to grid
 
 test('metronome sound menu opens without creating a scrollbar on the metronome card', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await switchMode(page, 'Metronome');
 
   const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
   const soundButton = page.locator('#metro-sound-button');
@@ -912,7 +915,7 @@ test('metronome time button shows "No Accent" after selecting no-accent mode', a
   page,
 }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await switchMode(page, 'Metronome');
 
   const timeButton = page.locator('#metro-time-button');
   await timeButton.click();
@@ -955,7 +958,7 @@ test("metronome time-signature change resets seigaiha phase to bar start", async
 
 test('metronome sound button keeps the most recent sound selection visible', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await switchMode(page, 'Metronome');
 
   const soundButton = page.locator('#metro-sound-button');
   const soundMenu = page.locator('#metro-sound-menu');
@@ -981,7 +984,7 @@ test('metronome sound button keeps the most recent sound selection visible', asy
 
 test('drum machine beat and kit buttons keep their most recent selections visible', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
 
   const beatButton = page.locator('#drum-beat-button');
   const beatMenu = page.locator('#drum-beat-menu');
@@ -1008,7 +1011,7 @@ test('drum machine transport remains responsive after mode switches', async ({
   page,
 }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
 
   const playButton = page.locator('#drum-play-toggle');
   await expect(playButton).toHaveText('Play');
@@ -1016,10 +1019,10 @@ test('drum machine transport remains responsive after mode switches', async ({
   await playButton.click();
   await page.waitForTimeout(160);
 
-  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await switchMode(page, 'Metronome');
   await expect(page.locator('.mode-screen[data-mode="metronome"]')).toHaveClass(/is-active/);
 
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
   await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);
   const returnedText = ((await playButton.textContent()) ?? '').trim();
   const firstExpected = returnedText === 'Play' ? 'Stop' : 'Play';
@@ -1054,7 +1057,7 @@ test('mode switching remains responsive after a runtime hook error', async ({ pa
     } as typeof AbortController;
   });
 
-  await page.getByRole('tab', { name: 'Metronome' }).click();
+  await switchMode(page, 'Metronome');
   await expect(page.locator('.mode-screen[data-mode="metronome"]')).toHaveClass(/is-active/);
 
   await page.evaluate(() => {
@@ -1068,31 +1071,28 @@ test('mode switching remains responsive after a runtime hook error', async ({ pa
     }
   });
 
-  await page.getByRole('tab', { name: 'Drum Machine' }).click();
+  await switchMode(page, 'Drum Machine');
 
   await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);
 });
 
 test('app restores the last selected mode on reload', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Fretboard' }).click();
+  await switchMode(page, 'Fretboard');
   await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
 
   await page.reload();
 
   await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
-  await expect(page.getByRole('tab', { name: 'Fretboard' })).toHaveAttribute(
-    'aria-selected',
-    'true'
-  );
+  await expect(page.locator('#mode-chip span')).toHaveText('Fretboard');
 });
 
 test('tuner status toggle is not duplicated after mode re-entry', async ({ page }) => {
   await page.goto('/?debug=1');
 
   await expect(page.locator('body')).not.toHaveClass(/status-hidden/);
-  await page.getByRole('tab', { name: 'Metronome' }).click();
-  await page.getByRole('tab', { name: 'Chromatic Tuner' }).click();
+  await switchMode(page, 'Metronome');
+  await switchMode(page, 'Chromatic Tuner');
 
   await page.waitForTimeout(620);
   await page.evaluate(() => {

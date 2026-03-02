@@ -1,0 +1,162 @@
+.key-finder-layout {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 auto;
+  padding: 0.75rem 0 1rem;
+  width: min(100%, 900px);
+}
+
+.key-finder-input-row {
+  align-items: stretch;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.key-finder-input--notes {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.key-finder-note-btn {
+  background: rgb(16 19 30 / 80%);
+  border: 1px solid rgb(88 103 144 / 60%);
+  border-radius: 0.6rem;
+  color: rgb(217 227 255 / 90%);
+  min-height: 2rem;
+}
+
+.key-finder-note-btn.is-active {
+  background: rgb(96 165 250 / 32%);
+  border-color: rgb(123 177 255 / 80%);
+}
+
+.key-finder-clear {
+  background: rgb(16 19 30 / 92%);
+  border: 1px solid rgb(88 103 144 / 55%);
+  border-radius: 0.8rem;
+  color: rgb(217 227 255 / 90%);
+  font: inherit;
+  min-height: 100%;
+  padding: 0 1rem;
+}
+
+.key-finder-empty,
+.key-finder-mode-hints {
+  color: rgb(181 192 225);
+  margin: 0;
+}
+
+.key-finder-results {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.key-finder-result {
+  --kf-randomness: 0;
+  --kf-noise-offset: 0px;
+  --kf-intensity: 0;
+  --kf-desat: 0%;
+  --kf-lift: 0%;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgb(255 255 255 / calc(0.02 + (var(--kf-randomness) * 0.08))) 0 2px,
+      transparent 2px calc(9px - (var(--kf-intensity) * 2px))
+    ),
+    linear-gradient(
+      145deg,
+      rgb(216 78 112 / calc(var(--kf-intensity) * 0.36)) 0%,
+      rgb(104 89 146 / calc(var(--kf-intensity) * 0.28)) 100%
+    ),
+    radial-gradient(
+      circle at calc(14% + var(--kf-noise-offset)) 18%,
+      rgb(255 255 255 / calc(0.04 + (var(--kf-randomness) * 0.09))) 0,
+      transparent 44%
+    ),
+    linear-gradient(
+      150deg,
+      hsl(224deg 28% calc(18% + var(--kf-lift))) 0%,
+      hsl(230deg 22% calc(14% + var(--kf-lift))) 100%
+    );
+  border: 1px solid rgb(120 130 178 / 72%);
+  filter: saturate(calc(1 - var(--kf-desat))) contrast(calc(1 - (var(--kf-intensity) * 0.12)));
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 24px rgb(7 8 14 / 35%);
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+  outline: none;
+  padding: 0.5rem 0.65rem;
+  transition: transform 160ms ease;
+}
+
+.key-finder-result:hover,
+.key-finder-result:focus-visible {
+  border-color: rgb(170 195 255 / 95%);
+  transform: translateY(-1px);
+}
+
+.key-finder-result-header {
+  align-items: baseline;
+  display: flex;
+  gap: 0.7rem;
+  justify-content: space-between;
+}
+
+.key-finder-result-header h4,
+.key-finder-result p {
+  margin: 0;
+}
+
+.key-finder-result-header h4 {
+  color: rgb(244 249 255);
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  text-shadow:
+    -1px -1px 0 rgb(8 10 18 / 80%),
+    1px -1px 0 rgb(8 10 18 / 80%),
+    -1px 1px 0 rgb(8 10 18 / 80%),
+    1px 1px 0 rgb(8 10 18 / 80%);
+}
+
+.key-finder-result-notes {
+  color: rgb(219 232 252);
+  font-size: 0.88rem;
+  text-shadow: 0 1px 0 rgb(8 11 20 / 70%);
+}
+
+.key-finder-token.is-selected {
+  color: rgb(255 255 255);
+  font-weight: 700;
+}
+
+.key-finder-outliers-inline {
+  color: rgb(255 201 201 / 98%);
+  font-weight: 600;
+}
+
+@media (max-width: 820px) {
+  .key-finder-input--notes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .key-finder-input-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .key-finder-clear {
+    min-height: 2.2rem;
+  }
+
+  .key-finder-result {
+    transform: none;
+  }
+
+  .key-finder-result:hover,
+  .key-finder-result:focus-visible {
+    transform: translateY(-1px);
+  }
+}

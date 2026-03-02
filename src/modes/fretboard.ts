@@ -320,7 +320,6 @@ export function createFretboardMode(): ModeDefinition {
   return {
     id: "fretboard",
     title: "Fretboard",
-    icon: "FB",
     preserveState: true,
     onEnter: enterMode,
     onExit: exitMode,

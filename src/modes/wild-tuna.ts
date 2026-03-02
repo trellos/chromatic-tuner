@@ -26,7 +26,7 @@ export function createWildTunaMode(): ModeDefinition {
   const options = { onRandomnessChange: (r: number | null) => seigaihaBridge.setModeRandomness(r) };
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="wild-tuna"]');
   if (!modeEl) {
-    return { id: "wild-tuna", title: "Wild Tuna", icon: "WT", preserveState: false, canFullscreen: true };
+    return { id: "wild-tuna", title: "Wild Tuna", preserveState: false, canFullscreen: true };
   }
 
   const drumHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-drum]");
@@ -96,7 +96,6 @@ export function createWildTunaMode(): ModeDefinition {
   return {
     id: "wild-tuna",
     title: "Wild Tuna",
-    icon: "WT",
     preserveState: false,
     canFullscreen: true,
     onEnter: async () => {

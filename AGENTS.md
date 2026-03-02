@@ -27,6 +27,22 @@
 - Hidden summary appears rotated near the high-E side of the board and restores controls on tap.
 - `createFretboardUi` supports `setLooperElement(...)`; attached looper UI is rendered in the board looper slot (under the 12th-fret area), not over the controls.
 
+
+
+## Navigation notes
+- Bottom mode icon bar is removed; mode switching is via the mode chip picker only.
+
+## Key Finder mode notes
+- Entry point: `src/modes/key-finder.ts`.
+- Pure scoring/normalization logic: `src/modes/key-finder-logic.ts` (must stay UI-independent).
+- UI markup/styles: `public/index.html` + `public/styles/80-key-finder.css` (imported via `public/style.css`).
+- Input is 12 note toggles only (no fretboard tab in this mode).
+- The note grid keeps a tall `Clear` button aligned to the right of both rows.
+- Candidate rows should stay compact: key label + scale notes (no confidence progress bar).
+- In candidate scale note text, selected notes are visually emphasized; non-diatonic notes appear inline in parentheses as `non-diatonic`.
+- Candidate cards use a seigaiha-style colorful background; randomness increases as confidence drops (`100% => 0`, `66% => 0.3`) and must affect texture/noise only (no card tilt/rotation), with visible seigaiha arcs filling the card interior.
+- Tapping a candidate row updates a separate one-line hint listing related modal interpretations (the row itself should not expand).
+
 ## Circle of Fifths notes
 - Shared UI implementation: `src/ui/circle-of-fifths.ts`.
 - Dedicated mode adapter: `src/modes/circle-of-fifths.ts`.
@@ -67,7 +83,7 @@
 ## Extra Jimmy mode notes
 - Entry point: `src/modes/extra-jimmy.ts`.
 - Harmony calculation logic: `getDiatonicHarmonyMidi()` in `src/fretboard-logic.ts`.
-- Markup: `public/index.html` (mode screen article + carousel dot).
+- Markup: `public/index.html` (mode screen article).
 - Styles: `public/styles/70-extra-jimmy.css`.
 - **Layout**: Three columns arranged horizontally — low fretboard (left, flex 1) | narrow controls (80px, fixed) | high fretboard (right, flex 1).
 - **Fretboards**: Two independent `createFretboardUi` instances, each cloned from the `#fretboard-template`. Both display in "key" mode (not scale/chord).

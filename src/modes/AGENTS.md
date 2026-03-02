@@ -5,7 +5,7 @@ This file describes how mode modules should be structured today and how to keep 
 ## Mode Contract
 
 Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.ts`):
-- identity (`id`, `title`, `icon`)
+- identity (`id`, `title`)
 - capabilities (`preserveState`, `canFullscreen`)
 - lifecycle hooks (`onEnter`, `onExit`)
 
