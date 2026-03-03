@@ -49,6 +49,7 @@ export type FretboardUiOptions = {
   onStateChange?: (nextState: FretboardState) => void;
   onPlayPress?: () => void;
   onFretPress?: (event: { midi: number; stringIndex: number; fret: number }) => void;
+  fretPressEvent?: "click" | "pointerdown";
 };
 
 export type FretboardUi = {
@@ -87,6 +88,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const markerPulseTimeouts = new WeakMap<HTMLElement, number>();
 
   const showControls = options.showControls ?? true;
+  const fretPressEvent = options.fretPressEvent ?? "click";
   controls?.toggleAttribute("hidden", !showControls);
 
   const emitState = () => {
@@ -290,6 +292,16 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     options.onFretPress?.({ midi, stringIndex, fret });
   };
 
+  const onMarkerInteraction = (event: Event) => {
+    if (event instanceof PointerEvent) {
+      if (!event.isPrimary || event.button !== 0) return;
+      // Prevent synthetic compatibility mouse/click events from firing after touch
+      // interactions. Extra Jimmy opts into pointer-down playback and should trigger once.
+      event.preventDefault();
+    }
+    onMarkerPress(event.target);
+  };
+
   const enter = () => {
     if (uiAbort) return;
     uiAbort = new AbortController();
@@ -372,8 +384,8 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
       },
       { signal }
     );
-    dotsLayer?.addEventListener("click", (event) => onMarkerPress(event.target), { signal });
-    openIndicatorsLayer?.addEventListener("click", (event) => onMarkerPress(event.target), { signal });
+    dotsLayer?.addEventListener(fretPressEvent, onMarkerInteraction, { signal });
+    openIndicatorsLayer?.addEventListener(fretPressEvent, onMarkerInteraction, { signal });
 
     render(state);
   };

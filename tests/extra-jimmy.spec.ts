@@ -35,6 +35,64 @@ async function assertElementFullyInViewport(
   ).toBeLessThanOrEqual((metrics?.viewportHeight ?? 0) + 1);
 }
 
+
+async function assertNoElementScrollbars(
+  page: import("@playwright/test").Page,
+  selector: string
+): Promise<void> {
+  const metrics = await page.evaluate((targetSelector) => {
+    const element = document.querySelector<HTMLElement>(targetSelector);
+    if (!element) return null;
+    return {
+      overflowX: window.getComputedStyle(element).overflowX,
+      overflowY: window.getComputedStyle(element).overflowY,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    };
+  }, selector);
+
+  expect(metrics, `Missing element: ${selector}`).not.toBeNull();
+  expect(metrics?.overflowX, `${selector} should hide x overflow`).toBe("hidden");
+  expect(metrics?.overflowY, `${selector} should hide y overflow`).toBe("hidden");
+  expect(metrics?.scrollWidth ?? 0, `${selector} content should fit width`).toBeLessThanOrEqual(
+    (metrics?.clientWidth ?? 0) + 1
+  );
+  expect(metrics?.scrollHeight ?? 0, `${selector} content should fit height`).toBeLessThanOrEqual(
+    (metrics?.clientHeight ?? 0) + 1
+  );
+}
+
+async function assertDotsAreInsideBoard(
+  page: import("@playwright/test").Page,
+  boardSelector: string
+): Promise<void> {
+  const clipping = await page.evaluate((targetSelector) => {
+    const board = document.querySelector<HTMLElement>(targetSelector);
+    if (!board) return null;
+    const boardRect = board.getBoundingClientRect();
+    const dots = Array.from(board.querySelectorAll<HTMLElement>(".fretboard-dot"));
+    return dots.map((dot) => {
+      const rect = dot.getBoundingClientRect();
+      return {
+        leftOverflow: boardRect.left - rect.left,
+        rightOverflow: rect.right - boardRect.right,
+        topOverflow: boardRect.top - rect.top,
+        bottomOverflow: rect.bottom - boardRect.bottom,
+      };
+    });
+  }, boardSelector);
+
+  expect(clipping, `Missing board: ${boardSelector}`).not.toBeNull();
+  expect(clipping?.length ?? 0, `${boardSelector} should have dots`).toBeGreaterThan(0);
+  for (const [index, dot] of (clipping ?? []).entries()) {
+    expect(dot.leftOverflow, `${boardSelector} dot ${index} clipped on left edge`).toBeLessThanOrEqual(1);
+    expect(dot.rightOverflow, `${boardSelector} dot ${index} clipped on right edge`).toBeLessThanOrEqual(1);
+    expect(dot.topOverflow, `${boardSelector} dot ${index} clipped on top edge`).toBeLessThanOrEqual(1);
+    expect(dot.bottomOverflow, `${boardSelector} dot ${index} clipped on bottom edge`).toBeLessThanOrEqual(1);
+  }
+}
 test("extra-jimmy mode displays two fretboards with controls", async ({ page }) => {
   await page.goto("/");
 
@@ -483,6 +541,23 @@ test("extra-jimmy mode fits on wide desktop", async ({ page }) => {
   await expect(controlsColumn).toBeVisible();
 });
 
+
+test("extra-jimmy mode fretboard viewports avoid scrollbars and keep dots fully visible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1536, height: 960 });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+
+  await page.waitForTimeout(200);
+
+  await assertNoElementScrollbars(page, '[data-ej-neck="low"] .ej-neck-viewport');
+  await assertNoElementScrollbars(page, '[data-ej-neck="high"] .ej-neck-viewport');
+
+  await assertDotsAreInsideBoard(page, '[data-ej-neck="low"] .fretboard-board');
+  await assertDotsAreInsideBoard(page, '[data-ej-neck="high"] .fretboard-board');
+});
+
 test("extra-jimmy mode is responsive across viewport sizes", async ({ page }) => {
   const viewports = [
     { width: 480, height: 640 },  // Mobile portrait
@@ -565,6 +640,50 @@ test("extra-jimmy mode low fretboard tap pulses harmony on high board", async ({
   await expect(highViewport).toBeVisible();
 });
 
+
+test("extra-jimmy mode starts note playback on pointer down", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+
+  const lowFirstDot = page.locator('[data-ej-neck="low"] .fretboard-dot').first();
+  const highFirstDot = page.locator('[data-ej-neck="high"] .fretboard-dot').first();
+
+  await lowFirstDot.dispatchEvent("pointerdown", {
+    bubbles: true,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerType: "mouse",
+  });
+
+  await expect
+    .poll(async () =>
+      page
+        .locator(
+          '.mode-screen[data-mode="extra-jimmy"] .fretboard-dot.is-pulsing, .mode-screen[data-mode="extra-jimmy"] .fretboard-open-indicator.is-pulsing'
+        )
+        .count()
+    )
+    .toBeGreaterThan(0);
+
+  await highFirstDot.dispatchEvent("pointerdown", {
+    bubbles: true,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerType: "touch",
+  });
+
+  await expect
+    .poll(async () =>
+      page
+        .locator(
+          '.mode-screen[data-mode="extra-jimmy"] .fretboard-dot.is-pulsing, .mode-screen[data-mode="extra-jimmy"] .fretboard-open-indicator.is-pulsing'
+        )
+        .count()
+    )
+    .toBeGreaterThan(0);
+});
 test("extra-jimmy mode can tap multiple times in sequence", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
