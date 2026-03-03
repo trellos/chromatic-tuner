@@ -35,7 +35,8 @@
 .ej-neck-viewport {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  padding-inline: 16px;
   position: relative;
 }
 
@@ -48,8 +49,8 @@
 
 .ej-neck-viewport .fretboard-board {
   flex: 1;
-  width: 100%;
   min-height: 0;
+  width: 100%;
 }
 
 .ej-neck-viewport .fretboard-controls {

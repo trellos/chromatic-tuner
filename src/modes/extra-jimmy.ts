@@ -155,6 +155,7 @@ export function createExtraJimmyMode(): ModeDefinition {
       // Create both FretboardUi instances with shared state and per-fretboard press handlers.
       lowUi = createFretboardUi(lowViewport, {
         initialState: { ...boardState },
+        fretPressEvent: "pointerdown",
         showControls: false,
         onFretPress: ({ midi, stringIndex }) => {
           // Tapping the low fretboard: play the note + its harmony partner above on the high board.
@@ -167,6 +168,7 @@ export function createExtraJimmyMode(): ModeDefinition {
       });
       highUi = createFretboardUi(highViewport, {
         initialState: { ...boardState },
+        fretPressEvent: "pointerdown",
         showControls: false,
         onFretPress: ({ midi, stringIndex }) => {
           // Tapping the high fretboard: play the note + its harmony partner below on the low board (negative steps).
