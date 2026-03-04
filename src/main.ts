@@ -141,8 +141,12 @@ function writeLastModeId(modeId: ModeId): void {
 
 function resolveInitialModeId(): ModeId {
   const params = new URLSearchParams(window.location.search);
+  const modeParam = parseModeId(params.get("mode"));
+  // If mode is explicitly specified, honour it (covers wild-tuna share URLs)
+  if (modeParam) return modeParam;
+  // Legacy: bare ?track= without ?mode= goes to drum-machine
   if (params.has("track")) return "drum-machine";
-  return parseModeId(params.get("mode")) ?? readLastModeId() ?? "tuner";
+  return readLastModeId() ?? "tuner";
 }
 
 function getModeById(id: ModeId): ModeDefinition | undefined {

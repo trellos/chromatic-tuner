@@ -127,6 +127,20 @@ const KEY_MODE_INTERVALS: Record<KeyModeType, readonly number[]> = {
   locrian: [0, 1, 3, 5, 6, 8, 10],
 };
 
+/** Returns the diatonic triad quality for a scale degree in a given key mode. */
+export function getKeyModeDegreeQuality(mode: KeyModeType, degreeInterval: number): "major" | "minor" | "diminished" {
+  const intervals = KEY_MODE_INTERVALS[mode];
+  const rootIdx = intervals.indexOf(degreeInterval);
+  if (rootIdx === -1) return "major";
+  const thirdInterval = intervals[(rootIdx + 2) % 7] ?? 0;
+  const fifthInterval = intervals[(rootIdx + 4) % 7] ?? 7;
+  const third = ((thirdInterval - degreeInterval) + 12) % 12;
+  const fifth = ((fifthInterval - degreeInterval) + 12) % 12;
+  if (third === 3 && fifth === 6) return "diminished";
+  if (third === 3) return "minor";
+  return "major";
+}
+
 const TRIAD_STRING_GROUP_BY_STRING_INDEX: ReadonlyArray<readonly [number, number, number]> = [
   [0, 1, 2],
   [1, 2, 3],

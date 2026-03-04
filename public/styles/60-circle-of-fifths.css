@@ -226,13 +226,13 @@
 
 .cof-instrument-label {
   dominant-baseline: middle;
-  fill: rgba(17, 35, 74, 0.82);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  fill: rgba(240, 248, 255, 0.96);
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   paint-order: stroke fill;
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 1;
+  stroke: rgba(10, 18, 50, 0.85);
+  stroke-width: 6;
   text-anchor: middle;
   text-transform: uppercase;
 }
@@ -688,16 +688,20 @@
 }
 
 .ui-composite-looper-measures {
-  display: grid;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
   gap: 5px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-height: 14px;
 }
 
 .ui-composite-looper-measure {
   background: rgba(198, 210, 236, 0.24);
   border: 1px solid rgba(222, 235, 255, 0.28);
   border-radius: 6px;
+  flex: 0 0 auto;
   height: 14px;
+  width: 14px;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -743,6 +747,23 @@
   }
 }
 
+.ui-composite-looper-rec-count {
+  color: rgba(255, 130, 155, 0.95);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ui-composite-looper.is-transport-stopped {
+  opacity: 0.52;
+}
+
+.ui-composite-looper.is-transport-stopped .ui-composite-looper-btn--play {
+  pointer-events: none;
+}
+
 @media (max-width: 900px) {
   .ui-composite-looper {
     padding: 7px;
@@ -766,7 +787,7 @@
   }
 
   .cof-instrument-label {
-    font-size: 16px;
+    font-size: 34px;
   }
 }
 
@@ -790,6 +811,7 @@
   .ui-composite-looper-measure {
     border-radius: 5px;
     height: 11px;
+    width: 11px;
   }
 
   .mode-screen[data-mode="circle-of-fifths"] {
@@ -815,7 +837,7 @@
   }
 
   .cof-instrument-label {
-    font-size: 12px;
+    font-size: 28px;
     letter-spacing: 0.06em;
   }
 

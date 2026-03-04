@@ -153,6 +153,13 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   z-index: 2;
 }
 
+/* Expand touch hit area to ~44px without affecting visual size. */
+.fretboard-open-indicator::after {
+  content: "";
+  inset: -16px;
+  position: absolute;
+}
+
 .fretboard-open-indicator.is-root {
   border-color: var(--tuna-pink);
 }
@@ -177,6 +184,13 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   transform: translate(-50%, -50%) scale(1);
   width: clamp(24px, 3vw, 32px);
   z-index: 2;
+}
+
+/* Ensure minimum 44px touch hit area at all sizes. */
+.fretboard-dot::after {
+  content: "";
+  inset: max(-10px, calc((44px - 100%) / -2));
+  position: absolute;
 }
 
 .fretboard-dot.is-root {
@@ -288,11 +302,10 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
 }
 
 .fretboard-looper-slot {
-  left: 79%;
   pointer-events: auto;
   position: absolute;
+  right: 0;
   top: calc(100% - 104px);
-  transform: translate(-50%, 0);
   width: min(220px, 48%);
   z-index: 9;
 }
@@ -486,7 +499,7 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   }
 
   .wild-tuna-pane--fretboard .fretboard-board {
-    min-height: 220px;
+    min-height: 0;
   }
 }
 

@@ -12,7 +12,8 @@
     "lint:css:strict": "stylelint \"public/**/*.css\" --max-warnings=0",
     "test:e2e": "playwright test",
     "test:e2e:mobile": "playwright test tests/ui.spec.ts --project=chromium --project=\"Mobile Safari\"",
-    "test": "npm run typecheck && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test": "npm run typecheck && npm run test:unit && npm run test:e2e",
     "ci": "npm run build && npm test"
   },
   "keywords": [],
@@ -28,7 +29,8 @@
     "postcss-safe-parser": "^7.0.1",
     "stylelint": "^17.3.0",
     "stylelint-order": "^7.0.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "express": "^5.2.1"

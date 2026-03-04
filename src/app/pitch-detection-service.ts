@@ -192,6 +192,9 @@ export function createPitchDetectionService(): PitchDetectionService {
     workletNode.connect(ctx.destination);
 
     if (isIOS) {
+      // TODO(deprecation): ScriptProcessorNode is deprecated (runs on main thread, may glitch
+      // under heavy UI load). Remove once AudioWorklet is confirmed reliable on all supported
+      // iOS Safari versions. Track at: https://caniuse.com/audio-worklet
       scriptNode = ctx.createScriptProcessor(2048, 1, 1);
       const windowSize = 4096;
       const ringSize = 16384;

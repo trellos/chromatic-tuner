@@ -14,7 +14,12 @@
       "Bash(node -e \"const {devices} = require\\(''@playwright/test''\\); console.log\\(devices[''Desktop Safari''].viewport\\)\")",
       "Bash(npx playwright test debug-wild-tuna --project=chromium --reporter=list)",
       "Bash(npx playwright test tests/ui.spec.ts tests/fretboard.spec.ts --grep \"wild tuna fullscreen keeps drum|fretboard UI stays fully visible\")",
-      "Bash(npx playwright test tests/ui.spec.ts --grep \"wild tuna fullscreen keeps drum\")"
+      "Bash(npx playwright test tests/ui.spec.ts --grep \"wild tuna fullscreen keeps drum\")",
+      "Bash(ls -la /c/dev/chromatic-tuner/public/*.css)",
+      "Bash(wc -l /c/dev/chromatic-tuner/public/styles/*.css)",
+      "Bash(npm install --save-dev vitest)",
+      "Bash(ls public/style*.css)",
+      "Bash(ls public/*.css)"
     ]
   },
   "enabledPlugins": {

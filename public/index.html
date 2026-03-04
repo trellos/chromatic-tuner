@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>TUNA</title>
     <link rel="stylesheet" href="./style.css" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
@@ -46,6 +46,8 @@
           </div>
 
           <div id="tuna-field" class="tuna-field" aria-hidden="true"></div>
+
+          <output id="tuner-live" class="sr-only" aria-live="polite" aria-atomic="true"></output>
 
           <div class="tuner-stack">
             <div id="strobe-visualizer" class="strobe-tuner idle">
@@ -91,6 +93,7 @@
             </div>
             <div class="wild-tuna-composite" data-wild-tuna-composite>
               <section class="wild-tuna-pane wild-tuna-pane--drum" data-wild-tuna-drum></section>
+              <div class="wild-tuna-timeline" data-wild-tuna-timeline></div>
               <section class="wild-tuna-pane wild-tuna-pane--circle">
                 <div class="wild-tuna-circle-looper" data-wild-tuna-circle-looper></div>
                 <div class="circle-mode-layout" data-wild-tuna-circle></div>

@@ -1,14 +1,13 @@
 import type { LooperRecorder } from "./looper-recordable.js";
 import { clamp } from "../utils.js";
 
-const TOTAL_MEASURES = 4;
 const STEPS_PER_MEASURE = 16;
+const MAX_MEASURES = 4;
 const MIN_EVENT_STEPS = 1;
 const SAFE_MEASURE_DURATION_MS = 2000;
 const BEAT_PULSE_MS = 180;
-const PLAYBACK_MEASURE_PULSE_MS = 260;
 
-type LooperRecordState = "idle" | "armed" | "recording" | "stopping";
+export type LooperRecordState = "idle" | "armed" | "recording" | "stopping";
 
 type QuantizedNoteEvent = {
   midis: number[];
@@ -31,6 +30,10 @@ export type CompositeLooperBeatBoundaryEvent = {
   scheduledPerfMs?: number;
 };
 
+export type CompositeLooperMeasureSlot = {
+  events: Array<{ midis: number[]; startStep: number; endStep: number }>;
+};
+
 export type CompositeLooperOptions = {
   getMeasureDurationMs: () => number;
   onPlaybackEvent: (event: {
@@ -38,6 +41,8 @@ export type CompositeLooperOptions = {
     midis: number[];
     durationMs: number;
   }) => void;
+  /** Called when the REC button is pressed while idle, before arming. Coordinator uses this to stop other loopers. */
+  onRecButtonPressed?: () => void;
 };
 
 export type CompositeLooper = LooperRecorder & {
@@ -46,6 +51,14 @@ export type CompositeLooper = LooperRecorder & {
   onTransportStop: () => void;
   onBeatBoundary: (event: CompositeLooperBeatBoundaryEvent) => void;
   destroy: () => void;
+  // Coordinator API
+  requestArm: () => void;
+  requestStop: () => void;
+  getRecordState: () => LooperRecordState;
+  getLoopMeasureCount: () => number;
+  seekToMeasure: (index: number) => void;
+  loadLoop: (slots: CompositeLooperMeasureSlot[]) => void;
+  getMeasureSlots: () => CompositeLooperMeasureSlot[];
 };
 
 function sanitizeMidis(midis: number[]): number[] {
@@ -56,10 +69,6 @@ function sanitizeMidis(midis: number[]): number[] {
 
 function hasStoredContent(slots: MeasureSlot[]): boolean {
   return slots.some((slot) => slot.events.length > 0);
-}
-
-function createMeasureSlots(): MeasureSlot[] {
-  return Array.from({ length: TOTAL_MEASURES }, () => ({ events: [] }));
 }
 
 export function createUiCompositeLooper(options: CompositeLooperOptions): CompositeLooper {
@@ -88,27 +97,17 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   playButton.dataset.looperPlay = "1";
   controlRow.appendChild(playButton);
 
-  const measuresRow = document.createElement("div");
-  measuresRow.className = "ui-composite-looper-measures";
-  measuresRow.setAttribute("role", "list");
-  rootEl.appendChild(measuresRow);
+  const rebuildMeasureEls = (): void => {
+    // no-op: measure dots removed; timeline lives in the wild-tuna grid row
+  };
 
-  const measureEls = Array.from({ length: TOTAL_MEASURES }, (_, index) => {
-    const measure = document.createElement("span");
-    measure.className = "ui-composite-looper-measure";
-    measure.setAttribute("role", "listitem");
-    measure.setAttribute("aria-label", `Measure ${index + 1}`);
-    measure.dataset.looperMeasure = String(index);
-    measuresRow.appendChild(measure);
-    return measure;
-  });
-
-  const measureSlots = createMeasureSlots();
+  const measureSlots: MeasureSlot[] = [];
   const activeRecordedNotesBySource = new Map<string, ActiveRecordedNote>();
   const playbackTimeoutIds = new Set<number>();
   const pulseEndTimeoutIds = new Set<number>();
   const recordPulseTimeoutIds = new Set<number>();
 
+  let loopMeasureCount = 0;
   let recordState: LooperRecordState = "idle";
   let isTransportPlaying = false;
   let sawFirstMeasureBoundary = false;
@@ -120,6 +119,8 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   let currentMeasureStartPerfMs: number | null = null;
   let currentMeasureDurationMs = SAFE_MEASURE_DURATION_MS;
   let pulseEventSeq = 0;
+  let pendingSeekMeasure: number | null = null;
+
 
   const clearTimeoutSet = (timeouts: Set<number>): void => {
     timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -191,25 +192,29 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     const finalizedEvents = currentRecordingEvents
       .map((event) => ({ ...event, midis: [...event.midis] }))
       .sort((left, right) => left.startStep - right.startStep);
-    measureSlots[recordingMeasureIndex] = { events: finalizedEvents };
+    measureSlots.push({ events: finalizedEvents });
     currentRecordingEvents = [];
     recordedMeasuresInPass += 1;
-    nextWriteMeasureIndex = (recordingMeasureIndex + 1) % TOTAL_MEASURES;
+    nextWriteMeasureIndex = measureSlots.length;
+    if (recordedMeasuresInPass >= MAX_MEASURES && recordState === "recording") {
+      recordState = "stopping";
+    }
   };
 
   const stopRecordingAtBoundary = (): void => {
+    loopMeasureCount = measureSlots.length;
     recordState = "idle";
     recordingMeasureIndex = null;
     recordedMeasuresInPass = 0;
     activeRecordedNotesBySource.clear();
     currentRecordingEvents = [];
+    rebuildMeasureEls();
   };
 
   const startRecordingMeasure = (measureIndex: number): void => {
     recordingMeasureIndex = measureIndex;
     currentRecordingEvents = [];
     activeRecordedNotesBySource.clear();
-    measureSlots[measureIndex] = { events: [] };
     recordState = "recording";
   };
 
@@ -227,6 +232,7 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
 
   const schedulePlaybackForMeasure = (measureIndex: number, measureStartPerfMs: number): void => {
     if (!isTransportPlaying) return;
+    if (isRecordingOpen()) return;
     const slot = measureSlots[measureIndex];
     if (!slot || slot.events.length === 0) return;
     const stepDurationMs = currentMeasureDurationMs / STEPS_PER_MEASURE;
@@ -249,16 +255,12 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       }, eventDelayMs);
       playbackTimeoutIds.add(timeoutId);
     });
-    const activeMeasureEl = measureEls[measureIndex];
-    if (activeMeasureEl) {
-      triggerTransientClass(activeMeasureEl, "is-playback-pulse", PLAYBACK_MEASURE_PULSE_MS);
-    }
   };
 
   const updateUi = (): void => {
     const hasRecording = hasStoredContent(measureSlots);
-    const hasLoopingPlayback = hasRecording && isTransportPlaying;
     rootEl.classList.toggle("is-transport-playing", isTransportPlaying);
+    rootEl.classList.toggle("is-transport-stopped", !isTransportPlaying);
     rootEl.classList.toggle("is-armed", recordState === "armed");
     rootEl.classList.toggle(
       "is-recording",
@@ -274,35 +276,19 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     rootEl.dataset.looperState = recordState;
     recButton.setAttribute("aria-pressed", String(recordState !== "idle"));
     recButton.setAttribute("aria-label", recordState === "idle" ? "Record loop" : "Recording control");
+    recButton.disabled = false;
     playButton.setAttribute(
       "aria-pressed",
       String(recordState === "idle" && hasRecording && isTransportPlaying)
     );
     playButton.disabled = !hasRecording;
 
-    measureEls.forEach((measureEl, index) => {
-      const slot = measureSlots[index];
-      const isStored = (slot?.events.length ?? 0) > 0;
-      measureEl.classList.toggle("is-stored", isStored);
-      measureEl.classList.toggle("is-guide", !hasRecording && index === 0);
-      measureEl.classList.toggle("is-next-write", recordState === "armed" && index === nextWriteMeasureIndex);
-      measureEl.classList.toggle(
-        "is-recording",
-        (recordState === "recording" || recordState === "stopping") &&
-          recordingMeasureIndex === index
-      );
-      measureEl.classList.toggle(
-        "is-playback-active",
-        hasLoopingPlayback && playbackMeasureIndex === index && isStored
-      );
-    });
   };
 
   const onControlButtonClick = (): void => {
     if (recordState === "idle") {
-      recordState = "armed";
-      recordedMeasuresInPass = 0;
-      updateUi();
+      options.onRecButtonPressed?.();
+      // requestArm() will be called by coordinator (or directly if no coordinator)
       return;
     }
     if (recordState === "armed") {
@@ -323,15 +309,17 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       playbackMeasureIndex = 0;
       sawFirstMeasureBoundary = true;
     } else {
-      playbackMeasureIndex = (playbackMeasureIndex + 1) % TOTAL_MEASURES;
+      if (pendingSeekMeasure !== null) {
+        playbackMeasureIndex = pendingSeekMeasure;
+        pendingSeekMeasure = null;
+      } else {
+        const effectiveCount = loopMeasureCount > 0 ? loopMeasureCount : 1;
+        playbackMeasureIndex = (playbackMeasureIndex + 1) % effectiveCount;
+      }
     }
 
     if (recordState === "recording" || recordState === "stopping") {
       finalizeRecordedMeasure();
-    }
-
-    if (recordState === "recording" && recordedMeasuresInPass >= TOTAL_MEASURES) {
-      recordState = "stopping";
     }
 
     if (recordState === "stopping") {
@@ -418,6 +406,46 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     },
     recordHoldEnd(sourceId) {
       closeActiveRecordedSource(sourceId, performance.now());
+    },
+    // Coordinator API
+    requestArm() {
+      measureSlots.length = 0;
+      loopMeasureCount = 0;
+      nextWriteMeasureIndex = 0;
+      recordedMeasuresInPass = 0;
+      recordState = "armed";
+      updateUi();
+    },
+    requestStop() {
+      if (recordState === "recording") {
+        recordState = "stopping";
+        updateUi();
+      }
+    },
+    getRecordState() {
+      return recordState;
+    },
+    getLoopMeasureCount() {
+      return loopMeasureCount;
+    },
+    seekToMeasure(index) {
+      pendingSeekMeasure = clamp(index, 0, Math.max(0, (loopMeasureCount || 1) - 1));
+    },
+    loadLoop(slots) {
+      measureSlots.length = 0;
+      for (const slot of slots) {
+        measureSlots.push({
+          events: slot.events.map((e) => ({ ...e, midis: [...e.midis] })),
+        });
+      }
+      loopMeasureCount = measureSlots.length;
+      rebuildMeasureEls();
+      updateUi();
+    },
+    getMeasureSlots() {
+      return measureSlots.map((slot) => ({
+        events: slot.events.map((e) => ({ ...e, midis: [...e.midis] })),
+      }));
     },
     destroy() {
       recButton.removeEventListener("click", onControlButtonClick);

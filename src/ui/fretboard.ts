@@ -1,8 +1,10 @@
 import {
   getFretboardDots,
   getFretboardMidiAtPosition,
+  getKeyModeDegreeQuality,
   normalizeKeyModeType,
   normalizeChordType,
+  NOTE_TO_SEMITONE,
   type AnnotationType,
   type CharacteristicType,
   type DisplayType,
@@ -88,7 +90,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const markerPulseTimeouts = new WeakMap<HTMLElement, number>();
 
   const showControls = options.showControls ?? true;
-  const fretPressEvent = options.fretPressEvent ?? "click";
+  const fretPressEvent = options.fretPressEvent ?? "pointerdown";
   controls?.toggleAttribute("hidden", !showControls);
 
   const emitState = () => {
@@ -266,7 +268,19 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
       marker.dataset.fret = String(dot.fret);
       marker.dataset.root = isRoot ? "1" : "0";
       marker.dataset.midi = String(dot.midi ?? getFretboardMidiAtPosition(dot.stringIndex, dot.fret));
-      marker.textContent = state.annotation === "notes" ? dot.note : dot.degree;
+      let noteLabel = state.annotation === "notes" ? dot.note : dot.degree;
+      if (state.annotation === "notes" && state.display === "key") {
+        const mode = normalizeKeyModeType(state.characteristic);
+        if (mode) {
+          const rootSemitone = NOTE_TO_SEMITONE[state.root] ?? 0;
+          const noteSemitone = NOTE_TO_SEMITONE[dot.note] ?? 0;
+          const intervalFromRoot = ((noteSemitone - rootSemitone) + 12) % 12;
+          const quality = getKeyModeDegreeQuality(mode, intervalFromRoot);
+          if (quality === "minor") noteLabel += "m";
+          else if (quality === "diminished") noteLabel += "°";
+        }
+      }
+      marker.textContent = noteLabel;
       dotsLayer.append(marker);
     }
   };

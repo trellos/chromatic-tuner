@@ -94,6 +94,7 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
   const activeSources = new Set<AudioScheduledSourceNode>();
   let instrumentIndex = 0;
   let sustainVoice: SustainVoice | null = null;
+  let sustainStopRequested = false;
 
   const ensureAudioContext = async (): Promise<AudioContext | null> => {
     if (audioContext && audioContext.state !== "closed") {
@@ -261,6 +262,7 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
   };
 
   const stopSustain = (): void => {
+    sustainStopRequested = true;
     const voice = sustainVoice;
     if (!voice) return;
     sustainVoice = null;
@@ -284,13 +286,15 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
 
   const startSustainWithMidis = async (midis: number[]): Promise<void> => {
     if (!midis.length) return;
+    sustainStopRequested = false;
     const ctx = await ensureAudioContext();
-    if (!ctx) return;
+    if (!ctx || sustainStopRequested) return;
     const instrument = CIRCLE_INSTRUMENTS[instrumentIndex] ?? CIRCLE_INSTRUMENTS[0]!;
     const sample = await ensureSample(ctx, instrument.sampleUrl);
-    if (!sample) return;
+    if (!sample || sustainStopRequested) return;
     const loopRegion = deriveLoopRegion(instrument.sampleUrl, sample);
     stopSustain();
+    sustainStopRequested = false;
 
     const at = ctx.currentTime + 0.008;
     const sources: AudioBufferSourceNode[] = [];

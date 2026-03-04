@@ -77,6 +77,7 @@ body {
     radial-gradient(70% 55% at 50% 110%, rgba(18, 55, 140, 0.22) 0%, transparent 65%),
     radial-gradient(55% 45% at 6% 8%, rgba(55, 28, 130, 0.16) 0%, transparent 65%),
     linear-gradient(170deg, #030a1e 0%, #060f2a 45%, #07122f 70%, #020710 100%);
+  background-attachment: fixed;
   background-color: #050c20;
   color: #f8fafc;
   display: flex;
@@ -442,11 +443,14 @@ body.drum-fullscreen .mode-stage {
 
 .wild-tuna-composite {
   display: none;
-  gap: 12px;
+  gap: 8px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(150px, 0.9fr) minmax(300px, 1fr) minmax(180px, 1fr);
+  grid-template-rows: 1.1fr auto 2fr 1.6fr;
   height: 100%;
+  margin: 0 auto;
+  max-width: min(700px, 100%);
   min-height: 0;
+  overflow: hidden;
   width: 100%;
 }
 
@@ -461,19 +465,90 @@ body.drum-fullscreen .mode-stage {
   grid-row: 1;
 }
 
-.wild-tuna-pane--circle {
+.wild-tuna-timeline {
   grid-row: 2;
+  min-height: 0;
 }
 
-.wild-tuna-pane--fretboard {
+.wild-tuna-pane--circle {
   grid-row: 3;
 }
 
+.wild-tuna-pane--fretboard {
+  grid-row: 4;
+}
+
 .wild-tuna-circle-looper {
+  left: 10px;
   position: absolute;
-  right: 10px;
   top: 10px;
   z-index: 8;
+}
+
+.wild-tuna-timeline {
+  display: flex;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.wt-timeline-block {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(198, 210, 236, 0.13);
+  border: 1.5px solid rgba(222, 235, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  flex: 1 1 0;
+  height: 14px;
+  padding: 0;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 150ms ease;
+}
+
+.wt-timeline-block[data-fill="1"] {
+  background: rgba(80, 180, 120, 0.28);
+  border-color: rgba(130, 220, 165, 0.45);
+}
+
+.wt-timeline-block[data-fill="2"] {
+  background: rgba(80, 150, 240, 0.34);
+  border-color: rgba(130, 195, 255, 0.55);
+}
+
+.wt-timeline-block.is-current {
+  box-shadow:
+    0 0 0 2px rgba(108, 200, 255, 0.25),
+    0 0 12px rgba(108, 200, 255, 0.3);
+  transform: scaleY(1.5);
+}
+
+.wt-timeline-block.is-current[data-fill="0"] {
+  background: rgba(108, 200, 255, 0.45);
+  border-color: rgba(160, 230, 255, 0.85);
+}
+
+.wt-timeline-block.is-current[data-fill="1"] {
+  background: rgba(80, 210, 130, 0.6);
+  border-color: rgba(140, 240, 175, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(80, 210, 130, 0.2),
+    0 0 12px rgba(80, 210, 130, 0.4);
+}
+
+.wt-timeline-block.is-current[data-fill="2"] {
+  background: rgba(80, 160, 255, 0.65);
+  border-color: rgba(140, 205, 255, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(80, 160, 255, 0.22),
+    0 0 14px rgba(80, 160, 255, 0.45);
+}
+
+.wt-timeline-block:hover:not(.is-current) {
+  background: rgba(198, 210, 236, 0.28);
+  border-color: rgba(222, 235, 255, 0.42);
 }
 
 body.wild-tuna-fullscreen .app-header,
@@ -517,6 +592,7 @@ body.wild-tuna-fullscreen .wild-tuna-mode-shell {
   flex-direction: column;
   height: 100%;
   max-width: 100%;
+  overflow: hidden;
   width: 100%;
 }
 
@@ -526,8 +602,14 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-board {
 
 @media (max-width: 900px) {
   .wild-tuna-composite {
-    gap: 10px;
-    grid-template-rows: minmax(150px, 0.85fr) minmax(300px, 1fr) minmax(180px, 1.1fr);
+    gap: 8px;
+    grid-template-rows: 1.1fr auto 2fr 1.6fr;
+  }
+}
+
+@media (max-width: 430px) {
+  body.wild-tuna-fullscreen .wild-tuna-composite {
+    gap: 6px;
   }
 }
 
@@ -733,5 +815,16 @@ h1 {
 
 .hero-title::after {
   content: none;
+}
+
+/* Visually hidden but accessible to screen readers. */
+.sr-only {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 

@@ -90,7 +90,7 @@ const ZOOMED_VIEWBOX_SIZE = 700;
 const ZOOM_FOCUS_RADIUS = 165;
 const SECONDARY_WEDGE_DEG = 24;
 const DIM_WEDGE_DEG = 24;
-const INSTRUMENT_LABEL_ARC_SPAN_DEG = 148;
+
 const INSTRUMENT_LABEL_RADIUS = DIM_INNER_RADIUS - 18;
 const SECONDARY_CENTERS = [-30, 0, 30] as const;
 const SECONDARY_INTERVALS = [2, 4, 9] as const; // II, III, VI
@@ -316,14 +316,6 @@ function describeAnnularSector(
   ].join(" ");
 }
 
-function describeCircularArc(radius: number, startDeg: number, endDeg: number): string {
-  const start = polarPoint(radius, startDeg);
-  const end = polarPoint(radius, endDeg);
-  const sweep = endDeg - startDeg;
-  const largeArc = Math.abs(sweep) > 180 ? 1 : 0;
-  const sweepFlag = sweep >= 0 ? 1 : 0;
-  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} ${sweepFlag} ${end.x} ${end.y}`;
-}
 
 function getSelectionFromPrimary(primaryIndex: number): CircleSelection {
   const primary = OUTER_NOTES[primaryIndex] ?? OUTER_NOTES[0]!;
@@ -447,7 +439,6 @@ export function createCircleOfFifthsUi(
   const defs = createSvgEl("defs");
   const outerHintThirdId = `cof-outer-hint-third-${instanceId}`;
   const outerHintDimId = `cof-outer-hint-dim-${instanceId}`;
-  const instrumentTextPathId = `cof-instrument-label-path-${instanceId}`;
   appendRadialHintGradient(defs, outerHintThirdId, "rgb(124, 58, 237)", "0.5");
   appendRadialHintGradient(defs, outerHintDimId, "rgb(255, 158, 0)", "0.44");
 
@@ -460,9 +451,6 @@ export function createCircleOfFifthsUi(
   clipPathShape.setAttribute("r", String(OUTER_INNER_RADIUS - 6));
   clipPath.appendChild(clipPathShape);
   defs.appendChild(clipPath);
-  const instrumentTextPath = createSvgEl("path");
-  instrumentTextPath.setAttribute("id", instrumentTextPathId);
-  defs.appendChild(instrumentTextPath);
   svg.appendChild(defs);
 
   const detailGroup = createSvgEl("g", "cof-detail");
@@ -480,11 +468,9 @@ export function createCircleOfFifthsUi(
   });
   const instrumentLabelGroup = createSvgEl("g", "cof-instrument-label-layer");
   const instrumentLabelText = createSvgEl("text", "cof-instrument-label");
-  const instrumentLabelTextPath = createSvgEl("textPath");
-  instrumentLabelTextPath.setAttribute("href", `#${instrumentTextPathId}`);
-  instrumentLabelTextPath.setAttribute("startOffset", "50%");
-  instrumentLabelTextPath.textContent = "ACOUSTIC GUITAR";
-  instrumentLabelText.appendChild(instrumentLabelTextPath);
+  instrumentLabelText.setAttribute("x", String(CENTER));
+  instrumentLabelText.setAttribute("y", String(CENTER + INSTRUMENT_LABEL_RADIUS));
+  instrumentLabelText.textContent = "ACOUSTIC GUITAR";
   instrumentLabelGroup.appendChild(instrumentLabelText);
   const outerPulseGroup = createSvgEl("g", "cof-pulse-layer");
   const detailPulseGroup = createSvgEl("g", "cof-pulse-layer cof-pulse-layer--detail");
@@ -644,12 +630,7 @@ export function createCircleOfFifthsUi(
   };
 
   const updateInstrumentLabelPlacement = (): void => {
-    const primaryForPlacement = primaryIndex ?? 0;
-    const oppositeDeg = primaryForPlacement * OUTER_STEP_DEG + 180;
-    const startDeg = oppositeDeg - INSTRUMENT_LABEL_ARC_SPAN_DEG / 2;
-    const endDeg = oppositeDeg + INSTRUMENT_LABEL_ARC_SPAN_DEG / 2;
-    instrumentTextPath.setAttribute("d", describeCircularArc(INSTRUMENT_LABEL_RADIUS, startDeg, endDeg));
-    instrumentLabelTextPath.textContent = instrumentLabel;
+    instrumentLabelText.textContent = instrumentLabel;
   };
 
   const applyChordZoom = (): void => {

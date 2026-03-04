@@ -16,6 +16,7 @@ const SHOW_STATUS = new URLSearchParams(window.location.search).has("debug");
 let statusEl: HTMLElement | null = null;
 let noteEl: HTMLElement | null = null;
 let centsEl: HTMLElement | null = null;
+let liveRegionEl: HTMLElement | null = null;
 let strobeVisualizerEl: HTMLElement | null = null;
 let tunaFieldEl: HTMLElement | null = null;
 let tunerVisualButtons: NodeListOf<HTMLButtonElement> | null = null;
@@ -207,6 +208,7 @@ function setStatus(msg: string): void {
 function setReading(note: string | null, cents: string | null): void {
   if (noteEl) noteEl.textContent = note ?? "";
   if (centsEl) centsEl.textContent = cents ?? "";
+  if (liveRegionEl) liveRegionEl.textContent = note && cents ? `${note}, ${cents}` : "";
 }
 
 function updateStrobeVisualizerRotation(centsValue: number | null, isDetecting: boolean): void {
@@ -307,6 +309,7 @@ async function enterTunerMode(): Promise<void> {
   statusEl = document.getElementById("status");
   noteEl = document.getElementById("note");
   centsEl = document.getElementById("cents");
+  liveRegionEl = document.getElementById("tuner-live");
   strobeVisualizerEl = document.getElementById("strobe-visualizer");
   tunaFieldEl = document.getElementById("tuna-field");
   tunerVisualButtons = document.querySelectorAll<HTMLButtonElement>("[data-tuner-visual]");
@@ -496,6 +499,7 @@ function exitTunerMode(): void {
   statusEl = null;
   noteEl = null;
   centsEl = null;
+  liveRegionEl = null;
   strobeVisualizerEl = null;
   tunaFieldEl = null;
   tunerVisualButtons = null;
