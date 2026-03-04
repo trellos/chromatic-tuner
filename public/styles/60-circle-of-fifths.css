@@ -259,7 +259,7 @@
 }
 
 .cof-mode-banner.is-scrolling {
-  animation: cof-mode-banner-indicator 2200ms ease-out forwards;
+  animation: cof-mode-banner-indicator 2400ms linear forwards;
 }
 
 .cof-note-bar {
@@ -559,13 +559,13 @@
     opacity: 0;
     transform: translateX(0);
   }
-  58% {
+  10% {
     opacity: 0.78;
-    transform: translateX(-560px);
+    transform: translateX(-104px);
   }
-  80% {
-    opacity: 0.7;
-    transform: translateX(-820px);
+  85% {
+    opacity: 0.78;
+    transform: translateX(-884px);
   }
   100% {
     opacity: 0;
