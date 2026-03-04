@@ -132,7 +132,9 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   const getQuantizedStartStep = (eventPerfMs: number): number => {
     if (currentMeasureStartPerfMs === null) return 0;
     const ratio = (eventPerfMs - currentMeasureStartPerfMs) / Math.max(1, currentMeasureDurationMs);
-    return clamp(Math.floor(ratio * STEPS_PER_MEASURE), 0, STEPS_PER_MEASURE - 1);
+    // Round to nearest step boundary so notes played slightly ahead of the beat
+    // snap forward (to the beat) rather than backward (to the previous grid slot).
+    return clamp(Math.round(ratio * STEPS_PER_MEASURE), 0, STEPS_PER_MEASURE - 1);
   };
 
   const getQuantizedEndStep = (eventPerfMs: number, startStep: number): number => {
@@ -140,7 +142,8 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       return clamp(startStep + MIN_EVENT_STEPS, 1, STEPS_PER_MEASURE);
     }
     const ratio = (eventPerfMs - currentMeasureStartPerfMs) / Math.max(1, currentMeasureDurationMs);
-    const rawEnd = Math.ceil(ratio * STEPS_PER_MEASURE);
+    // Round end to nearest step boundary, then enforce minimum note duration.
+    const rawEnd = Math.round(ratio * STEPS_PER_MEASURE);
     const minEnd = startStep + MIN_EVENT_STEPS;
     return clamp(rawEnd, minEnd, STEPS_PER_MEASURE);
   };
