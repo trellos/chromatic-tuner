@@ -16,29 +16,20 @@ import {
   FRETBOARD_SAMPLE_GAIN,
   fetchFretboardSample,
 } from "../audio/fretboard-sample.js";
-import { createUiCompositeLooper, type CompositeLooper, type CompositeLooperMeasureSlot } from "../ui/ui-composite-looper.js";
+import { createUiCompositeLooper, type CompositeLooper } from "../ui/ui-composite-looper.js";
 import { getOrCreateAudioContext } from "../utils.js";
 import type { ModeDefinition } from "./types.js";
 import { seigaihaBridge } from "../app/seigaiha-bridge.js";
 import { setCarouselHidden } from "../app/carousel-bridge.js";
+import { createSessionTransport } from "../app/session-transport.js";
+import {
+  decodeWildTunaTrackPayload,
+  encodeWildTunaTrackPayload,
+  type WildTunaTrackPayload,
+} from "../app/share-payloads.js";
 
-const WILD_TUNA_TRACK_VERSION = 1;
-
-type WildTunaTrackPayload = {
-  v: number;
-  drum: string;
-  fret: FretboardState;
-  loops: Array<{ id: string; measures: CompositeLooperMeasureSlot[] }>;
-};
-
-const toBase64Url = (value: string) =>
-  btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-
-const fromBase64Url = (value: string) => {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-  return atob(padded);
-};
+// Fixed number of measures shown in the timeline and cycled during playback.
+const GLOBAL_MEASURE_COUNT = 4;
 
 function serializeWildTunaShareUrl(
   drumUi: DrumMachineUi,
@@ -47,7 +38,7 @@ function serializeWildTunaShareUrl(
   fretState: FretboardState
 ): string {
   const payload: WildTunaTrackPayload = {
-    v: WILD_TUNA_TRACK_VERSION,
+    v: 1,
     drum: drumUi.getTrackPayload(),
     fret: { ...fretState },
     loops: [
@@ -55,29 +46,12 @@ function serializeWildTunaShareUrl(
       { id: "fretboard", measures: fretboardLooper.getMeasureSlots() },
     ],
   };
-  const encoded = toBase64Url(JSON.stringify(payload));
+  const encoded = encodeWildTunaTrackPayload(payload);
   const url = new URL(window.location.href);
   url.searchParams.set("mode", "wild-tuna");
   url.searchParams.set("track", encoded);
   return url.toString();
 }
-
-function parseWildTunaTrackPayload(encoded: string): WildTunaTrackPayload | null {
-  try {
-    const raw = fromBase64Url(encoded);
-    const parsed = JSON.parse(raw) as Partial<WildTunaTrackPayload>;
-    if (parsed.v !== WILD_TUNA_TRACK_VERSION) return null;
-    if (typeof parsed.drum !== "string") return null;
-    if (!parsed.fret || typeof parsed.fret !== "object") return null;
-    if (!Array.isArray(parsed.loops)) return null;
-    return parsed as WildTunaTrackPayload;
-  } catch {
-    return null;
-  }
-}
-
-// Fixed number of measures shown in the timeline and cycled during playback.
-const GLOBAL_MEASURE_COUNT = 4;
 
 // Coordinator: enforces mutual-exclusion recording across loopers and
 // handles the count-in flow when transport is stopped.
@@ -192,9 +166,8 @@ function createNoteCountTracker(onChange: (randomness: number) => void) {
 //   - Both loopers receive onTransportStart/Stop and onBeatBoundary.
 //   - On each measure boundary (beatIndex === 0), looper state advances:
 //       armed → recording → stopping → idle
-//   - globalMeasureIndex is tracked separately from each looper's
-//     internal playbackMeasureIndex so the timeline can display a
-//     single authoritative position independent of loop lengths.
+//   - Session transport tracks the shared measure index so timeline updates
+//     stay deterministic even when loopers have different internal loop lengths.
 //
 // Save/load:
 //   - Share button serializes drum pattern + both loop slots to base64url JSON.
@@ -219,11 +192,12 @@ export function createWildTunaMode(): ModeDefinition {
   let fretboardUi: ReturnType<typeof createFretboardUi> | null = null;
   let fretboardLooper: CompositeLooper | null = null;
   let fretboardState: FretboardState = { ...FRETBOARD_DEFAULT_STATE };
-  let globalMeasureIndex = 0;
   const guitarPlayer = createCircleGuitarPlayer();
   let audioContext: AudioContext | null = null;
   let fretSample: AudioBuffer | null = null;
   const noteTracker = createNoteCountTracker((r) => seigaihaBridge.setModeRandomness(r));
+
+  let sessionTransport = createSessionTransport();
 
   const ensureAudioContext = async (): Promise<AudioContext | null> => {
     audioContext = await getOrCreateAudioContext(audioContext);
@@ -282,6 +256,7 @@ export function createWildTunaMode(): ModeDefinition {
     canFullscreen: true,
     onEnter: async () => {
       noteTracker.reset();
+      sessionTransport = createSessionTransport();
       modeAbort?.abort();
       modeAbort = new AbortController();
       if (fullscreenTrigger) {
@@ -327,26 +302,13 @@ export function createWildTunaMode(): ModeDefinition {
       // Drum machine generates its own DOM; wild-tuna just appends drumUi.rootEl.
       drumUi = createDrumMachineUi({
         onTransportStart: () => {
-          // Reset measure counter so the first onBeatBoundary increments to 0.
-          globalMeasureIndex = -1;
-          circleLooper?.onTransportStart();
-          fretboardLooper?.onTransportStart();
-          timelineUi?.update(0, coordinator.getFillCounts());
+          sessionTransport.notifyStart();
         },
         onTransportStop: () => {
-          globalMeasureIndex = -1;
-          circleLooper?.onTransportStop();
-          fretboardLooper?.onTransportStop();
+          sessionTransport.notifyStop();
         },
         onBeatBoundary: (event) => {
-          // Forward beat events to both loopers so they can advance state.
-          circleLooper?.onBeatBoundary(event);
-          fretboardLooper?.onBeatBoundary(event);
-          // Update the global timeline indicator once per measure (beat 0).
-          if (event.beatIndex === 0) {
-            globalMeasureIndex = (globalMeasureIndex + 1) % Math.max(1, coordinator.getMaxMeasureCount());
-            timelineUi?.update(globalMeasureIndex, coordinator.getFillCounts());
-          }
+          sessionTransport.notifyBeatBoundary(event);
         },
         onShareOverride: () => {
           void (async () => {
@@ -366,6 +328,25 @@ export function createWildTunaMode(): ModeDefinition {
         },
       });
       drumHost.replaceChildren(drumUi.rootEl);
+
+      // Transport coordinator owns event ordering and shared measure index for both loopers.
+      sessionTransport.onStart(() => {
+        circleLooper?.onTransportStart();
+        fretboardLooper?.onTransportStart();
+        timelineUi?.update(0, coordinator.getFillCounts());
+      });
+      sessionTransport.onStop(() => {
+        circleLooper?.onTransportStop();
+        fretboardLooper?.onTransportStop();
+      });
+      sessionTransport.onBeatBoundary((event) => {
+        circleLooper?.onBeatBoundary(event);
+        fretboardLooper?.onBeatBoundary(event);
+        if (event.beatIndex === 0) {
+          const measureIndex = sessionTransport.getMeasureIndex() % Math.max(1, coordinator.getMaxMeasureCount());
+          timelineUi?.update(measureIndex, coordinator.getFillCounts());
+        }
+      });
 
       circleUi = createCircleOfFifthsUi(circleHost, {
         onPrimaryTap: (selection) => {
@@ -445,10 +426,7 @@ export function createWildTunaMode(): ModeDefinition {
           const block = (event.target as Element)?.closest<HTMLElement>("[data-measure]");
           const idx = block ? parseInt(block.dataset.measure ?? "", 10) : NaN;
           if (!isNaN(idx)) {
-            // Adjust globalMeasureIndex so that the next onBeatBoundary increment
-            // lands on the tapped measure (idx). The increment adds 1, so set
-            // globalMeasureIndex to idx - 1 (wrapping around).
-            globalMeasureIndex = (idx - 1 + coordinator.getMaxMeasureCount()) % coordinator.getMaxMeasureCount();
+            sessionTransport.setMeasureIndexBeforeNextBoundary(idx, coordinator.getMaxMeasureCount());
             timelineUi?.update(idx, coordinator.getFillCounts());
             coordinator.seekAll(idx);
           }
@@ -460,8 +438,9 @@ export function createWildTunaMode(): ModeDefinition {
       const params = new URLSearchParams(window.location.search);
       const trackParam = params.get("track");
       if (trackParam) {
-        const payload = parseWildTunaTrackPayload(trackParam);
-        if (payload) {
+        const parsed = decodeWildTunaTrackPayload(trackParam);
+        if (parsed.ok) {
+          const payload = parsed.value;
           await drumUi.loadTrackPayload(payload.drum);
           const circleData = payload.loops.find((l) => l.id === "circle");
           const fretData = payload.loops.find((l) => l.id === "fretboard");
