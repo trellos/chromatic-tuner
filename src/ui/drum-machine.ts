@@ -1,6 +1,10 @@
 import { DRUM_MACHINE_SAMPLE_URLS } from "../audio/embedded-samples.js";
 import { WOODBLOCK_SAMPLE_URLS } from "../audio/woodblock-samples.js";
 import { clamp } from "../utils.js";
+import {
+  decodeDrumTrackPayload,
+  encodeDrumTrackPayload,
+} from "../app/share-payloads.js";
 
 export function getDrumSoundingBeatIndicesFromFlags(
   beatHasSoundByBeat: boolean[]
@@ -393,27 +397,10 @@ export function createDrumMachineUi(
     `;
   };
 
-  type SharedTrackPayload = {
-    version: number;
-    bpm: number;
-    kit: KitId;
-    steps: string;
-  };
-
   // Shared URL format: ?mode=drum-machine&track=<base64url(JSON)>
   // JSON payload (v1): { version: 1, bpm: number, kit: KitId, steps: string }
   // `steps` is a 64-char row-major bitstring for the 4x16 grid; parser also accepts legacy `v`.
   const TRACK_PARAM_KEY = "track";
-  const TRACK_FORMAT_VERSION = 1;
-
-  const toBase64Url = (value: string) =>
-    btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-
-  const fromBase64Url = (value: string) => {
-    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
-    return atob(padded);
-  };
 
   const isKitId = (value: string): value is KitId => value in DRUM_KITS;
   const setKitLabel = () => {
@@ -723,13 +710,12 @@ export function createDrumMachineUi(
 
   const getShareUrl = () => {
     const activeGrid = getActiveGrid();
-    const payload: SharedTrackPayload = {
-      version: TRACK_FORMAT_VERSION,
+    const encoded = encodeDrumTrackPayload({
+      version: 1,
       bpm,
       kit: currentKit,
       steps: getTrackStepBits(activeGrid),
-    };
-    const encoded = toBase64Url(JSON.stringify(payload));
+    });
     const url = new URL(window.location.href);
     url.searchParams.set("mode", "drum-machine");
     url.searchParams.set(TRACK_PARAM_KEY, encoded);
@@ -738,58 +724,34 @@ export function createDrumMachineUi(
 
   const getTrackPayload = (): string => {
     const activeGrid = getActiveGrid();
-    const payload: SharedTrackPayload = {
-      version: TRACK_FORMAT_VERSION,
+    return encodeDrumTrackPayload({
+      version: 1,
       bpm,
       kit: currentKit,
       steps: getTrackStepBits(activeGrid),
-    };
-    return toBase64Url(JSON.stringify(payload));
+    });
+  };
+
+  const applyDecodedTrackPayload = async (encoded: string): Promise<boolean> => {
+    const decoded = decodeDrumTrackPayload(encoded);
+    if (!decoded.ok) return false;
+    const parsed = decoded.value;
+    setBpm(parsed.bpm);
+    if (isKitId(parsed.kit)) {
+      await setKit(parsed.kit);
+    }
+    return applyTrackStepBits(getActiveGrid(), parsed.steps);
   };
 
   const loadTrackPayload = async (encoded: string): Promise<boolean> => {
-    try {
-      const raw = fromBase64Url(encoded);
-      const parsed = JSON.parse(raw) as Partial<SharedTrackPayload> & { v?: number };
-      const parsedVersion =
-        typeof parsed.version === "number"
-          ? parsed.version
-          : typeof parsed.v === "number"
-            ? parsed.v
-            : null;
-      if (parsedVersion !== TRACK_FORMAT_VERSION || typeof parsed.steps !== "string") return false;
-      if (typeof parsed.bpm === "number") setBpm(parsed.bpm);
-      if (typeof parsed.kit === "string" && isKitId(parsed.kit)) {
-        await setKit(parsed.kit);
-      }
-      return applyTrackStepBits(getActiveGrid(), parsed.steps);
-    } catch {
-      return false;
-    }
+    return applyDecodedTrackPayload(encoded);
   };
 
   const hydrateTrackFromUrl = async () => {
     const params = new URLSearchParams(window.location.search);
     const encodedTrack = params.get(TRACK_PARAM_KEY);
     if (!encodedTrack) return false;
-    try {
-      const raw = fromBase64Url(encodedTrack);
-      const parsed = JSON.parse(raw) as Partial<SharedTrackPayload> & { v?: number };
-      const parsedVersion =
-        typeof parsed.version === "number"
-          ? parsed.version
-          : typeof parsed.v === "number"
-            ? parsed.v
-            : null;
-      if (parsedVersion !== TRACK_FORMAT_VERSION || typeof parsed.steps !== "string") return false;
-      if (typeof parsed.bpm === "number") setBpm(parsed.bpm);
-      if (typeof parsed.kit === "string" && isKitId(parsed.kit)) {
-        await setKit(parsed.kit);
-      }
-      return applyTrackStepBits(getActiveGrid(), parsed.steps);
-    } catch {
-      return false;
-    }
+    return applyDecodedTrackPayload(encodedTrack);
   };
 
   const applyStandardRock = () => {

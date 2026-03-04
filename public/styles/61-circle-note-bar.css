@@ -1,0 +1,146 @@
+/* Circle note-bar styles are isolated to reduce cascade risk when tuning wedge visuals. */
+.cof-note-bar {
+  bottom: 16px;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(12, minmax(0, 1fr));
+  pointer-events: auto;
+  position: absolute;
+  right: 8px;
+  top: 14px;
+  width: 116px;
+}
+
+.cof-note-row {
+  align-items: stretch;
+  column-gap: 5px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  min-height: 0;
+  position: relative;
+}
+
+.cof-note-cell {
+  --cof-note-pop-scale: 1.26;
+  background-color: rgba(124, 58, 237, 0.22);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(8, 18, 40, 0.14);
+  cursor: pointer;
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  position: relative;
+  transform: scale(1);
+  transform-origin: center;
+}
+
+.cof-note-cell-label {
+  color: rgba(248, 251, 255, 0.96);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  position: relative;
+  text-shadow:
+    0 1px 0 rgba(8, 18, 40, 0.36),
+    0 0 6px rgba(8, 18, 40, 0.22);
+  text-transform: none;
+  z-index: 2;
+}
+
+.cof-note-row-degree {
+  align-items: center;
+  color: rgba(226, 239, 255, 0.96);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  justify-content: flex-end;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding-right: 2px;
+  text-shadow:
+    0 1px 0 rgba(8, 18, 40, 0.48),
+    0 0 4px rgba(8, 18, 40, 0.22);
+  text-transform: uppercase;
+}
+
+.cof-note-cell.is-active {
+  transform: scale(var(--cof-note-pop-scale));
+}
+
+.cof-note-cell.is-root {
+  --cof-note-pop-scale: 1.48;
+}
+
+.cof-frame.has-primary .cof-note-cell[data-degree="i"] {
+  background-color: rgba(149, 192, 210, 0.9);
+}
+
+.cof-frame.has-primary .cof-note-cell[data-degree="iv"],
+.cof-frame.has-primary .cof-note-cell[data-degree="v"] {
+  background-color: rgba(185, 173, 212, 0.9);
+}
+
+.cof-frame.has-primary .cof-note-cell[data-degree="ii"],
+.cof-frame.has-primary .cof-note-cell[data-degree="iii"],
+.cof-frame.has-primary .cof-note-cell[data-degree="vi"],
+.cof-frame.has-primary .cof-note-cell[data-degree="vii"] {
+  background-color: rgba(189, 168, 207, 0.82);
+}
+
+.cof-frame.has-primary .cof-note-cell[data-diatonic="false"] {
+  opacity: 0.56;
+}
+
+.cof-note-trail {
+  --cof-note-trail-stretch-ms: 400ms;
+  --cof-note-trail-growth: 460px;
+  --cof-note-trail-initial-scale: 0.16;
+  background: rgba(0, 245, 212, 0.5);
+  border-radius: 6px;
+  display: block;
+  height: 100%;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform: translateX(0) scaleX(var(--cof-note-trail-initial-scale));
+  transform-origin: right center;
+  width: var(--cof-note-trail-growth);
+  z-index: 1;
+}
+
+.cof-note-trail.is-stretching {
+  animation: cof-note-trail-stretch var(--cof-note-trail-stretch-ms) linear forwards;
+}
+
+.cof-note-trail.is-floating {
+  animation: cof-note-trail-float-left 2000ms linear forwards;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .cof-note-bar {
+    bottom: 14px;
+    gap: 2px;
+    right: 6px;
+    top: 12px;
+    width: 102px;
+  }
+
+  .cof-note-cell {
+    border-radius: 5px;
+  }
+
+  .cof-note-cell-label {
+    font-size: 10px;
+  }
+
+  .cof-note-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .cof-note-row-degree {
+    font-size: 10px;
+  }
+}

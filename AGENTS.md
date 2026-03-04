@@ -89,6 +89,8 @@
 - Timeline blocks (`.wt-timeline-block`) show 4 global measures; tapping seeks all loopers.
 - Share URL (`?mode=wild-tuna&track=<base64url(JSON)>`) encodes drum pattern + loop MIDI for both instruments.
 - `globalMeasureIndex` tracks the active timeline measure independently of each looper's internal position.
+- Shared transport/session event bus for cross-UI timing coordination: `src/app/session-transport.ts` (used by Wild Tuna to fan out drum transport start/stop/beat events deterministically).
+- Share payload encode/decode + version/schema validation lives in `src/app/share-payloads.ts`; avoid ad-hoc base64/JSON parsers in mode/UI files.
 
 ## Extra Jimmy mode notes
 - Entry point: `src/modes/extra-jimmy.ts`.
@@ -113,9 +115,11 @@
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
 - Avoid test-only branches in runtime code.
+- Prefer unit tests for pure state/serialization modules (`src/app/share-payloads.ts`, `src/app/session-transport.ts`) and reserve Playwright for integrated UI flows.
 
 ## CSS maintainability
 - CSS lint rules are defined in `.stylelintrc.cjs`.
 - Keep drift low by running `npm run lint:css:fix` on style edits.
 - Property order is enforced (`stylelint-order`) to keep diffs deterministic.
 - Styles are split into ordered files under `public/styles/` and imported via `public/style.css`; see `docs/CSS_MAINTENANCE.md`.
+- Circle note-bar/trail styles are isolated in `public/styles/61-circle-note-bar.css` to reduce regressions while iterating wedge/zoom visuals.
