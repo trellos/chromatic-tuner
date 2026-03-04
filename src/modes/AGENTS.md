@@ -144,3 +144,21 @@ Do not preserve dead paths "for later" unless explicitly requested.
 - Tuner supports visual sub-modes (`strobe`, `circle`) via in-mode toggle.
 - Pitch detection drives Circle primary note + detune-guidance rotation when Circle view is active.
 - No detected note must clear Circle primary and hide inner detail wedges.
+
+### Wild Tuna (`src/modes/wild-tuna.ts`)
+- Three-pane jam mode: Drum Machine | Circle of Fifths | Fretboard with synchronized MIDI loop recording.
+- Entry point: `src/modes/wild-tuna.ts` (coordinator + mode wiring).
+- Reusable looper widget: `src/ui/ui-composite-looper.ts` (two instances: circle + fretboard).
+- The drum machine transport drives all timing; loopers receive `onTransportStart/Stop/BeatBoundary`.
+- `globalMeasureIndex` in wild-tuna tracks the timeline position independently from each looper's internal `playbackMeasureIndex`.
+- **Recording flow:**
+  - REC press calls `coordinator.onRecPressed(source)`.
+  - If transport is already playing: `source.requestArm()` → arms on next measure boundary → starts recording.
+  - If transport is stopped: drum machine plays a 4-beat woodblock count-in at current BPM, then `requestArm()` fires and transport starts. `requestArm()` also pre-sets `isTransportPlaying = true` in the looper so the first `onBeatBoundary` is not skipped.
+  - Only one looper can record at a time; pressing REC on one stops any other recording looper.
+  - Recording auto-stops after 4 measures (configurable via `MAX_MEASURES`).
+- **Timeline:** `buildWildTunaTimeline` renders 4 tappable measure blocks between the drum pane and the circle/fretboard panes. Tapping seeks all loopers to that measure.
+- **Save/load:** Share button serializes drum pattern + circle loop + fretboard loop to `?mode=wild-tuna&track=<base64url(JSON)>`. `onEnter` hydrates from URL if present.
+- **Fretboard state** (root, scale/chord mode, characteristic) is not serialized in share URLs — fretboard is re-created on each `onEnter` and the URL round-trip would require a post-construction setter.
+- **Seigaiha:** `noteTracker` converts active note count to a randomness value fed to `seigaihaBridge`; decays when notes stop sounding.
+- **CSS:** Layout lives in `public/styles/00-foundation.css` (`.wild-tuna-composite` grid). Timeline block styles are `.wt-timeline-block` in the same file.

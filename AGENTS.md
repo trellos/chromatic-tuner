@@ -80,6 +80,16 @@
 - Inner detail rotation should always follow shortest angular path when primary changes.
 - Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
 
+## Wild Tuna mode notes
+- Entry point: `src/modes/wild-tuna.ts`.
+- Three-pane layout: Drum Machine (top) | timeline row | Circle of Fifths + Fretboard (bottom).
+- Two `CompositeLooper` instances (`src/ui/ui-composite-looper.ts`) record MIDI from the Circle and Fretboard.
+- All timing is driven by the drum machine transport via `onTransportStart`, `onTransportStop`, `onBeatBoundary` callbacks.
+- REC logic is coordinated centrally: only one looper records at a time; if transport is stopped, pressing REC triggers a 4-beat woodblock count-in before recording starts.
+- Timeline blocks (`.wt-timeline-block`) show 4 global measures; tapping seeks all loopers.
+- Share URL (`?mode=wild-tuna&track=<base64url(JSON)>`) encodes drum pattern + loop MIDI for both instruments.
+- `globalMeasureIndex` tracks the active timeline measure independently of each looper's internal position.
+
 ## Extra Jimmy mode notes
 - Entry point: `src/modes/extra-jimmy.ts`.
 - Harmony calculation logic: `getDiatonicHarmonyMidi()` in `src/fretboard-logic.ts`.

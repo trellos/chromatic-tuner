@@ -168,6 +168,7 @@ Primary implementation:
 
 Integration points:
 - `src/modes/drum-machine.ts` (mode adapter)
+- `src/modes/wild-tuna.ts` (embedded in Wild Tuna layout)
 - `src/main.ts` (`window.__tunaUiObjects` exposure for coexistence testing)
 
 ### Drum invariants
@@ -176,3 +177,56 @@ Integration points:
 2. Transport and scheduling behavior must match existing mode behavior.
 3. Share/hydration contract (`track` base64url payload) must remain deterministic.
 4. Randomness callback emits `null` on exit and bounded `0..1` values while active.
+
+### Count-in
+
+- `countIn(onComplete)` plays a 4-beat woodblock count-in at current BPM using Web Audio API.
+- On completion: calls `onComplete()` then starts transport.
+- Visual: `is-count-in` + `is-count-in-beat` classes on `drumMockEl` for CSS animation.
+- Should only be called when transport is stopped (`isPlaying === false`).
+- Used by Wild Tuna coordinator when REC is pressed with transport stopped.
+
+### Wild Tuna integration notes
+
+- Wild Tuna passes `onShareOverride` to replace the drum machine's default share URL behavior.
+- Wild Tuna serializes the full session (drum pattern + loop MIDI data) via `getTrackPayload()` / `loadTrackPayload()`.
+- Wild Tuna tracks global measure position externally via `onBeatBoundary`; the drum machine does not own measure-level timing for loopers.
+
+## Composite Looper UI
+
+Primary implementation:
+- `src/ui/ui-composite-looper.ts`
+
+Integration points:
+- `src/modes/wild-tuna.ts` (two instances: circle looper + fretboard looper)
+
+### What it does
+
+A self-contained REC/PLAY widget that records and plays back quantized MIDI events
+synchronized to an external transport (the drum machine). Each instance manages:
+- A REC button (arms → records → stops) and a PLAY button (toggles playback).
+- Up to `MAX_MEASURES` (4) of recorded measure slots (growable per pass).
+- Quantization: note events are snapped to 16 steps per measure.
+- Playback: scheduled via `setTimeout` relative to `performance.now()`.
+
+### State machine
+
+```
+idle ──[REC press]──→ armed ──[measure boundary]──→ recording
+                                                         │
+                      idle ←──[measure boundary]── stopping ←──[REC press or MAX_MEASURES reached]
+```
+
+`requestArm()` transitions `idle → armed` externally (called by the coordinator).
+`requestStop()` transitions `recording → stopping` externally.
+
+### API contract
+
+- `onTransportStart()` / `onTransportStop()`: called by mode when drum transport changes.
+- `onBeatBoundary(event)`: drives state machine; measure boundary is `beatIndex === 0`.
+- `recordPulse(midis, durationMs)`: records a short tap event (e.g. circle tap).
+- `recordHoldStart(sourceId, midis)` / `recordHoldEnd(sourceId)`: records a sustained hold.
+- `requestArm()`: clears previous loop + arms for recording; also pre-sets `isTransportPlaying = true` to handle the count-in case where arm fires before `onTransportStart`.
+- `loadLoop(slots)`: hydrates looper with saved slot data (from share URL).
+- `getMeasureSlots()`: returns deep-copy of recorded slots for serialization.
+- `seekToMeasure(index)`: schedules a playback-head jump at next measure boundary.

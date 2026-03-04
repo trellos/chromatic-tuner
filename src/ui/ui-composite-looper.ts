@@ -97,10 +97,6 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   playButton.dataset.looperPlay = "1";
   controlRow.appendChild(playButton);
 
-  const rebuildMeasureEls = (): void => {
-    // no-op: measure dots removed; timeline lives in the wild-tuna grid row
-  };
-
   const measureSlots: MeasureSlot[] = [];
   const activeRecordedNotesBySource = new Map<string, ActiveRecordedNote>();
   const playbackTimeoutIds = new Set<number>();
@@ -208,7 +204,6 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     recordedMeasuresInPass = 0;
     activeRecordedNotesBySource.clear();
     currentRecordingEvents = [];
-    rebuildMeasureEls();
   };
 
   const startRecordingMeasure = (measureIndex: number): void => {
@@ -414,6 +409,10 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       nextWriteMeasureIndex = 0;
       recordedMeasuresInPass = 0;
       recordState = "armed";
+      // Mark transport as playing so onBeatBoundary is processed when transport starts
+      // (handles count-in path where requestArm fires before onTransportStart).
+      isTransportPlaying = true;
+      sawFirstMeasureBoundary = false;
       updateUi();
     },
     requestStop() {
@@ -439,7 +438,6 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
         });
       }
       loopMeasureCount = measureSlots.length;
-      rebuildMeasureEls();
       updateUi();
     },
     getMeasureSlots() {

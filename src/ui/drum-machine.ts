@@ -44,8 +44,6 @@ export type DrumMachineUiOptions = {
   }) => void;
   /** If provided, replaces the default share-URL behaviour with a custom handler. */
   onShareOverride?: () => void;
-  /** Called when a timeline measure block is tapped. Index is 0-based. */
-  onMeasureSeek?: (measureIndex: number) => void;
 };
 
 export type DrumMachineUi = {
@@ -56,8 +54,6 @@ export type DrumMachineUi = {
   getTrackPayload: () => string;
   /** Applies a drum payload previously obtained from getTrackPayload(). Returns true on success. */
   loadTrackPayload: (payload: string) => Promise<boolean>;
-  /** Updates the global measure timeline indicator. fillCounts[i] = number of instruments with content in measure i. */
-  setTimeline: (currentMeasure: number, totalMeasures: number, fillCounts?: number[]) => void;
   getBpm: () => number;
   isPlaying: () => boolean;
   /** Play a 4-beat woodblock count-in at current BPM, pulse the grid, then start transport and call onComplete. */
@@ -243,15 +239,8 @@ function buildDrumDOM() {
   drumGridsEl.appendChild(playheadEl);
   drumGridsEl.appendChild(drumGrid44);
 
-  // Timeline row — shows global measure position across all loopers (Wild Tuna only)
-  const timelineEl = document.createElement("div");
-  timelineEl.className = "drum-timeline";
-  timelineEl.setAttribute("aria-label", "Loop timeline");
-  timelineEl.hidden = true;
-
   rotatorEl.appendChild(drumUiEl);
   rotatorEl.appendChild(drumGridsEl);
-  rotatorEl.appendChild(timelineEl);
   drumMockEl.appendChild(rotatorEl);
 
   const tempoButtons = drumMockEl.querySelectorAll<HTMLButtonElement>("[data-tempo]");
@@ -260,7 +249,6 @@ function buildDrumDOM() {
     drumMockEl,
     drumGridsEl,
     playheadEl,
-    timelineEl,
     playButton,
     beatButton,
     beatMenu,
@@ -287,7 +275,6 @@ export function createDrumMachineUi(
     drumMockEl,
     drumGridsEl,
     playheadEl,
-    timelineEl,
     playButton,
     beatButton,
     beatMenu,
@@ -781,34 +768,6 @@ export function createDrumMachineUi(
     }
   };
 
-  let timelineBlockEls: HTMLElement[] = [];
-
-  const setTimeline = (currentMeasure: number, totalMeasures: number, fillCounts?: number[]): void => {
-    if (!timelineEl) return;
-    const clampedTotal = Math.max(1, totalMeasures);
-    // Rebuild blocks if count changed
-    if (timelineBlockEls.length !== clampedTotal) {
-      timelineEl.replaceChildren();
-      timelineBlockEls = [];
-      for (let i = 0; i < clampedTotal; i++) {
-        const block = document.createElement("button");
-        block.type = "button";
-        block.className = "drum-timeline-block";
-        block.dataset.timelineMeasure = String(i);
-        block.setAttribute("aria-label", `Jump to measure ${i + 1}`);
-        timelineEl.appendChild(block);
-        timelineBlockEls.push(block);
-      }
-      timelineEl.hidden = false;
-    }
-    const clampedCurrent = Math.max(0, Math.min(currentMeasure, clampedTotal - 1));
-    timelineBlockEls.forEach((block, i) => {
-      block.classList.toggle("is-current", i === clampedCurrent);
-      const fill = fillCounts?.[i] ?? 0;
-      block.dataset.fill = String(Math.min(fill, 2));
-    });
-  };
-
   const hydrateTrackFromUrl = async () => {
     const params = new URLSearchParams(window.location.search);
     const encodedTrack = params.get(TRACK_PARAM_KEY);
@@ -1284,21 +1243,6 @@ export function createDrumMachineUi(
       );
     }
 
-    // Timeline — seek on tap
-    if (timelineEl && options.onMeasureSeek) {
-      timelineEl.addEventListener(
-        "click",
-        (event) => {
-          const target = event.target as HTMLElement | null;
-          const block = target?.closest<HTMLElement>("[data-timeline-measure]");
-          if (!block) return;
-          const index = Number(block.dataset.timelineMeasure);
-          if (Number.isFinite(index)) options.onMeasureSeek?.(index);
-        },
-        { signal }
-      );
-    }
-
   };
 
   const enter = async () => {
@@ -1339,7 +1283,6 @@ export function createDrumMachineUi(
     getShareUrl,
     getTrackPayload,
     loadTrackPayload,
-    setTimeline,
     getBpm: () => bpm,
     isPlaying: () => isPlaying,
     countIn,

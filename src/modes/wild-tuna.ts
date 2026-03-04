@@ -76,27 +76,42 @@ function parseWildTunaTrackPayload(encoded: string): WildTunaTrackPayload | null
   }
 }
 
+// Fixed number of measures shown in the timeline and cycled during playback.
 const GLOBAL_MEASURE_COUNT = 4;
 
+// Coordinator: enforces mutual-exclusion recording across loopers and
+// handles the count-in flow when transport is stopped.
+//
+// Flow for REC press:
+//   1. onRecPressed(source) stops all other active loopers.
+//   2. If transport is already playing: arm source immediately.
+//   3. If transport is stopped: trigger a 4-beat woodblock count-in on the
+//      drum machine, then arm source and start transport together.
 function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi: () => ReturnType<typeof createDrumMachineUi> | null) {
   return {
     onRecPressed(source: CompositeLooper) {
       const drumUi = getDrumUi();
+      // Stop any other actively-recording looper so only one records at a time.
       for (const looper of getLoopers()) {
         if (looper !== source) looper.requestStop();
       }
       if (drumUi && !drumUi.isPlaying()) {
+        // Transport is stopped: play 4-beat count-in then arm + start transport.
         drumUi.countIn(() => source.requestArm());
       } else {
+        // Transport already running: arm immediately on next measure boundary.
         source.requestArm();
       }
     },
+    // Seek all loopers to a specific measure index (used by timeline click).
     seekAll(measureIndex: number) {
       for (const looper of getLoopers()) looper.seekToMeasure(measureIndex);
     },
     getMaxMeasureCount() {
       return GLOBAL_MEASURE_COUNT;
     },
+    // Returns how many loopers have recorded content in each measure slot.
+    // Values are 0 (empty), 1, or 2 — used for timeline fill coloring.
     getFillCounts(): number[] {
       const counts = Array<number>(GLOBAL_MEASURE_COUNT).fill(0);
       for (const looper of getLoopers()) {
@@ -110,6 +125,9 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
   };
 }
 
+// Builds the row of measure-indicator buttons between the drum machine and
+// Circle/Fretboard panes. Each block is tappable to seek all loopers.
+// `update(currentMeasure, fillCounts)` refreshes highlight + fill color.
 function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
   host.replaceChildren();
   const blocks: HTMLElement[] = [];
@@ -129,7 +147,6 @@ function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
         block.dataset.fill = String(Math.min(fillCounts[i] ?? 0, 2));
       });
     },
-    onSeek: null as ((index: number) => void) | null,
   };
 }
 
@@ -156,6 +173,32 @@ function createNoteCountTracker(onChange: (randomness: number) => void) {
   };
 }
 
+// Wild Tuna mode: a three-pane jam workspace combining Drum Machine,
+// Circle of Fifths, and Fretboard with synchronized MIDI loop recording.
+//
+// Architecture overview:
+//   ┌─────────────────────────────────────────────────────────────────┐
+//   │  DrumMachine  →  onTransportStart/Stop/BeatBoundary callbacks  │
+//   │       ↓                                                        │
+//   │  LooperCoordinator  →  exclusive REC + count-in logic         │
+//   │       ↓                                                        │
+//   │  CircleLooper + FretboardLooper (CompositeLooper instances)    │
+//   │       ↓  (onPlaybackEvent)                                     │
+//   │  playCircleMidis / playFretTargets  →  audio + visual pulse   │
+//   └─────────────────────────────────────────────────────────────────┘
+//
+// Transport lifecycle:
+//   - Drum machine starts/stops transport.
+//   - Both loopers receive onTransportStart/Stop and onBeatBoundary.
+//   - On each measure boundary (beatIndex === 0), looper state advances:
+//       armed → recording → stopping → idle
+//   - globalMeasureIndex is tracked separately from each looper's
+//     internal playbackMeasureIndex so the timeline can display a
+//     single authoritative position independent of loop lengths.
+//
+// Save/load:
+//   - Share button serializes drum pattern + both loop slots to base64url JSON.
+//   - URL param `?mode=wild-tuna&track=<payload>` hydrates on onEnter.
 export function createWildTunaMode(): ModeDefinition {
   const modeEl = document.querySelector<HTMLElement>('.mode-screen[data-mode="wild-tuna"]');
   if (!modeEl) {
@@ -251,7 +294,8 @@ export function createWildTunaMode(): ModeDefinition {
         fretboardTemplate ? fretboardTemplate.content.cloneNode(true) : document.createDocumentFragment()
       );
 
-      // Create coordinator before loopers so onRecButtonPressed can reference it
+      // Coordinator is created first so the loopers can reference it in
+      // their onRecButtonPressed callbacks (circular reference via closures).
       const coordinator = createLooperCoordinator(
         () => {
           const loopers: CompositeLooper[] = [];
@@ -280,9 +324,10 @@ export function createWildTunaMode(): ModeDefinition {
         onRecButtonPressed: () => coordinator.onRecPressed(fretboardLooper!),
       });
 
-      // createDrumMachineUi generates its own DOM — no cloneNode hack needed.
+      // Drum machine generates its own DOM; wild-tuna just appends drumUi.rootEl.
       drumUi = createDrumMachineUi({
         onTransportStart: () => {
+          // Reset measure counter so the first onBeatBoundary increments to 0.
           globalMeasureIndex = -1;
           circleLooper?.onTransportStart();
           fretboardLooper?.onTransportStart();
@@ -294,8 +339,10 @@ export function createWildTunaMode(): ModeDefinition {
           fretboardLooper?.onTransportStop();
         },
         onBeatBoundary: (event) => {
+          // Forward beat events to both loopers so they can advance state.
           circleLooper?.onBeatBoundary(event);
           fretboardLooper?.onBeatBoundary(event);
+          // Update the global timeline indicator once per measure (beat 0).
           if (event.beatIndex === 0) {
             globalMeasureIndex = (globalMeasureIndex + 1) % Math.max(1, coordinator.getMaxMeasureCount());
             timelineUi?.update(globalMeasureIndex, coordinator.getFillCounts());
@@ -316,9 +363,6 @@ export function createWildTunaMode(): ModeDefinition {
               window.prompt("Copy this Wild Tuna URL", url);
             }
           })();
-        },
-        onMeasureSeek: (measureIndex) => {
-          coordinator.seekAll(measureIndex);
         },
       });
       drumHost.replaceChildren(drumUi.rootEl);
@@ -401,7 +445,9 @@ export function createWildTunaMode(): ModeDefinition {
           const block = (event.target as Element)?.closest<HTMLElement>("[data-measure]");
           const idx = block ? parseInt(block.dataset.measure ?? "", 10) : NaN;
           if (!isNaN(idx)) {
-            // Set globalMeasureIndex so the next onBeatBoundary increment lands on idx
+            // Adjust globalMeasureIndex so that the next onBeatBoundary increment
+            // lands on the tapped measure (idx). The increment adds 1, so set
+            // globalMeasureIndex to idx - 1 (wrapping around).
             globalMeasureIndex = (idx - 1 + coordinator.getMaxMeasureCount()) % coordinator.getMaxMeasureCount();
             timelineUi?.update(idx, coordinator.getFillCounts());
             coordinator.seekAll(idx);
