@@ -91,6 +91,8 @@ export function createCircleOfFifthsMode(): ModeDefinition {
       lastTapPlaybackSignature = "";
       circleUi?.destroy();
       const initialInstrumentName = guitarPlayer.setInstrument("guitar-acoustic");
+      // Pre-fetch the sample bytes so only decodeAudioData remains on first tap.
+      guitarPlayer.preloadCurrentInstrument();
       circleUi = createCircleOfFifthsUi(mountEl, {
         // UI -> mode callback usage:
         // - interaction callbacks map to playback/state transitions.

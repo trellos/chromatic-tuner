@@ -82,12 +82,18 @@ export type CircleGuitarPlayer = {
   cycleInstrument: () => string;
   setInstrument: (instrumentId: CircleInstrumentId) => string;
   getInstrumentName: () => string;
+  /** Pre-fetches the raw bytes for the current instrument so decodeAudioData is
+   *  the only remaining work when the first note is played. Safe to call without
+   *  an AudioContext — no decoding happens here. */
+  preloadCurrentInstrument: () => void;
   stopAll: () => void;
   destroy: () => Promise<void>;
 };
 
 export function createCircleGuitarPlayer(): CircleGuitarPlayer {
   let audioContext: AudioContext | null = null;
+  const sampleBytesByUrl = new Map<string, ArrayBuffer>();
+  const sampleBytesPromiseByUrl = new Map<string, Promise<ArrayBuffer | null>>();
   const sampleBufferByUrl = new Map<string, AudioBuffer>();
   const sampleLoadPromiseByUrl = new Map<string, Promise<AudioBuffer | null>>();
   const sampleLoopRegionByUrl = new Map<string, { startSec: number; endSec: number }>();
@@ -108,6 +114,28 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
     return audioContext;
   };
 
+  const prefetchSampleBytes = (sampleUrl: string): Promise<ArrayBuffer | null> => {
+    const cached = sampleBytesByUrl.get(sampleUrl);
+    if (cached) return Promise.resolve(cached);
+    const inFlight = sampleBytesPromiseByUrl.get(sampleUrl);
+    if (inFlight) return inFlight;
+    const promise = (async () => {
+      try {
+        const response = await fetch(sampleUrl);
+        if (!response.ok) return null;
+        const bytes = await response.arrayBuffer();
+        sampleBytesByUrl.set(sampleUrl, bytes);
+        return bytes;
+      } catch {
+        return null;
+      } finally {
+        sampleBytesPromiseByUrl.delete(sampleUrl);
+      }
+    })();
+    sampleBytesPromiseByUrl.set(sampleUrl, promise);
+    return promise;
+  };
+
   const ensureSample = async (ctx: AudioContext, sampleUrl: string): Promise<AudioBuffer | null> => {
     const cached = sampleBufferByUrl.get(sampleUrl);
     if (cached) return cached;
@@ -117,10 +145,9 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
 
     const sampleLoadPromise = (async () => {
       try {
-        const response = await fetch(sampleUrl);
-        if (!response.ok) return null;
-        const arrayBuffer = await response.arrayBuffer();
-        const decoded = await ctx.decodeAudioData(arrayBuffer);
+        const bytes = await prefetchSampleBytes(sampleUrl);
+        if (!bytes) return null;
+        const decoded = await ctx.decodeAudioData(bytes.slice(0));
         sampleBufferByUrl.set(sampleUrl, decoded);
         return decoded;
       } catch {
@@ -390,6 +417,11 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
     sampleLoopRegionByUrl.clear();
   };
 
+  const preloadCurrentInstrument = (): void => {
+    const instrument = CIRCLE_INSTRUMENTS[instrumentIndex] ?? CIRCLE_INSTRUMENTS[0]!;
+    void prefetchSampleBytes(instrument.sampleUrl);
+  };
+
   const cycleInstrument = (): string => {
     instrumentIndex = (instrumentIndex + 1) % CIRCLE_INSTRUMENTS.length;
     return CIRCLE_INSTRUMENTS[instrumentIndex]?.name ?? "ACOUSTIC GUITAR";
@@ -411,6 +443,7 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
     startSustainMidi: (midi: number) => startSustainWithMidis([midi]),
     startSustainChord: (midis: number[]) => startSustainWithMidis(midis),
     stopSustain,
+    preloadCurrentInstrument,
     cycleInstrument,
     setInstrument,
     getInstrumentName,
