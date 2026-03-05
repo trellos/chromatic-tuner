@@ -143,6 +143,10 @@ Integration points:
    - pointer-up/cancel/leave stops sustain with a short release envelope.
 16. Chord zoom safety:
    - zoom target should keep the primary harmonic cluster (`I`, `IV`, `V`, `ii`, `iii`, `vi`, `vii°`) visible within the SVG viewport.
+17. Playback responsiveness is a hard requirement:
+   - note/chord onset is part of instrument feel, not just visual confirmation.
+   - outer wedge and note-bar playback should fire immediately on pointer-down for touch/pen/mouse.
+   - avoid intentional single-tap delay windows for click-vs-dblclick arbitration on audio-trigger paths.
 
 ### Circle test expectations
 
@@ -160,6 +164,7 @@ Integration points:
 - Verify inner-circle background double-tap cycles instrument indicator text deterministically.
 - Verify zoomed chord view does not clip the primary harmonic cluster in desktop and portrait mobile.
 - Verify wedge pointer hold toggles the holding lifecycle state (`is-holding`) deterministically.
+- Verify pointer-down triggers playback state before pointer-up on both touch-like and mouse-like inputs.
 
 ## Drum Machine UI (shared object)
 
