@@ -276,9 +276,9 @@ function pulseTunerCircleRandomness(durationMs: number): void {
 function ensureTunerCircleUi(): void {
   if (!tunerCircleHostEl || tunerCircleUi) return;
   tunerCircleUi = createCircleOfFifthsUi(tunerCircleHostEl, {
-    onPrimaryTap: (selection) => {
+    onOuterTap: (note) => {
       pulseTunerCircleRandomness(440);
-      void tunerCircleAudio.playMidi(selection.primaryMidi, 420);
+      void tunerCircleAudio.playMidi(note.midi, 420);
     },
     onSecondaryTap: (chord) => {
       pulseTunerCircleRandomness(680);

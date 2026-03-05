@@ -84,21 +84,29 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   const recButton = document.createElement("button");
   recButton.className = "ui-composite-looper-btn ui-composite-looper-btn--rec";
   recButton.type = "button";
-  recButton.textContent = "REC";
   recButton.setAttribute("aria-label", "Record loop");
   recButton.dataset.looperRec = "1";
+  const recDot = document.createElement("span");
+  recDot.className = "ui-composite-looper-rec-dot";
+  recButton.appendChild(recDot);
+  const recLabel = document.createElement("span");
+  recLabel.textContent = "REC";
+  recButton.appendChild(recLabel);
   controlRow.appendChild(recButton);
 
-  const playButton = document.createElement("button");
-  playButton.className = "ui-composite-looper-btn ui-composite-looper-btn--play";
-  playButton.type = "button";
-  playButton.textContent = "PLAY";
-  playButton.setAttribute("aria-label", "Play loop");
-  playButton.dataset.looperPlay = "1";
-  controlRow.appendChild(playButton);
+  const clearButton = document.createElement("button");
+  clearButton.className = "ui-composite-looper-btn ui-composite-looper-btn--clear";
+  clearButton.type = "button";
+  clearButton.textContent = "CLR";
+  clearButton.setAttribute("aria-label", "Clear loop");
+  controlRow.appendChild(clearButton);
 
   const measureSlots: MeasureSlot[] = [];
   const activeRecordedNotesBySource = new Map<string, ActiveRecordedNote>();
+  // Notes played while armed (before the first measure boundary) are buffered here.
+  // They flush into activeRecordedNotesBySource at step 0 when recording actually starts.
+  // durationMs is stored so each pulse gets a proper close timeout after flushing.
+  const preArmBuffer = new Map<string, { midis: number[]; durationMs: number }>();
   const playbackTimeoutIds = new Set<number>();
   const pulseEndTimeoutIds = new Set<number>();
   const recordPulseTimeoutIds = new Set<number>();
@@ -106,8 +114,8 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   let loopMeasureCount = 0;
   let recordState: LooperRecordState = "idle";
   let isTransportPlaying = false;
-  let sawFirstMeasureBoundary = false;
-  let playbackMeasureIndex = 0;
+  // -1 sentinel: first boundary increments to 0, giving a clean start without a flag.
+  let playbackMeasureIndex = -1;
   let nextWriteMeasureIndex = 0;
   let recordingMeasureIndex: number | null = null;
   let recordedMeasuresInPass = 0;
@@ -116,6 +124,9 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   let currentMeasureDurationMs = SAFE_MEASURE_DURATION_MS;
   let pulseEventSeq = 0;
   let pendingSeekMeasure: number | null = null;
+  // Separate from pendingSeekMeasure: set by seekToMeasure, consumed only by requestArm.
+  // This ensures a queued recording target survives count-in beat boundaries.
+  let recordingSeekTarget: number | null = null;
 
 
   const clearTimeoutSet = (timeouts: Set<number>): void => {
@@ -191,17 +202,21 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     const finalizedEvents = currentRecordingEvents
       .map((event) => ({ ...event, midis: [...event.midis] }))
       .sort((left, right) => left.startStep - right.startStep);
-    measureSlots.push({ events: finalizedEvents });
+    // Write to the specific measure slot (overwrite if it already exists).
+    measureSlots[recordingMeasureIndex] = { events: finalizedEvents };
     currentRecordingEvents = [];
     recordedMeasuresInPass += 1;
-    nextWriteMeasureIndex = measureSlots.length;
+    // Advance write index; wrap around the loop when overwriting existing content.
+    const writeCount = loopMeasureCount > 0 ? loopMeasureCount : MAX_MEASURES;
+    nextWriteMeasureIndex = (recordingMeasureIndex + 1) % writeCount;
     if (recordedMeasuresInPass >= MAX_MEASURES && recordState === "recording") {
       recordState = "stopping";
     }
   };
 
   const stopRecordingAtBoundary = (): void => {
-    loopMeasureCount = measureSlots.length;
+    // Extend loopMeasureCount if we recorded new slots beyond the previous loop.
+    loopMeasureCount = Math.max(loopMeasureCount, measureSlots.length);
     recordState = "idle";
     recordingMeasureIndex = null;
     recordedMeasuresInPass = 0;
@@ -213,6 +228,21 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     recordingMeasureIndex = measureIndex;
     currentRecordingEvents = [];
     activeRecordedNotesBySource.clear();
+    // Flush notes that were played while armed (before this boundary) into step 0
+    // so they aren't silently dropped. Schedule a close timeout per entry so
+    // pre-arm pulses get correct duration rather than spanning the full measure.
+    preArmBuffer.forEach((entry, sourceId) => {
+      activeRecordedNotesBySource.set(sourceId, { midis: entry.midis, startStep: 0 });
+      // durationMs > 0 = pulse: schedule auto-close. 0 = open hold: wait for recordHoldEnd.
+      if (entry.durationMs > 0) {
+        const timeoutId = window.setTimeout(() => {
+          recordPulseTimeoutIds.delete(timeoutId);
+          closeActiveRecordedSource(sourceId, performance.now());
+        }, entry.durationMs);
+        recordPulseTimeoutIds.add(timeoutId);
+      }
+    });
+    preArmBuffer.clear();
     recordState = "recording";
   };
 
@@ -266,20 +296,12 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     );
     rootEl.classList.toggle("is-stop-queued", recordState === "stopping");
     rootEl.classList.toggle("has-recording", hasRecording);
-    rootEl.classList.toggle(
-      "is-play-mode",
-      recordState === "idle" && hasRecording && isTransportPlaying
-    );
     rootEl.classList.toggle("is-rec-active", recordState !== "idle");
     rootEl.dataset.looperState = recordState;
     recButton.setAttribute("aria-pressed", String(recordState !== "idle"));
     recButton.setAttribute("aria-label", recordState === "idle" ? "Record loop" : "Recording control");
     recButton.disabled = false;
-    playButton.setAttribute(
-      "aria-pressed",
-      String(recordState === "idle" && hasRecording && isTransportPlaying)
-    );
-    playButton.disabled = !hasRecording;
+    clearButton.disabled = !hasRecording || recordState !== "idle";
 
   };
 
@@ -303,17 +325,14 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   const onMeasureBoundary = (measureStartPerfMs: number): void => {
     currentMeasureDurationMs = readMeasureDurationMs();
     currentMeasureStartPerfMs = measureStartPerfMs;
-    if (!sawFirstMeasureBoundary) {
-      playbackMeasureIndex = 0;
-      sawFirstMeasureBoundary = true;
+
+    if (pendingSeekMeasure !== null) {
+      playbackMeasureIndex = pendingSeekMeasure;
+      pendingSeekMeasure = null;
     } else {
-      if (pendingSeekMeasure !== null) {
-        playbackMeasureIndex = pendingSeekMeasure;
-        pendingSeekMeasure = null;
-      } else {
-        const effectiveCount = loopMeasureCount > 0 ? loopMeasureCount : 1;
-        playbackMeasureIndex = (playbackMeasureIndex + 1) % effectiveCount;
-      }
+      // -1 sentinel: first call yields (−1+1)%effectiveCount = 0.
+      const effectiveCount = loopMeasureCount > 0 ? loopMeasureCount : 1;
+      playbackMeasureIndex = (playbackMeasureIndex + 1) % effectiveCount;
     }
 
     if (recordState === "recording" || recordState === "stopping") {
@@ -322,9 +341,7 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
 
     if (recordState === "stopping") {
       stopRecordingAtBoundary();
-    } else if (recordState === "armed") {
-      startRecordingMeasure(nextWriteMeasureIndex);
-    } else if (recordState === "recording") {
+    } else if (recordState === "armed" || recordState === "recording") {
       startRecordingMeasure(nextWriteMeasureIndex);
     }
 
@@ -333,27 +350,39 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
   };
 
   recButton.addEventListener("click", onControlButtonClick);
-  playButton.addEventListener("click", onControlButtonClick);
+  clearButton.addEventListener("click", () => {
+    if (recordState !== "idle") return;
+    measureSlots.length = 0;
+    loopMeasureCount = 0;
+    updateUi();
+  });
   updateUi();
 
   return {
     rootEl,
     onTransportStart() {
+      // If armed or recording (count-in path where requestArm() fired before
+      // startTransport()), do not clobber currentMeasureStartPerfMs or reset
+      // the playback index — recording state is already correctly initialised.
+      if (recordState === "armed" || recordState === "recording") {
+        isTransportPlaying = true;
+        updateUi();
+        return;
+      }
       isTransportPlaying = true;
-      sawFirstMeasureBoundary = false;
-      playbackMeasureIndex = 0;
+      playbackMeasureIndex = -1;
       currentMeasureStartPerfMs = null;
       currentMeasureDurationMs = readMeasureDurationMs();
       updateUi();
     },
     onTransportStop() {
       isTransportPlaying = false;
-      sawFirstMeasureBoundary = false;
-      playbackMeasureIndex = 0;
+      playbackMeasureIndex = -1;
       currentMeasureStartPerfMs = null;
       clearTimeoutSet(playbackTimeoutIds);
       clearTimeoutSet(recordPulseTimeoutIds);
-      if (isRecordingOpen()) {
+      if (isRecordingOpen() || recordState === "armed") {
+        preArmBuffer.clear();
         activeRecordedNotesBySource.clear();
         currentRecordingEvents = [];
         recordState = "idle";
@@ -376,12 +405,19 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       onMeasureBoundary(measureStartPerfMs);
     },
     recordPulse(midis, durationMs) {
+      const cleanedMidis = sanitizeMidis(midis);
+      if (!cleanedMidis.length) return;
+      // If armed but measure hasn't started yet, buffer the note so it lands at step 0.
+      if (recordState === "armed" && currentMeasureStartPerfMs === null) {
+        const sourceId = `pulse-${pulseEventSeq++}`;
+        const clampedDurationMs = Math.max(0, durationMs);
+        preArmBuffer.set(sourceId, { midis: cleanedMidis, durationMs: clampedDurationMs });
+        return;
+      }
       if (!isRecordingOpen()) return;
       const sourceId = `pulse-${pulseEventSeq++}`;
       const clampedDurationMs = Math.max(0, durationMs);
       const now = performance.now();
-      const cleanedMidis = sanitizeMidis(midis);
-      if (!cleanedMidis.length) return;
       if (currentMeasureStartPerfMs === null) return;
       const startStep = getQuantizedStartStep(now);
       activeRecordedNotesBySource.set(sourceId, { midis: cleanedMidis, startStep });
@@ -392,10 +428,16 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       recordPulseTimeoutIds.add(timeoutId);
     },
     recordHoldStart(sourceId, midis) {
-      if (!isRecordingOpen()) return;
-      if (!sourceId.trim()) return;
       const cleanedMidis = sanitizeMidis(midis);
       if (!cleanedMidis.length) return;
+      if (!sourceId.trim()) return;
+      // If armed but measure hasn't started yet, buffer the hold at step 0.
+      // durationMs: 0 marks it as an open hold — no auto-close at flush.
+      if (recordState === "armed" && currentMeasureStartPerfMs === null) {
+        preArmBuffer.set(sourceId, { midis: cleanedMidis, durationMs: 0 });
+        return;
+      }
+      if (!isRecordingOpen()) return;
       if (currentMeasureStartPerfMs === null) return;
       const now = performance.now();
       closeActiveRecordedSource(sourceId, now);
@@ -407,15 +449,23 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     },
     // Coordinator API
     requestArm() {
-      measureSlots.length = 0;
-      loopMeasureCount = 0;
-      nextWriteMeasureIndex = 0;
+      preArmBuffer.clear();
+      if (loopMeasureCount === 0) {
+        // No existing loop: start fresh.
+        measureSlots.length = 0;
+        nextWriteMeasureIndex = 0;
+      } else {
+        // Overwrite mode: keep existing slots; write starting at the seek target
+        // (recordingSeekTarget survives count-in boundaries; fall back to playback position).
+        nextWriteMeasureIndex = recordingSeekTarget ?? playbackMeasureIndex;
+        recordingSeekTarget = null;
+      }
       recordedMeasuresInPass = 0;
       recordState = "armed";
       // Mark transport as playing so onBeatBoundary is processed when transport starts
       // (handles count-in path where requestArm fires before onTransportStart).
       isTransportPlaying = true;
-      sawFirstMeasureBoundary = false;
+      playbackMeasureIndex = -1;
       updateUi();
     },
     requestStop() {
@@ -431,7 +481,10 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       return loopMeasureCount;
     },
     seekToMeasure(index) {
-      pendingSeekMeasure = clamp(index, 0, Math.max(0, (loopMeasureCount || 1) - 1));
+      const clamped = clamp(index, 0, Math.max(0, (loopMeasureCount || 1) - 1));
+      pendingSeekMeasure = clamped;
+      // Also capture as a recording seek target so it survives count-in beat boundaries.
+      recordingSeekTarget = clamped;
     },
     loadLoop(slots) {
       measureSlots.length = 0;
@@ -450,7 +503,6 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     },
     destroy() {
       recButton.removeEventListener("click", onControlButtonClick);
-      playButton.removeEventListener("click", onControlButtonClick);
       clearTimeoutSet(playbackTimeoutIds);
       clearTimeoutSet(pulseEndTimeoutIds);
       clearTimeoutSet(recordPulseTimeoutIds);

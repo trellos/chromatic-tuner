@@ -23,10 +23,8 @@ export type CircleOfFifthsUiOptions = {
   // Usage limits:
   // - Callbacks should not directly mutate Circle UI DOM internals; use returned UI methods instead.
   // - Callbacks should be quick and non-blocking (no long sync work), because they run on interaction paths.
-  onPrimaryTap?: (selection: CircleSelection) => void;
   onSecondaryTap?: (chord: CircleChordSpec) => void;
   onOuterTap?: (note: CircleNoteTap) => void;
-  onOuterDoubleTap?: (note: CircleNoteTap) => void;
   onOuterPressStart?: (note: CircleNoteTap) => void;
   onOuterPressEnd?: (note: CircleNoteTap) => void;
   onSecondaryPressStart?: (chord: CircleChordSpec) => void;
@@ -38,18 +36,12 @@ export type CircleOfFifthsUiOptions = {
   onBackgroundTap?: () => void;
   onBackgroundPulseRequest?: () => void;
   onBackgroundRandomnessRequest?: (randomness: number) => void;
-  onChordModeChange?: (enabled: boolean) => void;
-};
-
-export type CircleChordModeOptions = {
-  zoomToPrimary?: boolean;
 };
 
 export type CircleOfFifthsUi = {
   setPrimaryByLabel: (label: string | null) => void;
   setPrimaryByMidi: (midi: number | null) => void;
   setTuningCents: (cents: number | null) => void;
-  setChordMode: (enabled: boolean, options?: CircleChordModeOptions) => void;
   setMinorMode: (enabled: boolean) => void;
   setInstrumentLabel: (text: string) => void;
   showInnerIndicator: (text: string) => void;
@@ -71,6 +63,8 @@ export type CircleNoteTap = {
   label: string;
   midi: number;
   isPrimary: boolean;
+  zone: "note" | "chord";
+  movesPrimary: boolean;
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -466,11 +460,21 @@ export function createCircleOfFifthsUi(
     modeBannerGroup.appendChild(text);
     return text;
   });
+  // Instrument label arcs along the inner circle, antipodal to the detail wedges.
+  const instrumentArcId = `cof-instrument-arc-${instanceId}`;
+  const instrumentArcPath = createSvgEl("path");
+  instrumentArcPath.setAttribute("id", instrumentArcId);
+  instrumentArcPath.setAttribute("fill", "none");
+  defs.appendChild(instrumentArcPath);
+
   const instrumentLabelGroup = createSvgEl("g", "cof-instrument-label-layer");
   const instrumentLabelText = createSvgEl("text", "cof-instrument-label");
-  instrumentLabelText.setAttribute("x", String(CENTER));
-  instrumentLabelText.setAttribute("y", String(CENTER + INSTRUMENT_LABEL_RADIUS));
-  instrumentLabelText.textContent = "ACOUSTIC GUITAR";
+  const instrumentTextPath = createSvgEl("textPath");
+  instrumentTextPath.setAttribute("href", `#${instrumentArcId}`);
+  instrumentTextPath.setAttribute("startOffset", "50%");
+  instrumentTextPath.setAttribute("text-anchor", "middle");
+  instrumentTextPath.textContent = "ACOUSTIC GUITAR";
+  instrumentLabelText.appendChild(instrumentTextPath);
   instrumentLabelGroup.appendChild(instrumentLabelText);
   const outerPulseGroup = createSvgEl("g", "cof-pulse-layer");
   const detailPulseGroup = createSvgEl("g", "cof-pulse-layer cof-pulse-layer--detail");
@@ -523,15 +527,16 @@ export function createCircleOfFifthsUi(
     const startPress = (event: PointerEvent): void => {
       if (activePointerId !== null) return;
       activePointerId = event.pointerId;
-      pulseNoteCells([semitone], semitone, 520);
-      options.onBackgroundPulseRequest?.();
-      options.onBackgroundRandomnessRequest?.(0.75);
+      // Play immediately on pointerdown so the note sounds on mobile where
+      // click fires after pointerup but is then suppressed by endPress.
+      activate();
       options.onNoteBarPressStart?.(notePayload);
     };
     const endPress = (event: PointerEvent): void => {
       if (activePointerId === null) return;
       if (event.pointerId !== activePointerId) return;
       activePointerId = null;
+      // Suppress the browser's synthetic click so activate() isn't called twice.
       suppressNextClick = true;
       options.onNoteBarPressEnd?.(notePayload);
     };
@@ -565,10 +570,8 @@ export function createCircleOfFifthsUi(
 
   let primaryIndex: number | null = null;
   let selection: CircleSelection | null = null;
-  let chordModeEnabled = false;
   let minorModeEnabled = false;
   let instrumentLabel = "ACOUSTIC GUITAR";
-  let chordZoomPrimaryIndex: number | null = null;
   let detuneDeg = 0;
   let detailBaseDeg = 0;
   let pendingOuterClickTimeout: number | null = null;
@@ -629,26 +632,24 @@ export function createCircleOfFifthsUi(
     });
   };
 
-  const updateInstrumentLabelPlacement = (): void => {
-    instrumentLabelText.textContent = instrumentLabel;
-  };
+  const INSTRUMENT_ARC_RADIUS = INSTRUMENT_LABEL_RADIUS;
+  const INSTRUMENT_ARC_SPAN_DEG = 160;
 
-  const applyChordZoom = (): void => {
-    if (!chordModeEnabled || chordZoomPrimaryIndex === null) {
-      svg.setAttribute("viewBox", `0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`);
-      return;
-    }
-    const zoomCenterDeg = chordZoomPrimaryIndex * OUTER_STEP_DEG;
-    const focusPoint = polarPoint(ZOOM_FOCUS_RADIUS, zoomCenterDeg);
-    const half = ZOOMED_VIEWBOX_SIZE / 2;
-    const maxOffset = VIEWBOX_SIZE - ZOOMED_VIEWBOX_SIZE;
-    const x = clamp(focusPoint.x - half, 0, maxOffset);
-    const y = clamp(focusPoint.y - half, 0, maxOffset);
-    svg.setAttribute(
-      "viewBox",
-      `${x.toFixed(2)} ${y.toFixed(2)} ${ZOOMED_VIEWBOX_SIZE} ${ZOOMED_VIEWBOX_SIZE}`
+  const updateInstrumentLabelPlacement = (): void => {
+    instrumentTextPath.textContent = instrumentLabel;
+    // Arc is centered at the antipode of the detail wedge group so the label
+    // always appears on the opposite side from the inner circle wedges.
+    const antipodalDeg = normalizeDegrees(detailBaseDeg + 180);
+    const startDeg = antipodalDeg - INSTRUMENT_ARC_SPAN_DEG / 2;
+    const endDeg = antipodalDeg + INSTRUMENT_ARC_SPAN_DEG / 2;
+    const startPt = polarPoint(INSTRUMENT_ARC_RADIUS, startDeg);
+    const endPt = polarPoint(INSTRUMENT_ARC_RADIUS, endDeg);
+    instrumentArcPath.setAttribute(
+      "d",
+      `M ${startPt.x.toFixed(2)} ${startPt.y.toFixed(2)} A ${INSTRUMENT_ARC_RADIUS} ${INSTRUMENT_ARC_RADIUS} 0 0 1 ${endPt.x.toFixed(2)} ${endPt.y.toFixed(2)}`
     );
   };
+
 
   const queuePulseCleanup = (pulse: SVGGElement): void => {
     const timeoutId = window.setTimeout(() => {
@@ -827,6 +828,21 @@ export function createCircleOfFifthsUi(
       "transform",
       `translate(${CENTER} ${CENTER}) rotate(${angle.toFixed(2)}) translate(${-CENTER} ${-CENTER})`
     );
+    updateInstrumentLabelPlacement();
+  };
+
+  const applyChordZoom = (primaryIdx: number | null): void => {
+    if (primaryIdx === null) {
+      svg.setAttribute("viewBox", `0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`);
+      return;
+    }
+    const zoomCenterDeg = primaryIdx * OUTER_STEP_DEG;
+    const focusPoint = polarPoint(ZOOM_FOCUS_RADIUS, zoomCenterDeg);
+    const half = ZOOMED_VIEWBOX_SIZE / 2;
+    const maxOffset = VIEWBOX_SIZE - ZOOMED_VIEWBOX_SIZE;
+    const x = clamp(focusPoint.x - half, 0, maxOffset);
+    const y = clamp(focusPoint.y - half, 0, maxOffset);
+    svg.setAttribute("viewBox", `${x.toFixed(2)} ${y.toFixed(2)} ${ZOOMED_VIEWBOX_SIZE} ${ZOOMED_VIEWBOX_SIZE}`);
   };
 
   const setDetailBaseForPrimary = (index: number | null): void => {
@@ -854,6 +870,34 @@ export function createCircleOfFifthsUi(
     const hintPath = createSvgEl("path", "cof-wedge-hint");
     hintPath.setAttribute("d", describeAnnularSector(OUTER_INNER_RADIUS, OUTER_RADIUS, centerDeg, OUTER_WEDGE_DEG));
     node.appendChild(hintPath);
+    // Zone gradient: smooth light-to-dark tint from CCW edge to CW edge.
+    const midRadius = (OUTER_INNER_RADIUS + OUTER_RADIUS) / 2;
+    const ccwEdgeDeg = centerDeg - OUTER_WEDGE_DEG / 2;
+    const cwEdgeDeg = centerDeg + OUTER_WEDGE_DEG / 2;
+    const ccwPt = polarPoint(midRadius, ccwEdgeDeg);
+    const cwPt = polarPoint(midRadius, cwEdgeDeg);
+    const zoneGradId = `cof-zone-grad-${instanceId}-${index}`;
+    const zoneGrad = createSvgEl("linearGradient");
+    zoneGrad.setAttribute("id", zoneGradId);
+    zoneGrad.setAttribute("gradientUnits", "userSpaceOnUse");
+    zoneGrad.setAttribute("x1", String(ccwPt.x));
+    zoneGrad.setAttribute("y1", String(ccwPt.y));
+    zoneGrad.setAttribute("x2", String(cwPt.x));
+    zoneGrad.setAttribute("y2", String(cwPt.y));
+    const zoneStop0 = createSvgEl("stop");
+    zoneStop0.setAttribute("offset", "0%");
+    zoneStop0.setAttribute("stop-color", "rgba(255,255,255,0.32)");
+    zoneGrad.appendChild(zoneStop0);
+    const zoneStop1 = createSvgEl("stop");
+    zoneStop1.setAttribute("offset", "100%");
+    zoneStop1.setAttribute("stop-color", "rgba(0,0,0,0.28)");
+    zoneGrad.appendChild(zoneStop1);
+    defs.appendChild(zoneGrad);
+    const zoneGradPath = createSvgEl("path", "cof-wedge-zone-grad");
+    zoneGradPath.setAttribute("d", describeAnnularSector(OUTER_INNER_RADIUS, OUTER_RADIUS, centerDeg, OUTER_WEDGE_DEG));
+    zoneGradPath.setAttribute("fill", `url(#${zoneGradId})`);
+    zoneGradPath.setAttribute("pointer-events", "none");
+    node.appendChild(zoneGradPath);
 
     const label = createSvgEl("text", "cof-wedge-label");
     const labelPoint = polarPoint((OUTER_RADIUS + OUTER_INNER_RADIUS) / 2, centerDeg);
@@ -870,15 +914,36 @@ export function createCircleOfFifthsUi(
     degreeLabel.setAttribute("y", String(degreeCorner.y));
     node.appendChild(degreeLabel);
 
-    const emitOuterTap = (): CircleNoteTap => ({
+    const emitOuterTap = (zone: "note" | "chord", movesPrimary: boolean): CircleNoteTap => ({
       index,
       label: note.label,
       midi: midiFromSemitoneNearC4(note.semitone),
       isPrimary: index === primaryIndex,
+      zone,
+      movesPrimary,
     });
 
-    const onActivate = (): void => {
-      const tap = emitOuterTap();
+    const onActivate = (clientX: number | null, clientY: number | null): void => {
+      // Determine CW vs CCW zone from tap position.
+      // CW zone (60% of wedge) = chord tap; CCW zone (40%) = note-only tap.
+      const isChordSide = (clientX === null || clientY === null) ? true : (() => {
+        const pt = clientToSvgPoint(clientX, clientY);
+        const dx = pt.x - CENTER;
+        const dy = pt.y - CENTER;
+        const angleDeg = normalizeDegrees((Math.atan2(dy, dx) * 180 / Math.PI) + 90);
+        const delta = normalizeSignedDegrees(angleDeg - centerDeg);
+        return delta >= -(OUTER_WEDGE_DEG * 0.1);
+      })();
+
+      // Check if this wedge is IV or V relative to current primary.
+      const isIVorV = (() => {
+        if (primaryIndex === null) return false;
+        const active = OUTER_NOTES[primaryIndex];
+        if (!active) return false;
+        const interval = wrapSemitone(note.semitone - active.semitone);
+        const token = degreeTokenForMajorInterval(interval);
+        return token === "IV" || token === "V";
+      })();
 
       const pathD = path.getAttribute("d");
       if (pathD) {
@@ -891,20 +956,23 @@ export function createCircleOfFifthsUi(
           layer: "outer",
         });
       }
-
-      options.onOuterTap?.(tap);
       options.onBackgroundPulseRequest?.();
       options.onBackgroundRandomnessRequest?.(0.75);
-      if (chordModeEnabled) return;
-      const isRetap = index === primaryIndex;
-      setPrimaryIndex(index);
-      if (isRetap) enterChordModeInternal();
-      if (selection) options.onPrimaryTap?.(selection);
+
+      if (isChordSide) {
+        // CW zone: move inner circle only if not IV/V.
+        const movesPrimary = !isIVorV;
+        if (movesPrimary) {
+          setPrimaryIndex(index);
+        }
+        options.onOuterTap?.(emitOuterTap("chord", movesPrimary));
+      } else {
+        // CCW zone: note only, no primary change.
+        options.onOuterTap?.(emitOuterTap("note", false));
+      }
     };
 
     const onDoubleActivate = (): void => {
-      const tap = emitOuterTap();
-      options.onOuterDoubleTap?.(tap);
       if (primaryIndex === null) return;
       const active = OUTER_NOTES[primaryIndex];
       if (!active) return;
@@ -934,7 +1002,15 @@ export function createCircleOfFifthsUi(
       node.classList.add("is-holding");
       options.onBackgroundPulseRequest?.();
       options.onBackgroundRandomnessRequest?.(0.75);
-      options.onOuterPressStart?.(emitOuterTap());
+      // Detect zone for press using same CW/CCW logic as onActivate.
+      const pt = clientToSvgPoint(event.clientX, event.clientY);
+      const dx = pt.x - CENTER;
+      const dy = pt.y - CENTER;
+      const angleDeg = normalizeDegrees((Math.atan2(dy, dx) * 180 / Math.PI) + 90);
+      const delta = normalizeSignedDegrees(angleDeg - centerDeg);
+      const isChordSide = delta >= -(OUTER_WEDGE_DEG * 0.1);
+      const pressZone: "note" | "chord" = isChordSide ? "chord" : "note";
+      options.onOuterPressStart?.(emitOuterTap(pressZone, false));
     };
 
     const endOuterPress = (event: PointerEvent): void => {
@@ -942,18 +1018,18 @@ export function createCircleOfFifthsUi(
       if (event.pointerId !== activePointerId) return;
       activePointerId = null;
       node.classList.remove("is-holding");
-      options.onOuterPressEnd?.(emitOuterTap());
+      options.onOuterPressEnd?.(emitOuterTap("chord", false));
     };
 
-    node.addEventListener("click", () => {
+    node.addEventListener("click", (event) => {
       if (!shouldDelayForMinorToggle()) {
-        onActivate();
+        onActivate(event.clientX, event.clientY);
         return;
       }
       clearPendingOuterClick();
       pendingOuterClickTimeout = window.setTimeout(() => {
         pendingOuterClickTimeout = null;
-        onActivate();
+        onActivate(event.clientX, event.clientY);
       }, OUTER_CLICK_DELAY_MS);
     });
     path.addEventListener("dblclick", (event) => {
@@ -968,7 +1044,8 @@ export function createCircleOfFifthsUi(
     node.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      onActivate();
+      // Keyboard: no pointer position, treat as chord side.
+      onActivate(null, null);
     });
 
     outerGroup.appendChild(node);
@@ -1145,12 +1222,13 @@ export function createCircleOfFifthsUi(
     playDiminished();
   });
 
+  // Tapping outside the circle when inner circle is visible hides it (no sound).
   const maybeHandleBackgroundTap = (
     target: EventTarget | null,
     clientX: number,
     clientY: number
   ): void => {
-    if (!chordModeEnabled) return;
+    if (primaryIndex === null) return;
     if (!(target instanceof Element)) return;
     const clickedWedge = target.closest(".cof-wedge, .cof-secondary-cell, .cof-dim-cell");
     if (clickedWedge) return;
@@ -1167,15 +1245,30 @@ export function createCircleOfFifthsUi(
     lastBackgroundTapAt = now;
     lastBackgroundTapX = clientX;
     lastBackgroundTapY = clientY;
-    exitChordModeInternal();
+    setPrimaryIndex(null);
     options.onBackgroundTap?.();
   };
 
-  svg.addEventListener("click", (event) => {
+  // Use pointerup only (not click) to avoid double-firing on desktop/mobile.
+  // pointerup fires before the synthetic click, so we track it and suppress
+  // the click if it's within 500ms of a handled pointerup at the same position.
+  let lastBackgroundPointerUpAt = 0;
+  let lastBackgroundPointerUpX = 0;
+  let lastBackgroundPointerUpY = 0;
+
+  svg.addEventListener("pointerup", (event) => {
+    lastBackgroundPointerUpAt = performance.now();
+    lastBackgroundPointerUpX = event.clientX;
+    lastBackgroundPointerUpY = event.clientY;
     maybeHandleBackgroundTap(event.target, event.clientX, event.clientY);
   });
 
-  svg.addEventListener("pointerup", (event) => {
+  svg.addEventListener("click", (event) => {
+    // Suppress click if a pointerup at the same position was already handled.
+    const dt = performance.now() - lastBackgroundPointerUpAt;
+    const dx = Math.abs(event.clientX - lastBackgroundPointerUpX);
+    const dy = Math.abs(event.clientY - lastBackgroundPointerUpY);
+    if (dt < 500 && dx <= 6 && dy <= 6) return;
     maybeHandleBackgroundTap(event.target, event.clientX, event.clientY);
   });
 
@@ -1189,23 +1282,6 @@ export function createCircleOfFifthsUi(
     if (Math.sqrt(dx * dx + dy * dy) > OUTER_RADIUS) return;
     options.onInnerDoubleTap?.();
   });
-
-  const updateOuterChordModeLabels = (): void => {
-    root.classList.toggle("is-chord-mode", chordModeEnabled);
-    outerButtons.forEach(({ label, note }) => {
-      label.replaceChildren();
-      const rootSpan = createSvgEl("tspan", "cof-wedge-label-root");
-      rootSpan.textContent = note.label;
-      label.appendChild(rootSpan);
-
-      if (chordModeEnabled) {
-        const suffixSpan = createSvgEl("tspan", "cof-wedge-label-suffix");
-        suffixSpan.textContent = "maj";
-        suffixSpan.setAttribute("dx", "3");
-        label.appendChild(suffixSpan);
-      }
-    });
-  };
 
   const setPrimaryIndex = (nextPrimaryIndex: number | null): void => {
     const prevPrimaryIndex = primaryIndex;
@@ -1258,7 +1334,7 @@ export function createCircleOfFifthsUi(
       frame.classList.remove("has-primary");
       detuneDeg = 0;
       applyDetailTransform();
-      applyChordZoom();
+      applyChordZoom(null);
       return;
     }
 
@@ -1266,6 +1342,7 @@ export function createCircleOfFifthsUi(
     root.classList.add("has-primary");
     frame.classList.add("has-primary");
     applyDetailTransform();
+    applyChordZoom(primaryIndex);
 
     secondaryNodes.forEach(({ node, text, degreeText }, index) => {
       const chord = activeSelection.secondaryChords[index];
@@ -1285,7 +1362,6 @@ export function createCircleOfFifthsUi(
     if (prevPrimaryIndex !== primaryIndex) {
       showInnerCircleIndicator(activeSelection.primaryLabel);
     }
-    applyChordZoom();
   };
 
   const setMinorModeInternal = (enabled: boolean): void => {
@@ -1293,28 +1369,6 @@ export function createCircleOfFifthsUi(
     minorModeEnabled = enabled;
     showInnerCircleIndicator(enabled ? "minor" : "MAJOR");
     if (primaryIndex !== null) setPrimaryIndex(primaryIndex);
-  };
-
-  const enterChordModeInternal = (): void => {
-    chordZoomPrimaryIndex = null;
-    if (chordModeEnabled) return;
-    chordModeEnabled = true;
-    showInnerCircleIndicator("CHORD");
-    updateOuterChordModeLabels();
-    applyChordZoom();
-    options.onChordModeChange?.(true);
-  };
-
-  const exitChordModeInternal = (): void => {
-    chordZoomPrimaryIndex = null;
-    if (!chordModeEnabled) return;
-    heldNoteSemitones.forEach((semitone) => { finishNoteVisual(semitone); });
-    heldNoteSemitones.clear();
-    chordModeEnabled = false;
-    showInnerCircleIndicator("NOTE");
-    updateOuterChordModeLabels();
-    applyChordZoom();
-    options.onChordModeChange?.(false);
   };
 
   updateInstrumentLabelPlacement();
@@ -1345,21 +1399,6 @@ export function createCircleOfFifthsUi(
       }
       detuneDeg = clamp((cents / 7) * 8, -12, 12);
       applyDetailTransform();
-    },
-    setChordMode(enabled: boolean, modeOptions: CircleChordModeOptions = {}) {
-      if (enabled) {
-        chordZoomPrimaryIndex = modeOptions.zoomToPrimary ? primaryIndex : null;
-      } else {
-        chordZoomPrimaryIndex = null;
-      }
-      if (chordModeEnabled === enabled) {
-        applyChordZoom();
-        return;
-      }
-      chordModeEnabled = enabled;
-      showInnerCircleIndicator(enabled ? "CHORD" : "NOTE");
-      updateOuterChordModeLabels();
-      applyChordZoom();
     },
     setMinorMode(enabled: boolean) {
       setMinorModeInternal(enabled);

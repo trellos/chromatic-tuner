@@ -498,14 +498,27 @@ body.drum-fullscreen .mode-stage {
   border: 1.5px solid rgba(222, 235, 255, 0.2);
   border-radius: 6px;
   cursor: pointer;
+  display: flex;
   flex: 1 1 0;
+  gap: 1px;
   height: 14px;
-  padding: 0;
+  overflow: hidden;
+  padding: 2px 3px;
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
     box-shadow 180ms ease,
     transform 150ms ease;
+}
+
+.wt-timeline-step {
+  background: rgba(0, 210, 180, 1);
+  border-radius: 1px;
+  flex: 1 1 0;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
 }
 
 .wt-timeline-block[data-fill="1"] {

@@ -92,6 +92,7 @@
   max-height: 100%;
   position: relative;
   width: min(100%, 560px);
+  z-index: 2;
 }
 
 .cof-frame {
@@ -99,6 +100,7 @@
   display: flex;
   height: 100%;
   justify-content: center;
+  overflow: visible;
   position: relative;
   width: 100%;
 }
@@ -150,6 +152,11 @@
 
 .cof-wedge-hint {
   fill: transparent;
+  pointer-events: none;
+}
+
+/* Zone gradient overlay: smooth light-to-dark tint from CCW (note) edge to CW (chord) edge. */
+.cof-wedge-zone-grad {
   pointer-events: none;
 }
 
@@ -227,12 +234,12 @@
 .cof-instrument-label {
   dominant-baseline: middle;
   fill: rgba(240, 248, 255, 0.96);
-  font-size: 38px;
+  font-size: 28px;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   paint-order: stroke fill;
   stroke: rgba(10, 18, 50, 0.85);
-  stroke-width: 6;
+  stroke-width: 5;
   text-anchor: middle;
   text-transform: uppercase;
 }
@@ -517,8 +524,8 @@
   background: rgba(171, 50, 79, 0.9);
 }
 
-.ui-composite-looper-btn--play {
-  background: rgba(58, 132, 80, 0.84);
+.ui-composite-looper-btn--clear {
+  background: rgba(60, 72, 100, 0.72);
 }
 
 .ui-composite-looper-btn:disabled {
@@ -559,12 +566,27 @@
   transform: scale(1.06);
 }
 
-.ui-composite-looper.is-play-mode .ui-composite-looper-btn--play {
-  border-color: rgba(138, 255, 177, 0.92);
-  box-shadow:
-    0 0 0 2px rgba(138, 255, 177, 0.2),
-    0 0 16px rgba(108, 255, 154, 0.34);
-  color: rgba(236, 255, 242, 0.98);
+.ui-composite-looper-rec-dot {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  display: inline-block;
+  height: 8px;
+  margin-right: 5px;
+  vertical-align: middle;
+  width: 8px;
+}
+
+.ui-composite-looper.is-armed .ui-composite-looper-rec-dot {
+  background: rgba(255, 120, 150, 0.9);
+}
+
+.ui-composite-looper.is-recording .ui-composite-looper-rec-dot {
+  animation: rec-dot-blink 800ms step-start infinite;
+  background: rgb(255, 60, 90);
+}
+
+@keyframes rec-dot-blink {
+  50% { opacity: 0; }
 }
 
 .ui-composite-looper-measures {
@@ -636,12 +658,10 @@
   white-space: nowrap;
 }
 
-.ui-composite-looper.is-transport-stopped {
-  opacity: 0.52;
-}
-
-.ui-composite-looper.is-transport-stopped .ui-composite-looper-btn--play {
-  pointer-events: none;
+/* When stopped and idle, REC gets a visible border so it looks tappable */
+.ui-composite-looper.is-transport-stopped .ui-composite-looper-btn--rec {
+  border-color: rgba(210, 170, 190, 0.72);
+  box-shadow: 0 0 0 2px rgba(210, 170, 190, 0.2);
 }
 
 @media (max-width: 900px) {
@@ -667,7 +687,7 @@
   }
 
   .cof-instrument-label {
-    font-size: 34px;
+    font-size: 26px;
   }
 }
 
@@ -717,7 +737,7 @@
   }
 
   .cof-instrument-label {
-    font-size: 28px;
+    font-size: 22px;
     letter-spacing: 0.06em;
   }
 

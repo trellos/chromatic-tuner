@@ -10,6 +10,7 @@
   right: 8px;
   top: 14px;
   width: 116px;
+  z-index: 1;
 }
 
 .cof-note-row {
@@ -23,7 +24,7 @@
 
 .cof-note-cell {
   --cof-note-pop-scale: 1.26;
-  background-color: rgba(124, 58, 237, 0.22);
+  background-color: rgba(124, 58, 237, 0.72);
   border: none;
   border-radius: 6px;
   box-shadow: 0 2px 6px rgba(8, 18, 40, 0.14);
@@ -33,7 +34,9 @@
   place-items: center;
   position: relative;
   transform: scale(1);
-  transform-origin: center;
+  /* Expand leftward so the scaled cell doesn't overflow the right edge. */
+  transform-origin: right center;
+  z-index: 2;
 }
 
 .cof-note-cell-label {
@@ -74,23 +77,31 @@
 }
 
 .cof-frame.has-primary .cof-note-cell[data-degree="i"] {
-  background-color: rgba(149, 192, 210, 0.9);
+  background-color: rgba(149, 192, 210, 1);
 }
 
 .cof-frame.has-primary .cof-note-cell[data-degree="iv"],
 .cof-frame.has-primary .cof-note-cell[data-degree="v"] {
-  background-color: rgba(185, 173, 212, 0.9);
+  background-color: rgba(185, 173, 212, 1);
 }
 
 .cof-frame.has-primary .cof-note-cell[data-degree="ii"],
 .cof-frame.has-primary .cof-note-cell[data-degree="iii"],
 .cof-frame.has-primary .cof-note-cell[data-degree="vi"],
 .cof-frame.has-primary .cof-note-cell[data-degree="vii"] {
-  background-color: rgba(189, 168, 207, 0.82);
+  background-color: rgba(189, 168, 207, 1);
 }
 
 .cof-frame.has-primary .cof-note-cell[data-diatonic="false"] {
   opacity: 0.56;
+}
+
+/* When a degree cell is scaled up (active), show a border so it stands apart cleanly. */
+.cof-frame.has-primary .cof-note-cell[data-diatonic="true"].is-active {
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 3px 10px rgba(8, 18, 40, 0.28),
+    0 0 0 3px rgba(124, 58, 237, 0.18);
 }
 
 .cof-note-trail {

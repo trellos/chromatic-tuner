@@ -26,6 +26,14 @@
   overflow: auto;
 }
 
+/* In Wild Tuna, position the hidden-summary in the top-left so it doesn't cover the fretboard */
+.wild-tuna-pane--fretboard .fretboard-layout.fretboard-controls-hidden .fretboard-hidden-summary {
+  left: 8px;
+  max-width: 140px;
+  top: 8px;
+  width: auto;
+}
+
 body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard-controls-hidden .fretboard-hidden-summary {
   top: 18px;
   width: 160px;

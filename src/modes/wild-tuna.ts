@@ -31,6 +31,94 @@ import {
 // Fixed number of measures shown in the timeline and cycled during playback.
 const GLOBAL_MEASURE_COUNT = 4;
 
+// ── Playing Track API ──────────────────────────────────────────────────────
+// A unified, aggregated stream of note events from all active loopers.
+// Consumers subscribe via `getWildTunaTrackApi()` and listen for note-on/off
+// events or poll `getActiveNotes()` for the currently-sounding notes.
+
+export type TrackNoteEvent = {
+  /** Which looper fired the event */
+  source: "circle" | "fretboard";
+  midis: number[];
+  durationMs: number;
+  /** performance.now() timestamp when the note started */
+  startedAt: number;
+};
+
+export type ActiveTrackNote = TrackNoteEvent & {
+  /** performance.now() timestamp when the note will end */
+  endAt: number;
+};
+
+export type WildTunaTrackApi = {
+  /** Register a handler called when a note starts. Returns an unsubscribe function. */
+  onNoteOn: (handler: (event: TrackNoteEvent) => void) => () => void;
+  /** Register a handler called when a note ends. Returns an unsubscribe function. */
+  onNoteOff: (handler: (event: TrackNoteEvent) => void) => () => void;
+  /** Returns a snapshot of all notes that are currently sounding. */
+  getActiveNotes: () => ActiveTrackNote[];
+};
+
+type TrackApiInternal = WildTunaTrackApi & {
+  _emit: (event: TrackNoteEvent) => void;
+  _reset: () => void;
+};
+
+function buildTrackApi(): TrackApiInternal {
+  const noteOnHandlers = new Set<(e: TrackNoteEvent) => void>();
+  const noteOffHandlers = new Set<(e: TrackNoteEvent) => void>();
+  // Key: `${source}:${midis.join(",")}` — tracks one active slot per source+chord combo.
+  const activeNotes = new Map<string, ActiveTrackNote>();
+  const endTimeouts = new Map<string, number>();
+
+  return {
+    _emit(event) {
+      const key = `${event.source}:${event.midis.join(",")}`;
+      const prev = endTimeouts.get(key);
+      if (prev !== undefined) {
+        window.clearTimeout(prev);
+        endTimeouts.delete(key);
+      }
+      noteOnHandlers.forEach((h) => h(event));
+      activeNotes.set(key, { ...event, endAt: event.startedAt + event.durationMs });
+      const tid = window.setTimeout(() => {
+        endTimeouts.delete(key);
+        activeNotes.delete(key);
+        noteOffHandlers.forEach((h) => h(event));
+      }, event.durationMs);
+      endTimeouts.set(key, tid);
+    },
+    _reset() {
+      endTimeouts.forEach((tid) => window.clearTimeout(tid));
+      endTimeouts.clear();
+      activeNotes.clear();
+    },
+    onNoteOn(handler) {
+      noteOnHandlers.add(handler);
+      return () => { noteOnHandlers.delete(handler); };
+    },
+    onNoteOff(handler) {
+      noteOffHandlers.add(handler);
+      return () => { noteOffHandlers.delete(handler); };
+    },
+    getActiveNotes() {
+      return [...activeNotes.values()];
+    },
+  };
+}
+
+// Module-level singleton — recreated on each onEnter, cleared on onExit.
+let _trackApi: TrackApiInternal = buildTrackApi();
+
+/**
+ * Returns the current Wild Tuna track API.
+ * Subscribe to note-on/off events or poll getActiveNotes() for real-time playback state.
+ * The same object is reused across mode entries; handlers are preserved between entries.
+ */
+export function getWildTunaTrackApi(): WildTunaTrackApi {
+  return _trackApi;
+}
+
 function serializeWildTunaShareUrl(
   drumUi: DrumMachineUi,
   circleLooper: CompositeLooper,
@@ -96,29 +184,83 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
       }
       return counts;
     },
+    // Returns a 2D array [measureIndex][stepIndex] with the total note count
+    // across all loopers for that step. A note spans startStep..endStep, so
+    // it contributes to every step in that range.
+    getStepDensities(): number[][] {
+      const STEPS = 16;
+      const densities: number[][] = Array.from({ length: GLOBAL_MEASURE_COUNT }, () =>
+        Array<number>(STEPS).fill(0)
+      );
+      for (const looper of getLoopers()) {
+        const slots = looper.getMeasureSlots();
+        for (let mi = 0; mi < Math.min(slots.length, GLOBAL_MEASURE_COUNT); mi++) {
+          const events = slots[mi]?.events ?? [];
+          for (const event of events) {
+            const noteCount = event.midis.length;
+            for (let s = event.startStep; s < Math.min(event.endStep, STEPS); s++) {
+              (densities[mi] as number[])[s] = ((densities[mi] as number[])[s] ?? 0) + noteCount;
+            }
+          }
+        }
+      }
+      return densities;
+    },
   };
+}
+
+const TIMELINE_STEPS = 16;
+
+// Maps a total note count across all instruments at one step to an opacity.
+// 0 notes → 0 (transparent), 1 → low, 2-3 → mid, 4+ → high.
+function stepDensityToOpacity(noteCount: number): number {
+  if (noteCount <= 0) return 0;
+  if (noteCount === 1) return 0.25;
+  if (noteCount <= 3) return 0.5;
+  return 0.82;
 }
 
 // Builds the row of measure-indicator buttons between the drum machine and
 // Circle/Fretboard panes. Each block is tappable to seek all loopers.
-// `update(currentMeasure, fillCounts)` refreshes highlight + fill color.
+// Each block contains 16 mini step-slots that light up based on note density.
+// `update(currentMeasure, fillCounts, stepDensities)` refreshes all visuals.
 function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
   host.replaceChildren();
   const blocks: HTMLElement[] = [];
+  // stepSpans[i] is the array of 16 step-slot spans for measure i.
+  const stepSpans: HTMLSpanElement[][] = [];
+
   for (let i = 0; i < measureCount; i++) {
     const block = document.createElement("button");
     block.type = "button";
     block.className = "wt-timeline-block";
     block.dataset.measure = String(i);
     block.setAttribute("aria-label", `Measure ${i + 1}`);
+
+    const spans: HTMLSpanElement[] = [];
+    for (let s = 0; s < TIMELINE_STEPS; s++) {
+      const span = document.createElement("span");
+      span.className = "wt-timeline-step";
+      block.appendChild(span);
+      spans.push(span);
+    }
+    stepSpans.push(spans);
+
     host.appendChild(block);
     blocks.push(block);
   }
   return {
-    update(currentMeasure: number, fillCounts: number[]) {
+    update(currentMeasure: number, fillCounts: number[], stepDensities: number[][]) {
       blocks.forEach((block, i) => {
         block.classList.toggle("is-current", i === currentMeasure);
         block.dataset.fill = String(Math.min(fillCounts[i] ?? 0, 2));
+        const spans = stepSpans[i] ?? [];
+        const densities = stepDensities[i] ?? [];
+        spans.forEach((span, s) => {
+          const opacity = stepDensityToOpacity(densities[s] ?? 0);
+          span.style.opacity = opacity > 0 ? String(opacity) : "";
+          span.classList.toggle("has-notes", opacity > 0);
+        });
       });
     },
   };
@@ -281,9 +423,12 @@ export function createWildTunaMode(): ModeDefinition {
         () => drumUi
       );
 
+      _trackApi._reset();
+
       circleLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
         onPlaybackEvent: (event) => {
+          _trackApi._emit({ source: "circle", ...event, startedAt: performance.now() });
           void playCircleMidis(event.midis, event.durationMs, false);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(circleLooper!),
@@ -293,6 +438,7 @@ export function createWildTunaMode(): ModeDefinition {
       fretboardLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
         onPlaybackEvent: (event) => {
+          _trackApi._emit({ source: "fretboard", ...event, startedAt: performance.now() });
           const targets = event.midis.map((midi) => ({ midi, stringIndex: 0 }));
           void playFretTargets(targets, event.durationMs, false);
         },
@@ -333,7 +479,7 @@ export function createWildTunaMode(): ModeDefinition {
       sessionTransport.onStart(() => {
         circleLooper?.onTransportStart();
         fretboardLooper?.onTransportStart();
-        timelineUi?.update(0, coordinator.getFillCounts());
+        timelineUi?.update(0, coordinator.getFillCounts(), coordinator.getStepDensities());
       });
       sessionTransport.onStop(() => {
         circleLooper?.onTransportStop();
@@ -344,18 +490,43 @@ export function createWildTunaMode(): ModeDefinition {
         fretboardLooper?.onBeatBoundary(event);
         if (event.beatIndex === 0) {
           const measureIndex = sessionTransport.getMeasureIndex() % Math.max(1, coordinator.getMaxMeasureCount());
-          timelineUi?.update(measureIndex, coordinator.getFillCounts());
+          timelineUi?.update(measureIndex, coordinator.getFillCounts(), coordinator.getStepDensities());
         }
       });
 
+      // Track whether a press-start was handled so the follow-up tap (which
+      // fires as a click after pointerup) doesn't replay the same chord.
+      let suppressOuterTap = false;
+
       circleUi = createCircleOfFifthsUi(circleHost, {
-        onPrimaryTap: (selection) => {
-          void playCircleMidis([selection.primaryMidi], 380, true);
+        onOuterTap: (note) => {
+          if (suppressOuterTap) {
+            suppressOuterTap = false;
+            return;
+          }
+          if (note.zone === "chord") {
+            void playCircleMidis(getCircleMajorChordMidis(note.midi), 640, true);
+          } else {
+            void playCircleMidis([note.midi], 380, true);
+          }
         },
         onInnerDoubleTap: () => {
           const instrumentName = guitarPlayer.cycleInstrument();
           circleUi?.setInstrumentLabel(instrumentName);
           circleUi?.showInnerIndicator(instrumentName);
+        },
+        onNoteBarTap: (note) => {
+          void playCircleMidis([note.midi], 380, true);
+        },
+        onNoteBarPressStart: (note) => {
+          circleLooper?.recordHoldStart(`circle-note-${note.midi}`, [note.midi]);
+          circleUi?.holdNote(note.midi);
+          void guitarPlayer.startSustainMidi(note.midi);
+        },
+        onNoteBarPressEnd: (note) => {
+          circleLooper?.recordHoldEnd(`circle-note-${note.midi}`);
+          circleUi?.releaseHeldNotes();
+          guitarPlayer.stopSustain();
         },
         onSecondaryPressStart: (chord) => {
           const chordMidis = getCircleChordMidis(chord);
@@ -369,13 +540,26 @@ export function createWildTunaMode(): ModeDefinition {
           guitarPlayer.stopSustain();
         },
         onOuterPressStart: (note) => {
+          if (note.zone === "note") {
+            // CCW zone press: play single note hold. Do not suppress the tap
+            // event — there is no follow-up click to suppress since the tap
+            // fires on press, not on release.
+            circleLooper?.recordHoldStart(`circle-single-${note.midi}`, [note.midi]);
+            circleUi?.holdNote(note.midi);
+            void guitarPlayer.startSustainMidi(note.midi);
+            return;
+          }
+          // CW zone press: chord sustain. Suppress the follow-up tap click.
+          suppressOuterTap = true;
           const midis = getCircleMajorChordMidis(note.midi);
           circleLooper?.recordHoldStart(`circle-major-${note.midi}`, midis);
           circleUi?.holdChord(midis);
           void guitarPlayer.startSustainChord(midis);
         },
         onOuterPressEnd: (note) => {
-          circleLooper?.recordHoldEnd(`circle-major-${note.midi}`);
+          circleLooper?.recordHoldEnd(
+            note.zone === "note" ? `circle-single-${note.midi}` : `circle-major-${note.midi}`
+          );
           circleUi?.releaseHeldNotes();
           guitarPlayer.stopSustain();
         },
@@ -427,11 +611,11 @@ export function createWildTunaMode(): ModeDefinition {
           const idx = block ? parseInt(block.dataset.measure ?? "", 10) : NaN;
           if (!isNaN(idx)) {
             sessionTransport.setMeasureIndexBeforeNextBoundary(idx, coordinator.getMaxMeasureCount());
-            timelineUi?.update(idx, coordinator.getFillCounts());
+            timelineUi?.update(idx, coordinator.getFillCounts(), coordinator.getStepDensities());
             coordinator.seekAll(idx);
           }
         }, { signal: modeAbort!.signal });
-        timelineUi.update(0, coordinator.getFillCounts());
+        timelineUi.update(0, coordinator.getFillCounts(), coordinator.getStepDensities());
       }
 
       // Hydrate from URL if a Wild Tuna track is encoded
@@ -455,6 +639,7 @@ export function createWildTunaMode(): ModeDefinition {
     onExit: () => {
       modeAbort?.abort();
       modeAbort = null;
+      _trackApi._reset();
       seigaihaBridge.setModeRandomness(null);
       guitarPlayer.stopSustain();
       guitarPlayer.stopAll();
