@@ -37,8 +37,15 @@ export function createAudioContextService(): AudioContextService {
       // silenced by the ringer switch.
     }
 
-    // iOS Safari can report a "bad" audio context on first init.
-    // Warm up with a short silent buffer, then create the real context.
+    // iOS Safari initialises the AudioContext sample rate based on the hardware
+    // output state at the moment of creation. If the context is created "cold"
+    // (before any audio playback has occurred), Safari can assign the wrong
+    // sample rate. The microphone input is then resampled to match, which shifts
+    // every detected pitch by up to a semitone — the root cause of the half-step
+    // detection error observed on iOS before this warmup was added.
+    // Playing a 1-sample silent buffer through a throwaway context forces the
+    // audio hardware to fully initialise at the correct rate before we create
+    // the real context that will process mic input.
     try {
       const warmup = new AudioCtx({ latencyHint: "interactive" });
       await warmup.resume();

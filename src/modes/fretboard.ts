@@ -304,6 +304,11 @@ export function createFretboardMode(): ModeDefinition {
     state = { ...state };
     ui?.render(state);
     ui?.enter();
+    // Decode the pre-fetched guitar sample immediately so the first tap plays
+    // without decode latency. The raw bytes were already fetched on page load;
+    // only the AudioContext creation and decodeAudioData call are deferred to
+    // first interaction under the old lazy path.
+    void ensureAudioContext().then((ctx) => { if (ctx) void ensureGuitarSample(ctx); });
   };
 
   const exitMode = () => {
