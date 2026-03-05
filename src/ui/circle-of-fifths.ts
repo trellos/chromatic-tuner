@@ -93,7 +93,6 @@ const DIM_DEGREE_LABEL = "vii°";
 const SECONDARY_DEGREE_KEYS = ["ii", "iii", "vi"] as const;
 const DIM_DEGREE_KEY = "vii";
 const WEDGE_PULSE_DURATION_MS = 640;
-const OUTER_CLICK_DELAY_MS = 360;
 const TRAIL_FLOAT_DISTANCE_PX = 560;
 const TRAIL_FLOAT_DURATION_MS = 2000;
 const TRAIL_PIXELS_PER_MS = TRAIL_FLOAT_DISTANCE_PX / TRAIL_FLOAT_DURATION_MS;
@@ -574,7 +573,6 @@ export function createCircleOfFifthsUi(
   let instrumentLabel = "ACOUSTIC GUITAR";
   let detuneDeg = 0;
   let detailBaseDeg = 0;
-  let pendingOuterClickTimeout: number | null = null;
   let lastBackgroundTapAt = 0;
   let lastBackgroundTapX = 0;
   let lastBackgroundTapY = 0;
@@ -584,11 +582,6 @@ export function createCircleOfFifthsUi(
   // - primary selection controls detail visibility/content
   // - chord mode toggles outer label suffix + background-tap exit behavior
   // - minor mode remaps roman numerals only (does not change chord spellings)
-  const clearPendingOuterClick = (): void => {
-    if (pendingOuterClickTimeout === null) return;
-    window.clearTimeout(pendingOuterClickTimeout);
-    pendingOuterClickTimeout = null;
-  };
 
   const getSvgViewBoxRect = (): { x: number; y: number; width: number; height: number } => {
     const attribute = svg.getAttribute("viewBox");
@@ -984,19 +977,17 @@ export function createCircleOfFifthsUi(
       }
     };
 
-    const shouldDelayForMinorToggle = (): boolean => {
-      if (primaryIndex === null) return false;
-      const active = OUTER_NOTES[primaryIndex];
-      if (!active) return false;
-      const interval = wrapSemitone(note.semitone - active.semitone);
-      const majorToken = degreeTokenForMajorInterval(interval);
-      if (!majorToken) return false;
-      if (minorModeEnabled && majorToken === "I") return true;
-      return false;
+    let activePointerId: number | null = null;
+    let lastPressActivateAt = 0;
+    let lastPressActivateX = 0;
+    let lastPressActivateY = 0;
+
+    const maybeActivateOuterTap = (clientX: number, clientY: number): void => {
+      onActivate(clientX, clientY);
     };
 
-    let activePointerId: number | null = null;
     const startOuterPress = (event: PointerEvent): void => {
+      if (!event.isPrimary || event.button !== 0) return;
       if (activePointerId !== null) return;
       activePointerId = event.pointerId;
       node.classList.add("is-holding");
@@ -1011,6 +1002,12 @@ export function createCircleOfFifthsUi(
       const isChordSide = delta >= -(OUTER_WEDGE_DEG * 0.1);
       const pressZone: "note" | "chord" = isChordSide ? "chord" : "note";
       options.onOuterPressStart?.(emitOuterTap(pressZone, false));
+      // Musical note/chord onset is instrument behavior, not cosmetic feedback.
+      // Fire on pointerdown so desktop/mobile input paths feel immediate.
+      maybeActivateOuterTap(event.clientX, event.clientY);
+      lastPressActivateAt = performance.now();
+      lastPressActivateX = event.clientX;
+      lastPressActivateY = event.clientY;
     };
 
     const endOuterPress = (event: PointerEvent): void => {
@@ -1022,19 +1019,20 @@ export function createCircleOfFifthsUi(
     };
 
     node.addEventListener("click", (event) => {
-      if (!shouldDelayForMinorToggle()) {
-        onActivate(event.clientX, event.clientY);
+      // Pointer-driven activation already ran on pointerdown. Suppress only the
+      // corresponding compatibility click to avoid duplicate note/chord attacks.
+      const dt = performance.now() - lastPressActivateAt;
+      const dx = Math.abs(event.clientX - lastPressActivateX);
+      const dy = Math.abs(event.clientY - lastPressActivateY);
+      if (dt >= 0 && dt < 700 && dx <= 4 && dy <= 4) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
         return;
       }
-      clearPendingOuterClick();
-      pendingOuterClickTimeout = window.setTimeout(() => {
-        pendingOuterClickTimeout = null;
-        onActivate(event.clientX, event.clientY);
-      }, OUTER_CLICK_DELAY_MS);
+      maybeActivateOuterTap(event.clientX, event.clientY);
     });
     path.addEventListener("dblclick", (event) => {
       event.preventDefault();
-      clearPendingOuterClick();
       onDoubleActivate();
     });
     node.addEventListener("pointerdown", startOuterPress);
@@ -1437,7 +1435,6 @@ export function createCircleOfFifthsUi(
       heldNoteSemitones.clear();
     },
     destroy() {
-      clearPendingOuterClick();
       notePulseTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       notePulseTimeouts.clear();
       noteTrailCleanupTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -1452,4 +1449,3 @@ export function createCircleOfFifthsUi(
     },
   };
 }
-

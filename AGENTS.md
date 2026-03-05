@@ -63,6 +63,7 @@
 - Double-tapping SVG background inside the circle cycles instruments and updates the inner indicator text.
 - Holding a circle wedge sustains playback while pressed, then releases on pointer end/cancel/leave.
 - Note-bar notes follow the same press lifecycle as wedges: sound starts on pointer down and ends on pointer up/cancel/leave.
+- Playback latency contract: Circle note/chord onset is instrument behavior, not cosmetic UI feedback. Trigger sound on pointer-down immediately on both desktop and mobile paths; do not add intentional single-tap delays for click/double-click arbitration.
 - Sustained playback uses looped sample regions derived from zero-crossing loop points per instrument sample.
 - Note-bar trail behavior:
   - each played note spawns a separate trail object under the note square

@@ -651,6 +651,91 @@ test("instrument label arc stays on bottom with no primary and moves opposite se
   expect(movedMidpoint?.x ?? 1000).toBeLessThan(504);
 });
 
+test("outer wedge pointerdown applies tap activation before pointerup", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const circle = panel.locator('.cof');
+  const wedgePath = panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
+
+  const pressPoint = await panel.locator('.cof-svg').evaluate((svgNode) => {
+    const svg = svgNode as SVGSVGElement;
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width * 0.58,
+      y: rect.top + rect.height * 0.15,
+    };
+  });
+
+  await wedgePath.dispatchEvent("pointerdown", {
+    bubbles: true,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 701,
+    pointerType: "touch",
+    clientX: pressPoint.x,
+    clientY: pressPoint.y,
+  });
+
+  await expect(circle).toHaveClass(/has-primary/);
+
+  await wedgePath.dispatchEvent("pointerup", {
+    bubbles: true,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 701,
+    pointerType: "touch",
+    clientX: pressPoint.x,
+    clientY: pressPoint.y,
+  });
+});
+
+
+
+test("outer wedge mouse pointerdown applies tap activation before pointerup", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const circle = panel.locator('.cof');
+  const wedgePath = panel.locator('.cof-wedge[data-index="1"] .cof-wedge-path');
+
+  const pressPoint = await panel.locator('.cof-svg').evaluate((svgNode) => {
+    const svg = svgNode as SVGSVGElement;
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width * 0.64,
+      y: rect.top + rect.height * 0.18,
+    };
+  });
+
+  await wedgePath.dispatchEvent("pointerdown", {
+    bubbles: true,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 702,
+    pointerType: "mouse",
+    clientX: pressPoint.x,
+    clientY: pressPoint.y,
+  });
+
+  await expect(circle).toHaveClass(/has-primary/);
+
+  await wedgePath.dispatchEvent("pointerup", {
+    bubbles: true,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 702,
+    pointerType: "mouse",
+    clientX: pressPoint.x,
+    clientY: pressPoint.y,
+  });
+});
 test("indicator animation triggers for primary note, chord mode, and minor/major mode transitions", async ({
   page,
 }) => {
@@ -681,6 +766,32 @@ test("indicator animation triggers for primary note, chord mode, and minor/major
 
   await circle.locator('.cof-wedge[data-index="3"] .cof-wedge-path').dispatchEvent("dblclick");
   await expect(firstBanner).toContainText("MAJOR");
+});
+
+test("minor-mode tonic click does not stall outer-tap playback", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const circle = panel.locator('.cof');
+  const aWedgePath = panel.locator('.cof-wedge[data-index="3"] .cof-wedge-path');
+
+  await aWedgePath.click({ force: true });
+  await aWedgePath.click({ force: true });
+  await expect(circle).toHaveClass(/is-chord-mode/);
+
+  await panel
+    .locator('.cof-secondary-cell')
+    .nth(2)
+    .locator('.cof-secondary-path')
+    .dispatchEvent("dblclick");
+  await expect(panel.locator('.cof-mode-banner').first()).toContainText("minor");
+
+  const pulseCountBefore = await panel.locator('.cof-pulse').count();
+  await aWedgePath.click({ force: true });
+  await expect
+    .poll(async () => panel.locator('.cof-pulse').count(), { timeout: 120 })
+    .toBeGreaterThan(pulseCountBefore);
 });
 
 test("note-bar supports keyboard activation with Enter and Space", async ({ page }) => {
