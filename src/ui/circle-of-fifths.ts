@@ -93,7 +93,9 @@ const DIM_DEGREE_LABEL = "vii°";
 const SECONDARY_DEGREE_KEYS = ["ii", "iii", "vi"] as const;
 const DIM_DEGREE_KEY = "vii";
 const WEDGE_PULSE_DURATION_MS = 640;
-const OUTER_CLICK_DELAY_MS = 360;
+// Keep this short so single taps still feel immediate while preserving a narrow
+// window where a minor-mode tonic double-click can cancel the pending single-tap.
+const OUTER_CLICK_DELAY_MS = 140;
 const TRAIL_FLOAT_DISTANCE_PX = 560;
 const TRAIL_FLOAT_DURATION_MS = 2000;
 const TRAIL_PIXELS_PER_MS = TRAIL_FLOAT_DISTANCE_PX / TRAIL_FLOAT_DURATION_MS;
@@ -996,7 +998,22 @@ export function createCircleOfFifthsUi(
     };
 
     let activePointerId: number | null = null;
+    let suppressNextClick = false;
+
+    const maybeActivateOuterTap = (clientX: number, clientY: number): void => {
+      if (!shouldDelayForMinorToggle()) {
+        onActivate(clientX, clientY);
+        return;
+      }
+      clearPendingOuterClick();
+      pendingOuterClickTimeout = window.setTimeout(() => {
+        pendingOuterClickTimeout = null;
+        onActivate(clientX, clientY);
+      }, OUTER_CLICK_DELAY_MS);
+    };
+
     const startOuterPress = (event: PointerEvent): void => {
+      if (!event.isPrimary || event.button !== 0) return;
       if (activePointerId !== null) return;
       activePointerId = event.pointerId;
       node.classList.add("is-holding");
@@ -1011,6 +1028,10 @@ export function createCircleOfFifthsUi(
       const isChordSide = delta >= -(OUTER_WEDGE_DEG * 0.1);
       const pressZone: "note" | "chord" = isChordSide ? "chord" : "note";
       options.onOuterPressStart?.(emitOuterTap(pressZone, false));
+      // Run the tap action on pointerdown so touch/pen input does not wait for
+      // post-release synthetic click dispatch.
+      maybeActivateOuterTap(event.clientX, event.clientY);
+      suppressNextClick = true;
     };
 
     const endOuterPress = (event: PointerEvent): void => {
@@ -1022,15 +1043,13 @@ export function createCircleOfFifthsUi(
     };
 
     node.addEventListener("click", (event) => {
-      if (!shouldDelayForMinorToggle()) {
-        onActivate(event.clientX, event.clientY);
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        event.preventDefault();
+        event.stopImmediatePropagation();
         return;
       }
-      clearPendingOuterClick();
-      pendingOuterClickTimeout = window.setTimeout(() => {
-        pendingOuterClickTimeout = null;
-        onActivate(event.clientX, event.clientY);
-      }, OUTER_CLICK_DELAY_MS);
+      maybeActivateOuterTap(event.clientX, event.clientY);
     });
     path.addEventListener("dblclick", (event) => {
       event.preventDefault();
@@ -1452,4 +1471,3 @@ export function createCircleOfFifthsUi(
     },
   };
 }
-
