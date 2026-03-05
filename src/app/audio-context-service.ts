@@ -26,6 +26,17 @@ export function createAudioContextService(): AudioContextService {
       return new AudioCtx({ latencyHint: "interactive" });
     }
 
+    // On iOS, Web Audio defaults to the "ambient" session category which is
+    // silenced by the hardware ringer switch. Setting type to "playback" routes
+    // audio through the media channel so it plays even when the ringer is off.
+    // Supported in iOS 16.4+ (Safari 16.4+); silently ignored on older versions.
+    try {
+      (navigator as any).audioSession.type = "playback";
+    } catch {
+      // Not supported on this iOS version; audio will still work but may be
+      // silenced by the ringer switch.
+    }
+
     // iOS Safari can report a "bad" audio context on first init.
     // Warm up with a short silent buffer, then create the real context.
     try {

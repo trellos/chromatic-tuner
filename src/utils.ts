@@ -17,6 +17,8 @@ export async function getOrCreateAudioContext(
     window.AudioContext ??
     ((window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ?? null);
   if (!AudioCtor) return null;
+  // Route audio through media channel so it plays even when the ringer is off (iOS 16.4+).
+  try { (navigator as any).audioSession.type = "playback"; } catch { /* not supported */ }
   const ctx = new AudioCtor({ latencyHint: "interactive" });
   await ctx.resume();
   return ctx;
