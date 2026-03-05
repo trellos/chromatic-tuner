@@ -747,7 +747,7 @@ test("minor-mode tonic click does not stall outer-tap playback", async ({ page }
   const pulseCountBefore = await panel.locator('.cof-pulse').count();
   await aWedgePath.click({ force: true });
   await expect
-    .poll(async () => panel.locator('.cof-pulse').count(), { timeout: 260 })
+    .poll(async () => panel.locator('.cof-pulse').count(), { timeout: 120 })
     .toBeGreaterThan(pulseCountBefore);
 });
 
