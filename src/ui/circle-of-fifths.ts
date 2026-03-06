@@ -978,9 +978,7 @@ export function createCircleOfFifthsUi(
     };
 
     let activePointerId: number | null = null;
-    let lastPressActivateAt = 0;
-    let lastPressActivateX = 0;
-    let lastPressActivateY = 0;
+    let suppressNextClick = false;
 
     const maybeActivateOuterTap = (clientX: number, clientY: number): void => {
       onActivate(clientX, clientY);
@@ -1002,12 +1000,10 @@ export function createCircleOfFifthsUi(
       const isChordSide = delta >= -(OUTER_WEDGE_DEG * 0.1);
       const pressZone: "note" | "chord" = isChordSide ? "chord" : "note";
       options.onOuterPressStart?.(emitOuterTap(pressZone, false));
-      // Musical note/chord onset is instrument behavior, not cosmetic feedback.
-      // Fire on pointerdown so desktop/mobile input paths feel immediate.
+      // Run the tap action on pointerdown so touch/pen input does not wait for
+      // post-release synthetic click dispatch.
       maybeActivateOuterTap(event.clientX, event.clientY);
-      lastPressActivateAt = performance.now();
-      lastPressActivateX = event.clientX;
-      lastPressActivateY = event.clientY;
+      suppressNextClick = true;
     };
 
     const endOuterPress = (event: PointerEvent): void => {
@@ -1019,12 +1015,8 @@ export function createCircleOfFifthsUi(
     };
 
     node.addEventListener("click", (event) => {
-      // Pointer-driven activation already ran on pointerdown. Suppress only the
-      // corresponding compatibility click to avoid duplicate note/chord attacks.
-      const dt = performance.now() - lastPressActivateAt;
-      const dx = Math.abs(event.clientX - lastPressActivateX);
-      const dy = Math.abs(event.clientY - lastPressActivateY);
-      if (dt >= 0 && dt < 700 && dx <= 4 && dy <= 4) {
+      if (suppressNextClick) {
+        suppressNextClick = false;
         event.preventDefault();
         event.stopImmediatePropagation();
         return;
