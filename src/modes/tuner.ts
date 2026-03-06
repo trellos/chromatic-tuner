@@ -383,8 +383,6 @@ async function enterTunerMode(): Promise<void> {
             const useTestTone = !document.body.classList.contains("test-tone-active");
             document.body.classList.toggle("test-tone-active", useTestTone);
             pitchService.setTestTone(useTestTone);
-            document.body.classList.remove("status-hidden");
-            setStatus(useTestTone ? "Test tone ON (440 Hz)" : "Test tone OFF");
           }, 600);
         },
         { passive: true, signal }

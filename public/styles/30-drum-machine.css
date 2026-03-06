@@ -439,7 +439,6 @@ body.drum-fullscreen .drum-ui {
 
   .drum-play {
     order: 4;
-    width: 100%;
   }
 
   #drum-beat-button {
@@ -473,6 +472,7 @@ body.drum-fullscreen .drum-ui {
   }
 
   .drum-play {
+    flex-grow: 1;
     min-height: 34px;
     min-width: 74px;
     padding: 8px 14px;
