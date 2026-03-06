@@ -978,10 +978,16 @@ export function createDrumMachineUi(
         }, delayMs);
       }
       const afterCountInMs = Math.max(0, (startTime + 4 * beatDurationSec - ctx.currentTime) * 1000);
+      // Arm the looper half a step early so notes anticipated slightly before the
+      // 1 beat snap to step 0 rather than being dropped. A step is one 16th note
+      // (beatDuration / 4); half a step is beatDuration / 8.
+      const halfStepMs = (beatDurationSec * 1000) / 8;
       window.setTimeout(() => {
         drumMockEl.classList.remove("is-count-in");
         drumMockEl.classList.remove("is-count-in-beat");
         onComplete();
+      }, Math.max(0, afterCountInMs - halfStepMs));
+      window.setTimeout(() => {
         void startTransport();
       }, afterCountInMs);
     })();

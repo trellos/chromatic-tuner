@@ -42,6 +42,7 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
 .fretboard-board {
   --fretboard-playfield-top: 30px;
   --fretboard-playfield-bottom: 12px;
+  touch-action: manipulation;
   background:
     linear-gradient(180deg, rgba(169, 175, 192, 0.86), rgba(141, 148, 166, 0.9));
   border: 1px solid rgba(209, 223, 246, 0.72);
