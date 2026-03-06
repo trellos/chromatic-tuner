@@ -1,4 +1,4 @@
-﻿# UI Directory Guide
+# UI Directory Guide
 
 This file describes how `src/ui` modules should be designed and maintained as this directory grows.
 
@@ -6,14 +6,17 @@ This file describes how `src/ui` modules should be designed and maintained as th
 
 `src/ui` is for reusable UI-level presentation logic that is shared across modes or app-wide surfaces.
 
-Current entry:
+Current entries:
 - `seigaihaBackground.ts`: app background pattern generation + install/update API.
 - `drum-machine.ts`: reusable drum machine UI object (lifecycle + transport).
+- `circle-of-fifths.ts`: reusable Circle of Fifths SVG UI (tap zones, note bar, sustain, trails).
+- `fretboard.ts`: reusable fretboard UI object.
+- `ui-composite-looper.ts`: reusable quantized MIDI loop recorder widget (REC/CLR, 4-measure slots).
 
-Future entries should follow the same principles:
-- module owns its own rendering/state concerns,
-- exposes small integration APIs to callers,
-- avoids mode-specific business logic.
+Modules should:
+- own their own rendering/state concerns,
+- expose small integration APIs to callers,
+- avoid mode-specific business logic.
 
 ## Integration Expectations
 
@@ -101,7 +104,8 @@ Primary implementation:
 Integration points:
 - `src/modes/tuner.ts` (Strobe/Circle toggle + pitch-driven primary updates)
 - `src/modes/circle-of-fifths.ts` (standalone mode wrapper)
-- `public/style.css` (`.cof-*` styles)
+- `src/modes/wild-tuna.ts` (embedded circle with looper integration)
+- `public/styles/60-circle-of-fifths.css` + `public/styles/61-circle-note-bar.css`
 
 ### Circle invariants
 
@@ -114,36 +118,40 @@ Integration points:
 4. Primary note change rotates the inner detail layer using shortest angular path; avoid long-way spins.
 5. In tuner integration, no detected note means no primary and no inner wedges.
 6. Tuner detune guidance maps signed cents into a bounded rotational offset centered at in-tune.
-7. Roman numeral corner labels on outer wedges:
-   - major mode: show `I`, `IV`, `V`
-   - minor mode: show `III`, `VI`, `VII` (relative minor mapping)
-8. Inner detail wedges should show corner roman numerals (`ii`, `iii`, `vi`, `vii°`) and center chord labels (`m` / `°`) while playback follows the selected key.
-9. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
-10. Diminished chord labels should use the `°` symbol (for example `B°`) instead of the `dim` suffix.
-11. Relative minor mode toggle:
-   - entering: double-tap middle-ring `vi`
-   - exiting: double-tap outer `III`
-   - when active, outer roman labels and inner roman detail labels remap to relative minor degrees.
-12. Chord-mode zoom:
-   - entering chord mode from a primary double-tap should zoom viewBox toward that primary sector while keeping the I/IV/V and inner detail wedges in-frame.
-   - exiting chord mode must restore the full-circle viewBox.
-   - inner and outer rings must remain concentric while zoomed (same visual pivot center).
-13. Note bar degree badges:
+7. **Tap zone split (no chord mode toggle):**
+   - Each outer wedge is split angularly: CCW 40% = note-only tap, CW 60% = chord tap.
+   - CCW tap plays the single note; does not change the primary (inner circle) selection.
+   - CW tap plays the major chord; moves the inner circle to that key (except IV/V which don't move primary).
+   - IV/V CW taps play the chord without changing the primary.
+   - Tap outside the circle clears the inner circle (no sound).
+   - There is no separate chord mode state, no zoom, no double-tap entry.
+8. Note bar degree badges:
    - when a primary is selected, each diatonic note row shows its roman numeral in a left column outside the note square.
    - roman numerals in the note bar should render as bold uppercase tokens (for example `III`, `VII°`).
    - note labels remain uppercase note names (not chord symbols).
    - note rectangles should remain visible across patterned backgrounds; lesser degrees (`ii`,`iii`,`vi`,`vii`) may be intentionally more muted than `I/IV/V`, but never near-invisible.
-14. Instrument cycling:
+9. Instrument cycling:
    - a double-tap on SVG background inside the circle radius cycles circle playback instruments.
    - inner indicator text shows the active instrument name (for example `ELECTRIC GUITAR`, `PIPE ORGAN`).
+10. Hold-to-sustain behavior:
+    - CW zone pointer-down sustains major chord; pointer-up/cancel/leave stops sustain.
+    - CCW zone pointer-down sustains single note; pointer-up/cancel/leave stops sustain.
+    - Note-bar notes follow the same press lifecycle: sound starts on pointer down, ends on pointer up/cancel/leave.
+11. Instrument label arc runs along the inner-circle boundary, always antipodal to the detail wedge group; rotates smoothly when the primary changes.
+12. Note-bar cells expand leftward (`transform-origin: right center`) on press so they don't clip at the CoF edge.
+13. Note-bar trail behavior:
+    - each played note spawns a separate trail object under the note square.
+    - while held/sounding, trail stretch keeps its right edge pinned under the note square and extends left at constant velocity.
+    - on release/end, the trail keeps its width and both edges move left at the same velocity (~2s across the circle).
+    - repeated note/chord pulses stack trails instead of replacing them.
+    - roman numeral degree labels never animate with the trail.
+14. Rapid double-taps on the same target are debounced to prevent a second short re-attack.
+15. Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
+16. Keep Circle rendering shared in `src/ui/circle-of-fifths.ts`; mode files should stay as lifecycle/adapters.
    - in chord mode, inner/background double-tap must not exit chord mode or cancel zoom.
-15. Hold-to-sustain behavior:
-   - pointer-down on an outer wedge starts sustain playback for that wedge role (note in note mode, major triad in chord mode).
-   - pointer-down on inner detail wedges starts sustain playback for the selected chord.
-   - pointer-up/cancel/leave stops sustain with a short release envelope.
-16. Chord zoom safety:
+17. Chord zoom safety:
    - zoom target should keep the primary harmonic cluster (`I`, `IV`, `V`, `ii`, `iii`, `vi`, `vii°`) visible within the SVG viewport.
-17. Playback responsiveness is a hard requirement:
+18. Playback responsiveness is a hard requirement:
    - note/chord onset is part of instrument feel, not just visual confirmation.
    - outer wedge and note-bar playback should fire immediately on pointer-down for touch/pen/mouse.
    - avoid intentional single-tap delay windows for click-vs-dblclick arbitration on audio-trigger paths.
@@ -153,16 +161,10 @@ Integration points:
 - Verify deterministic note/chord labels and visible-state toggles.
 - Cover at least one desktop and one mobile viewport in Playwright for layout visibility.
 - Prefer class/visibility/count assertions over pixel snapshots.
-- Verify chord-mode enter/exit behavior:
-  - retap primary enters chord mode and plays major triad
-  - primary double-tap while in chord mode applies zoom-to-primary view
-  - only taps outside the circle radius exit chord mode
-  - chord-mode exit resets zoom to full-circle view
-  - primary tap in chord mode plays major triad (does not exit)
+- Verify CCW/CW tap zone behavior: CCW plays single note (no primary change), CW plays chord (primary moves except IV/V).
 - Verify rapid double-tap on the same note/chord does not trigger duplicate short re-attacks.
 - Verify note-bar roman numeral badges for at least one selected key.
 - Verify inner-circle background double-tap cycles instrument indicator text deterministically.
-- Verify zoomed chord view does not clip the primary harmonic cluster in desktop and portrait mobile.
 - Verify wedge pointer hold toggles the holding lifecycle state (`is-holding`) deterministically.
 - Verify pointer-down triggers playback state before pointer-up on both touch-like and mouse-like inputs.
 
@@ -186,7 +188,7 @@ Integration points:
 ### Count-in
 
 - `countIn(onComplete)` plays a 4-beat woodblock count-in at current BPM using Web Audio API.
-- On completion: calls `onComplete()` then starts transport.
+- On completion: calls `onComplete()` synchronously, then starts transport asynchronously (`await ensureAudio()`).
 - Visual: `is-count-in` + `is-count-in-beat` classes on `drumMockEl` for CSS animation.
 - Should only be called when transport is stopped (`isPlaying === false`).
 - Used by Wild Tuna coordinator when REC is pressed with transport stopped.
@@ -207,9 +209,9 @@ Integration points:
 
 ### What it does
 
-A self-contained REC/PLAY widget that records and plays back quantized MIDI events
+A self-contained REC/CLR widget that records and plays back quantized MIDI events
 synchronized to an external transport (the drum machine). Each instance manages:
-- A REC button (arms → records → stops) and a PLAY button (toggles playback).
+- A REC button (arms → records → stops) and a CLR button (wipes loop). No PLAY button.
 - Up to `MAX_MEASURES` (4) of recorded measure slots (growable per pass).
 - Quantization: note events are snapped to 16 steps per measure.
 - Playback: scheduled via `setTimeout` relative to `performance.now()`.
@@ -228,10 +230,27 @@ idle ──[REC press]──→ armed ──[measure boundary]──→ recordin
 ### API contract
 
 - `onTransportStart()` / `onTransportStop()`: called by mode when drum transport changes.
+  - **`onTransportStart()` is a no-op when `recordState === "armed" || "recording"`** to prevent resetting `currentMeasureStartPerfMs` after the count-in arm path has already set up recording state.
 - `onBeatBoundary(event)`: drives state machine; measure boundary is `beatIndex === 0`.
 - `recordPulse(midis, durationMs)`: records a short tap event (e.g. circle tap).
 - `recordHoldStart(sourceId, midis)` / `recordHoldEnd(sourceId)`: records a sustained hold.
-- `requestArm()`: clears previous loop + arms for recording; also pre-sets `isTransportPlaying = true` to handle the count-in case where arm fires before `onTransportStart`.
+- `requestArm()`: clears previous loop + arms for recording; pre-sets `isTransportPlaying = true` so count-in beat boundaries aren't dropped (arm fires before `onTransportStart` in count-in path).
 - `loadLoop(slots)`: hydrates looper with saved slot data (from share URL).
 - `getMeasureSlots()`: returns deep-copy of recorded slots for serialization.
-- `seekToMeasure(index)`: schedules a playback-head jump at next measure boundary.
+- `seekToMeasure(index)`: schedules a playback-head jump at next measure boundary. Sets a `recordingSeekTarget` (separate from `pendingSeekMeasure`) that survives count-in beat boundaries and is consumed only by `requestArm()`.
+
+### Key implementation details
+
+- **`playbackMeasureIndex` sentinel:** initialized to `-1`; reset to `-1` in `onTransportStart()` and `onTransportStop()`. First measure boundary always produces `(-1+1) % effectiveCount = 0`, guaranteeing playback starts at measure 0 without a separate boolean flag.
+- **`preArmBuffer`:** notes played between `requestArm()` and the first beat boundary are buffered as `{ midis, durationMs }`. Flushed into slot 0 when recording begins. Pulses (`durationMs > 0`) schedule an auto-close timeout after flush. Holds (`durationMs === 0`) stay open until `recordHoldEnd` fires.
+- **Count-in ordering:** `requestArm()` fires synchronously; `onTransportStart()` fires later (async `ensureAudio()`). The `onTransportStart` guard prevents clobbering `currentMeasureStartPerfMs` if a beat boundary already set it.
+
+### Composite Looper test expectations
+
+- Unit tests in `tests/unit/ui-composite-looper.test.ts` using `vi.useFakeTimers()`.
+- Verify 4-measure recording stores all 4 slots and plays them back in order (0, 1, 2, 3, 0...).
+- Verify `onTransportStart()` after `requestArm()` (count-in path) does not clobber measure-0 recording.
+- Verify pre-arm buffer notes land in slot 0 at step 0.
+- Verify measure-0 notes are not silently dropped when `onTransportStart` fires mid-measure.
+- Verify CLR wipes slots and resets to idle.
+- Verify `seekToMeasure()` jumps playback head at the next boundary.

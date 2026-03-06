@@ -1,4 +1,4 @@
-﻿# Repository Guide
+# Repository Guide
 
 ## Core workflow
 - Install: `npm ci`
@@ -27,8 +27,6 @@
 - Hidden summary appears rotated near the high-E side of the board and restores controls on tap.
 - `createFretboardUi` supports `setLooperElement(...)`; attached looper UI is rendered in the board looper slot (under the 12th-fret area), not over the controls.
 
-
-
 ## Navigation notes
 - Bottom mode icon bar is removed; mode switching is via the mode chip picker only.
 
@@ -51,17 +49,21 @@
   - middle: three minor wedges (`ii`, `iii`, `vi`)
   - inner: one diminished wedge (`vii°`)
   - preserve a visible annular gap between middle and inner rings; do not let rings touch/overlap
-- Chord mode flow:
-  - first tap on a primary note sets primary and plays single note
-  - tapping the same primary note again enters chord mode and plays that primary major triad
-  - if the retap is a primary double tap, chord mode zooms to that primary cluster while keeping I/IV/V and inner detail wedges visible
-  - while in chord mode, tapping any outer wedge plays that wedge's major triad and does not change primary
-  - chord mode exits only when tapping outside the circle radius (not just outside wedges)
-- Exiting chord mode restores full-circle zoom.
+- **Tap zone split (no chord mode toggle):**
+  - Each outer wedge is split angularly: CCW 40% = note-only tap, CW 60% = chord tap.
+  - CCW tap plays the single note; does not change the primary (inner circle) selection.
+  - CW tap plays the major chord; moves the inner circle to that key (except IV/V which don't move primary).
+  - IV/V CW taps play the chord without changing the primary.
+  - Tap outside the circle clears the inner circle (no sound).
+  - There is no separate chord mode state, no zoom, no double-tap entry.
+- Instrument label arcs along the inner-circle boundary, always antipodal to the detail wedge group; rotates smoothly when the primary changes.
 - When a primary note is selected, note-bar rows show bold uppercase roman numerals in a left column beside each diatonic note square.
 - Note-bar rectangles must stay visibly filled for all degrees; `ii/iii/vi/vii` can be more muted than `I/IV/V` but should remain clearly visible.
+- Note-bar cells expand leftward (`transform-origin: right center`) on press/active so they don't clip at the CoF edge.
 - Double-tapping SVG background inside the circle cycles instruments and updates the inner indicator text.
 - Holding a circle wedge sustains playback while pressed, then releases on pointer end/cancel/leave.
+  - CW zone hold: sustains major chord.
+  - CCW zone hold: sustains single note.
 - Note-bar notes follow the same press lifecycle as wedges: sound starts on pointer down and ends on pointer up/cancel/leave.
 - Playback latency contract: Circle note/chord onset is instrument behavior, not cosmetic UI feedback. Trigger sound on pointer-down immediately on both desktop and mobile paths; do not add intentional single-tap delays for click/double-click arbitration.
 - Sustained playback uses looped sample regions derived from zero-crossing loop points per instrument sample.
@@ -87,11 +89,13 @@
 - Two `CompositeLooper` instances (`src/ui/ui-composite-looper.ts`) record MIDI from the Circle and Fretboard.
 - All timing is driven by the drum machine transport via `onTransportStart`, `onTransportStop`, `onBeatBoundary` callbacks.
 - REC logic is coordinated centrally: only one looper records at a time; if transport is stopped, pressing REC triggers a 4-beat woodblock count-in before recording starts.
-- Timeline blocks (`.wt-timeline-block`) show 4 global measures; tapping seeks all loopers.
+- **Timeline:** `.wt-timeline-block` buttons show 4 global measures. Each block contains 16 `.wt-timeline-step` spans that light up based on note density at that step across all loopers (opacity scales with note count). Tapping a block seeks all loopers to that measure.
+- **Looper controls:** REC button (with indicator dot: dim=idle, pink=armed, red+blink=recording) and CLR button. No PLAY button. CLR wipes the loop and is disabled during recording.
 - Share URL (`?mode=wild-tuna&track=<base64url(JSON)>`) encodes drum pattern + loop MIDI for both instruments.
 - `globalMeasureIndex` tracks the active timeline measure independently of each looper's internal position.
 - Shared transport/session event bus for cross-UI timing coordination: `src/app/session-transport.ts` (used by Wild Tuna to fan out drum transport start/stop/beat events deterministically).
 - Share payload encode/decode + version/schema validation lives in `src/app/share-payloads.ts`; avoid ad-hoc base64/JSON parsers in mode/UI files.
+- **Track API:** `getWildTunaTrackApi()` returns a `WildTunaTrackApi` that aggregates `NoteOn`/`NoteOff` events from both loopers. Consumers subscribe via `onNoteOn`/`onNoteOff` or poll `getActiveNotes()`.
 
 ## Extra Jimmy mode notes
 - Entry point: `src/modes/extra-jimmy.ts`.
@@ -116,7 +120,7 @@
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
 - Avoid test-only branches in runtime code.
-- Prefer unit tests for pure state/serialization modules (`src/app/share-payloads.ts`, `src/app/session-transport.ts`) and reserve Playwright for integrated UI flows.
+- Prefer unit tests for pure state/serialization modules (`src/app/share-payloads.ts`, `src/app/session-transport.ts`, `src/ui/ui-composite-looper.ts`) and reserve Playwright for integrated UI flows.
 
 ## CSS maintainability
 - CSS lint rules are defined in `.stylelintrc.cjs`.

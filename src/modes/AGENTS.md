@@ -43,8 +43,9 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Preserve regression coverage in `tests/ui.spec.ts` for the metronome sound menu overflow + no-scrollbar behavior.
 
 ### Drum Machine (`src/modes/drum-machine.ts`)
+- Thin mode adapter over `src/ui/drum-machine.ts`.
 - 4-row, 16-step sequencer with presets and playhead.
-- Fullscreen is supported only in this mode.
+- Fullscreen is supported only in this mode (and Wild Tuna).
 - `onEnter`: bind controls, sync layout, seed initial pattern once.
 - `onExit`: stop scheduler and detach listeners/observers.
 - Fullscreen layout behavior is controlled by existing responsive CSS/media rules; do not add no-op class toggles without matching styles.
@@ -105,6 +106,48 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Play action drives a stronger playback envelope: start near `0.8`, then decay to `0` when playback completes.
   - Mode exit must clear/neutralize fretboard-owned randomness (`null`) so other modes can drive background state.
 
+### Circle of Fifths (`src/modes/circle-of-fifths.ts`)
+- Dedicated mode is a thin adapter over shared Circle UI (`src/ui/circle-of-fifths.ts`).
+- Taps trigger guitar-sample playback + seigaiha pulse; keep theory/render logic in shared UI helpers.
+- Keep this mode focused on lifecycle wiring (`onEnter`/`onExit`) and cleanup only.
+- Interaction contract:
+  - CCW 40% of wedge: plays single note only, no primary change.
+  - CW 60% of wedge: plays major chord; sets inner circle primary (except IV/V which don't move primary).
+  - Hold on CCW zone: sustains single note.
+  - Hold on CW zone: sustains major chord.
+  - Tap outside circle: clears inner circle (no sound).
+  - There is no chord mode state, zoom, or double-tap entry into a different interaction mode.
+- Background randomness contract:
+  - On chord tap: pulse to high randomness then ease down.
+  - On note tap: shorter randomness pulse.
+  - On hold: oscillates between min/max while held.
+  - On release: eases back down.
+
+### Tuner Circle toggle (`src/modes/tuner.ts`)
+- Tuner supports visual sub-modes (`strobe`, `circle`) via in-mode toggle.
+- Pitch detection drives Circle primary note + detune-guidance rotation when Circle view is active.
+- No detected note must clear Circle primary and hide inner detail wedges.
+
+### Wild Tuna (`src/modes/wild-tuna.ts`)
+- Three-pane jam mode: Drum Machine | Circle of Fifths | Fretboard with synchronized MIDI loop recording.
+- Entry point: `src/modes/wild-tuna.ts` (coordinator + mode wiring).
+- Reusable looper widget: `src/ui/ui-composite-looper.ts` (two instances: circle + fretboard).
+- The drum machine transport drives all timing; loopers receive `onTransportStart/Stop/BeatBoundary`.
+- **Recording flow:**
+  - REC press calls `coordinator.onRecPressed(source)`.
+  - If transport is already playing: `source.requestArm()` → arms on next measure boundary → starts recording.
+  - If transport is stopped: drum machine plays a 4-beat woodblock count-in at current BPM. After count-in, `requestArm()` fires synchronously, then `startTransport()` fires asynchronously. The looper handles this ordering: `requestArm()` pre-sets `isTransportPlaying = true` so beat boundaries aren't skipped, and `onTransportStart()` is a no-op when already armed/recording.
+  - Only one looper can record at a time; pressing REC on one stops any other recording looper.
+  - Recording auto-stops after 4 measures (`MAX_MEASURES`).
+  - A `recordingSeekTarget` (separate from `pendingSeekMeasure`) survives count-in beat boundaries so a pre-press seek is applied when recording begins.
+- **Timeline:** `buildWildTunaTimeline` renders 4 tappable measure blocks between the drum pane and the circle/fretboard panes. Each block contains 16 `.wt-timeline-step` spans that light up based on note density per step across all loopers. Tapping a block seeks all loopers to that measure.
+- **Looper controls:** REC button (indicator dot: dim=idle, pink=armed, red+blink=recording) and CLR button. No PLAY button.
+- **Save/load:** Share button serializes drum pattern + circle loop + fretboard loop to `?mode=wild-tuna&track=<base64url(JSON)>`. `onEnter` hydrates from URL if present.
+- **Fretboard state** (root, scale/chord mode, characteristic) is not serialized in share URLs.
+- **Seigaiha:** `noteTracker` converts active note count to a randomness value fed to `seigaihaBridge`; decays when notes stop sounding.
+- **Track API:** `getWildTunaTrackApi()` returns a `WildTunaTrackApi` with `onNoteOn`/`onNoteOff`/`getActiveNotes` aggregating playback events from both loopers. The singleton is recreated on each `onEnter` via `_reset()`.
+- **CSS:** Layout in `public/styles/00-foundation.css` (`.wild-tuna-composite` grid). Timeline block + step styles: `.wt-timeline-block`, `.wt-timeline-step` in the same file. Looper widget styles: `public/styles/60-circle-of-fifths.css`.
+
 ## Guardrails
 
 - Keep cross-mode coupling out of mode files.
@@ -125,40 +168,3 @@ Do not preserve dead paths "for later" unless explicitly requested.
 
 - Keep PR title/body plain ASCII and concise when possible.
 - If PR creation returns a 400 from host integration, retry with a shorter title and a minimal body first, then expand only if accepted.
-
-### Circle of Fifths (`src/modes/circle-of-fifths.ts`)
-- Dedicated mode is a thin adapter over shared Circle UI (`src/ui/circle-of-fifths.ts`).
-- Taps should trigger guitar-sample playback + seigaiha pulse, but keep theory/render logic in shared UI helpers.
-- Keep this mode focused on lifecycle wiring (`onEnter`/`onExit`) and cleanup only.
-- Interaction contract:
-  - first primary tap sets primary + plays single note
-  - tapping the same primary again enters chord mode + plays primary major triad
-  - in chord mode, any outer wedge tap plays that wedge major triad and does not change the active primary
-  - chord mode exits only from tapping outside wedges (background tap)
-- Background randomness contract:
-  - chord mode oscillates continuously between configured min/max randomness
-  - on chord mode exit, randomness eases back down instead of dropping instantly
-  - one-shot playback pulses can still drive short high-randomness bursts
-
-### Tuner Circle toggle (`src/modes/tuner.ts`)
-- Tuner supports visual sub-modes (`strobe`, `circle`) via in-mode toggle.
-- Pitch detection drives Circle primary note + detune-guidance rotation when Circle view is active.
-- No detected note must clear Circle primary and hide inner detail wedges.
-
-### Wild Tuna (`src/modes/wild-tuna.ts`)
-- Three-pane jam mode: Drum Machine | Circle of Fifths | Fretboard with synchronized MIDI loop recording.
-- Entry point: `src/modes/wild-tuna.ts` (coordinator + mode wiring).
-- Reusable looper widget: `src/ui/ui-composite-looper.ts` (two instances: circle + fretboard).
-- The drum machine transport drives all timing; loopers receive `onTransportStart/Stop/BeatBoundary`.
-- `globalMeasureIndex` in wild-tuna tracks the timeline position independently from each looper's internal `playbackMeasureIndex`.
-- **Recording flow:**
-  - REC press calls `coordinator.onRecPressed(source)`.
-  - If transport is already playing: `source.requestArm()` → arms on next measure boundary → starts recording.
-  - If transport is stopped: drum machine plays a 4-beat woodblock count-in at current BPM, then `requestArm()` fires and transport starts. `requestArm()` also pre-sets `isTransportPlaying = true` in the looper so the first `onBeatBoundary` is not skipped.
-  - Only one looper can record at a time; pressing REC on one stops any other recording looper.
-  - Recording auto-stops after 4 measures (configurable via `MAX_MEASURES`).
-- **Timeline:** `buildWildTunaTimeline` renders 4 tappable measure blocks between the drum pane and the circle/fretboard panes. Tapping seeks all loopers to that measure.
-- **Save/load:** Share button serializes drum pattern + circle loop + fretboard loop to `?mode=wild-tuna&track=<base64url(JSON)>`. `onEnter` hydrates from URL if present.
-- **Fretboard state** (root, scale/chord mode, characteristic) is not serialized in share URLs — fretboard is re-created on each `onEnter` and the URL round-trip would require a post-construction setter.
-- **Seigaiha:** `noteTracker` converts active note count to a randomness value fed to `seigaihaBridge`; decays when notes stop sounding.
-- **CSS:** Layout lives in `public/styles/00-foundation.css` (`.wild-tuna-composite` grid). Timeline block styles are `.wt-timeline-block` in the same file.
