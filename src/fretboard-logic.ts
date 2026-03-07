@@ -203,7 +203,9 @@ export function getFretboardZoomViewport(
   const stringStart = clamp(centeredStringStart, 0, maxStringStart);
 
   const maxFretStart = Math.max(0, maxFret - fretCount + 1);
-  const centeredFretStart = Math.floor(fret - (fretCount - 1) / 2);
+  // Keep the tapped fret in the upper half of the window so the reachable
+  // notes ahead of the root stay visible for quick runs (for example 5 -> 4..7).
+  const centeredFretStart = Math.floor(fret - (fretCount - 2) / 2);
   const fretStart = clamp(centeredFretStart, 0, maxFretStart);
 
   return {

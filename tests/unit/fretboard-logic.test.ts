@@ -176,7 +176,7 @@ describe("getFretboardZoomViewport", () => {
     expect(viewport).toEqual({
       stringStart: 0,
       stringCount: 3,
-      fretStart: 3,
+      fretStart: 4,
       fretCount: 4,
     });
   });

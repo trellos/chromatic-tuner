@@ -28,6 +28,7 @@
 - `createFretboardUi` supports `setLooperElement(...)`; attached looper UI is rendered in the board looper slot (under the 12th-fret area), not over the controls.
 - Fretboard zoom: `TARGET` arms a one-shot zoom, and the next tapped note zooms to a 3-string / 4-fret window around that note.
 - Zoom exits when tapping outside the board or pressing Escape.
+- In Extra Jimmy, toggling the shared `TARGET` button off clears zoom on both boards.
 
 ## Navigation notes
 - Bottom mode icon bar is removed; mode switching is via the mode chip picker only.

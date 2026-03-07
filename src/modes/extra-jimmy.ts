@@ -126,6 +126,10 @@ export function createExtraJimmyMode(): ModeDefinition {
     zoomArmed = armed;
     lowUi?.setZoomArmed(armed);
     highUi?.setZoomArmed(armed);
+    if (!armed) {
+      lowUi?.clearZoom();
+      highUi?.clearZoom();
+    }
     syncZoomArmVisual();
   };
 

@@ -669,3 +669,22 @@ test("fretboard target button zooms to tapped note and outside tap restores full
   await outsideControl.click();
   await expect(board).not.toHaveClass(/is-zoomed/);
 });
+
+test("mobile target zoom can be armed and dismissed by outside tap", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "Mobile Safari", "mobile zoom coverage");
+
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+
+  const board = page.locator('.mode-screen[data-mode="fretboard"] .fretboard-board').first();
+  const targetButton = page.locator("[data-fretboard-zoom-target]").first();
+  const targetDot = page.locator('.fretboard-dot[data-string-index="1"][data-fret="5"]').first();
+  const outsideControl = page.locator("[data-fretboard-display='key']");
+
+  await targetButton.click();
+  await targetDot.click();
+  await expect(board).toHaveClass(/is-zoomed/);
+
+  await outsideControl.click();
+  await expect(board).not.toHaveClass(/is-zoomed/);
+});

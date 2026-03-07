@@ -815,3 +815,25 @@ test("extra-jimmy uses one shared target button to zoom the next tapped neck", a
   await expect(lowBoard).not.toHaveClass(/is-zoomed/);
   await expect(targetButton).not.toHaveClass(/is-active/);
 });
+
+test("extra-jimmy shared target toggles off and clears zoom on both boards", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+
+  const targetButton = page.locator("[data-ej-zoom-target]");
+  const lowBoard = page.locator('[data-ej-neck="low"] .fretboard-board');
+  const highBoard = page.locator('[data-ej-neck="high"] .fretboard-board');
+  const lowTargetDot = page.locator('[data-ej-neck="low"] .fretboard-dot[data-string-index="1"][data-fret="5"]').first();
+
+  await targetButton.click();
+  await lowTargetDot.click();
+  await expect(lowBoard).toHaveClass(/is-zoomed/);
+
+  await targetButton.click();
+  await expect(targetButton).toHaveClass(/is-active/);
+  await targetButton.click();
+
+  await expect(targetButton).not.toHaveClass(/is-active/);
+  await expect(lowBoard).not.toHaveClass(/is-zoomed/);
+  await expect(highBoard).not.toHaveClass(/is-zoomed/);
+});
