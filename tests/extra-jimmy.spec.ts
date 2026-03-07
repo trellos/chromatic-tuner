@@ -794,3 +794,24 @@ test("extra-jimmy mode can change multiple controls in sequence", async ({
   await expect(lowViewport).toBeVisible();
   await expect(highViewport).toBeVisible();
 });
+
+test("extra-jimmy uses one shared target button to zoom the next tapped neck", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+
+  const targetButton = page.locator("[data-ej-zoom-target]");
+  await expect(targetButton).toHaveCount(1);
+
+  const lowBoard = page.locator('[data-ej-neck="low"] .fretboard-board');
+  const highBoard = page.locator('[data-ej-neck="high"] .fretboard-board');
+
+  await targetButton.click();
+  await expect(targetButton).toHaveClass(/is-active/);
+
+  const highTargetDot = page.locator('[data-ej-neck="high"] .fretboard-dot[data-string-index="1"][data-fret="5"]').first();
+  await highTargetDot.click();
+
+  await expect(highBoard).toHaveClass(/is-zoomed/);
+  await expect(lowBoard).not.toHaveClass(/is-zoomed/);
+  await expect(targetButton).not.toHaveClass(/is-active/);
+});

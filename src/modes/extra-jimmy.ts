@@ -35,6 +35,7 @@ export function createExtraJimmyMode(): ModeDefinition {
   const harmonySelect = modeEl.querySelector<HTMLSelectElement>("[data-ej-harmony]");
   const scaleSelect = modeEl.querySelector<HTMLSelectElement>("[data-ej-scale]");
   const keyTrigger = modeEl.querySelector<HTMLButtonElement>("[data-ej-key-trigger]");
+  const zoomTargetButton = modeEl.querySelector<HTMLButtonElement>("[data-ej-zoom-target]");
   const keyPopup = modeEl.querySelector<HTMLElement>("[data-ej-key-popup]");
   const keyNoteButtons = modeEl.querySelectorAll<HTMLButtonElement>("[data-ej-key-note]");
 
@@ -53,6 +54,7 @@ export function createExtraJimmyMode(): ModeDefinition {
   };
   // Harmony interval controls how many scale degrees to jump when calculating the partner note.
   let stepsAbove = 2;
+  let zoomArmed = false;
 
   const ensureAudio = async () => {
     audioCtx = await getOrCreateAudioContext(audioCtx);
@@ -112,6 +114,26 @@ export function createExtraJimmyMode(): ModeDefinition {
     highUi?.render(boardState);
   };
 
+  const syncZoomArmVisual = () => {
+    if (!zoomTargetButton) return;
+    zoomTargetButton.classList.toggle("is-active", zoomArmed);
+    zoomTargetButton.setAttribute("aria-pressed", String(zoomArmed));
+    zoomTargetButton.textContent = zoomArmed ? "TARGET ON" : "TARGET";
+  };
+
+  const setSharedZoomArmed = (armed: boolean) => {
+    if (zoomArmed === armed) return;
+    zoomArmed = armed;
+    lowUi?.setZoomArmed(armed);
+    highUi?.setZoomArmed(armed);
+    syncZoomArmVisual();
+  };
+
+  const onBoardZoomArmChanged = (armed: boolean) => {
+    if (!armed && zoomArmed) {
+      setSharedZoomArmed(false);
+    }
+  };
 
   const isPopupOpen = () => !keyPopup?.hasAttribute("hidden");
   const openPopup = () => {
@@ -157,6 +179,8 @@ export function createExtraJimmyMode(): ModeDefinition {
         initialState: { ...boardState },
         fretPressEvent: "pointerdown",
         showControls: false,
+        showZoomControl: false,
+        onZoomArmedChange: onBoardZoomArmChanged,
         onFretPress: ({ midi, stringIndex }) => {
           // Tapping the low fretboard: play the note + its harmony partner above on the high board.
           const harmony = harmonyOf(midi, stepsAbove);
@@ -170,6 +194,8 @@ export function createExtraJimmyMode(): ModeDefinition {
         initialState: { ...boardState },
         fretPressEvent: "pointerdown",
         showControls: false,
+        showZoomControl: false,
+        onZoomArmedChange: onBoardZoomArmChanged,
         onFretPress: ({ midi, stringIndex }) => {
           // Tapping the high fretboard: play the note + its harmony partner below on the low board (negative steps).
           const harmony = harmonyOf(midi, -stepsAbove);
@@ -182,9 +208,18 @@ export function createExtraJimmyMode(): ModeDefinition {
 
       lowUi.enter();
       highUi.enter();
+      syncZoomArmVisual();
 
       // Wire control event listeners. All listeners are tied to the abort signal so they
       // are cleaned up on mode exit.
+
+      zoomTargetButton?.addEventListener(
+        "click",
+        () => {
+          setSharedZoomArmed(!zoomArmed);
+        },
+        { signal }
+      );
 
       // Harmony interval selector: updates the scale degree jump for partner note calculation.
       harmonySelect?.addEventListener(
@@ -254,10 +289,14 @@ export function createExtraJimmyMode(): ModeDefinition {
       modeAbort = null;
 
       // Shut down both fretboard UI instances and clear references.
+      lowUi?.clearZoom();
+      highUi?.clearZoom();
       lowUi?.exit();
       highUi?.exit();
       lowUi = null;
       highUi = null;
+      zoomArmed = false;
+      syncZoomArmVisual();
 
       // Clear the viewport DOM to remove all cloned fretboard elements.
       if (lowViewport) lowViewport.replaceChildren();

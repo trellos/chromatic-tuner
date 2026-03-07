@@ -641,3 +641,31 @@ test("mobile safari KEY tap enters key mode without mode-swiping to metronome", 
   await expect(fretboardScreen).toHaveClass(/is-active/);
   await expect(metronomeScreen).not.toHaveClass(/is-active/);
 });
+
+test("fretboard target button zooms to tapped note and outside tap restores full board", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+
+  const board = page.locator(".mode-screen[data-mode='fretboard'] .fretboard-board").first();
+  const targetButton = page.locator("[data-fretboard-zoom-target]").first();
+  const targetDot = page.locator('.fretboard-dot[data-string-index="1"][data-fret="5"]').first();
+  const outsideControl = page.locator("[data-fretboard-display='chord']");
+
+  await expect(targetButton).toHaveText("TARGET");
+  await targetButton.click();
+  await expect(targetButton).toHaveClass(/is-active/);
+
+  const before = await targetDot.boundingBox();
+  expect(before).toBeTruthy();
+  await targetDot.click();
+
+  await expect(board).toHaveClass(/is-zoomed/);
+  await expect(targetButton).not.toHaveClass(/is-active/);
+
+  const after = await targetDot.boundingBox();
+  expect(after).toBeTruthy();
+  expect(after!.width).toBeGreaterThan(before!.width);
+
+  await outsideControl.click();
+  await expect(board).not.toHaveClass(/is-zoomed/);
+});

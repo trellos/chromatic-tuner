@@ -50,6 +50,10 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     inset 0 -1px 0 rgba(36, 45, 67, 0.24);
+  --fretboard-zoom-scale-x: 1;
+  --fretboard-zoom-scale-y: 1;
+  --fretboard-zoom-translate-x: 0%;
+  --fretboard-zoom-translate-y: 0%;
   min-height: 520px;
   overflow: visible;
   position: relative;
@@ -144,6 +148,30 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
 
 .fretboard-dots {
   z-index: 4;
+}
+
+
+.fretboard-board.is-zoomed {
+  overflow: hidden;
+}
+
+.fretboard-board.is-zoomed .fretboard-open-indicators,
+.fretboard-board.is-zoomed .fretboard-frets,
+.fretboard-board.is-zoomed .fretboard-strings,
+.fretboard-board.is-zoomed .fretboard-dots,
+.fretboard-board.is-zoomed .fretboard-inlays,
+.fretboard-board.is-zoomed .fretboard-string-labels {
+  transform: scale(var(--fretboard-zoom-scale-x), var(--fretboard-zoom-scale-y)) translate(var(--fretboard-zoom-translate-x), var(--fretboard-zoom-translate-y));
+  transform-origin: top left;
+}
+
+.fretboard-board.is-zoomed .fretboard-dot {
+  font-size: clamp(14px, 2.2vw, 18px);
+  width: clamp(36px, 5vw, 52px);
+}
+
+.fretboard-board.is-zoomed .fretboard-open-indicator {
+  opacity: 0.3;
 }
 
 .fretboard-open-indicator {
@@ -347,6 +375,15 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   flex-wrap: wrap;
 }
 
+.fretboard-zoom-action {
+  border: 1px solid rgba(0, 245, 212, 0.45);
+}
+
+.fretboard-zoom-action.is-active {
+  background: rgba(0, 245, 212, 0.32);
+  border-color: rgba(0, 245, 212, 0.8);
+}
+
 .fretboard-hide-action {
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(12, 16, 32, 0.2);
@@ -542,7 +579,7 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
     transform: none;
   }
 
-  .fretboard-open-indicator {
+.fretboard-open-indicator {
     border-width: 1.5px;
     height: 8px;
     width: 8px;
@@ -583,6 +620,15 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
     font-size: 11px;
     min-width: 78px;
     padding: 8px 10px;
+  }
+
+  .fretboard-zoom-action {
+    border: 1px solid rgba(0, 245, 212, 0.45);
+  }
+
+  .fretboard-zoom-action.is-active {
+    background: rgba(0, 245, 212, 0.32);
+    border-color: rgba(0, 245, 212, 0.8);
   }
 
   .fretboard-hide-action {

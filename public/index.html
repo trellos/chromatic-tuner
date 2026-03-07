@@ -235,6 +235,7 @@
 
               <div class="fretboard-actions" data-fretboard-hideable>
                 <button type="button" class="fretboard-play-action" data-fretboard-play>PLAY</button>
+                <button type="button" class="fretboard-zoom-action" data-fretboard-zoom-target aria-pressed="false">TARGET</button>
                 <button type="button" class="fretboard-hide-action" data-fretboard-hide>HIDE</button>
               </div>
               <button
@@ -273,7 +274,7 @@
                 <label class="fretboard-characteristic-label" for="fretboard-characteristic" data-fretboard-hideable>Characteristic</label>
                 <select id="fretboard-characteristic" class="fretboard-characteristic" data-fretboard-hideable></select>
                 <div class="fretboard-segmented" data-fretboard-hideable><button type="button" data-fretboard-annotation="notes">NOTES</button><button type="button" data-fretboard-annotation="degrees">DEGREES</button></div>
-                <div class="fretboard-actions" data-fretboard-hideable><button type="button" class="fretboard-play-action" data-fretboard-play>PLAY</button><button type="button" class="fretboard-hide-action" data-fretboard-hide>HIDE</button></div>
+                <div class="fretboard-actions" data-fretboard-hideable><button type="button" class="fretboard-play-action" data-fretboard-play>PLAY</button><button type="button" class="fretboard-zoom-action" data-fretboard-zoom-target aria-pressed="false">TARGET</button><button type="button" class="fretboard-hide-action" data-fretboard-hide>HIDE</button></div>
                 <button type="button" class="fretboard-hidden-summary" data-fretboard-summary hidden aria-label="Show fretboard selectors"></button>
               </div>
             </div>
@@ -359,6 +360,9 @@
                   <option value="8">9th</option>
                   <option value="10">11th</option>
                 </select>
+
+                <label class="ej-control-label" for="ej-zoom-target">Target</label>
+                <button type="button" id="ej-zoom-target" class="ej-target-btn" data-ej-zoom-target aria-pressed="false">TARGET</button>
 
                 <label class="ej-control-label">Key</label>
                 <div class="ej-key-chip">
