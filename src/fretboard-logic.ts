@@ -59,6 +59,13 @@ export type FretboardDot = {
   midi: number;
 };
 
+export type FretboardZoomViewport = {
+  stringStart: number;
+  stringCount: number;
+  fretStart: number;
+  fretCount: number;
+};
+
 const CHROMATIC_BY_SEMITONE = [
   "C",
   "C#",
@@ -170,6 +177,44 @@ const OPEN_STRING_SEMITONES = [4, 9, 2, 7, 11, 4] as const;
 const OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64] as const;
 
 export const MAX_FRET = 12;
+const MAX_STRING_INDEX = OPEN_STRING_MIDI.length - 1;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Computes a stable 3-string / 4-fret viewport around a tapped note.
+ *
+ * We center the tapped position when possible, then clamp to board bounds so
+ * edge notes still produce a full-size window instead of shrinking.
+ */
+export function getFretboardZoomViewport(
+  stringIndex: number,
+  fret: number,
+  options: { stringCount?: number; fretCount?: number; maxFret?: number } = {}
+): FretboardZoomViewport {
+  const stringCount = Math.max(1, Math.floor(options.stringCount ?? 3));
+  const fretCount = Math.max(1, Math.floor(options.fretCount ?? 4));
+  const maxFret = Math.max(0, Math.floor(options.maxFret ?? MAX_FRET));
+
+  const maxStringStart = Math.max(0, MAX_STRING_INDEX - stringCount + 1);
+  const centeredStringStart = Math.floor(stringIndex - (stringCount - 1) / 2);
+  const stringStart = clamp(centeredStringStart, 0, maxStringStart);
+
+  const maxFretStart = Math.max(0, maxFret - fretCount + 1);
+  // Keep the tapped fret in the upper half of the window so the reachable
+  // notes ahead of the root stay visible for quick runs (for example 5 -> 4..7).
+  const centeredFretStart = Math.floor(fret - (fretCount - 2) / 2);
+  const fretStart = clamp(centeredFretStart, 0, maxFretStart);
+
+  return {
+    stringStart,
+    stringCount,
+    fretStart,
+    fretCount,
+  };
+}
 
 function normalizeSemitone(value: number): number {
   return ((value % 12) + 12) % 12;

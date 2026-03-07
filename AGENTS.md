@@ -26,6 +26,9 @@
 - `HIDE` collapses all controls to a single summary button; no selector/action rows should remain visible while hidden.
 - Hidden summary appears rotated near the high-E side of the board and restores controls on tap.
 - `createFretboardUi` supports `setLooperElement(...)`; attached looper UI is rendered in the board looper slot (under the 12th-fret area), not over the controls.
+- Fretboard zoom: `TARGET` arms a one-shot zoom, and the next tapped note zooms to a 3-string / 4-fret window around that note.
+- Zoom exits when tapping outside the board or pressing Escape.
+- In Extra Jimmy, toggling the shared `TARGET` button off clears zoom on both boards.
 
 ## Navigation notes
 - Bottom mode icon bar is removed; mode switching is via the mode chip picker only.
@@ -112,6 +115,7 @@
   - Harmony select: 9 options (2nd–11th degrees).
   - Key button: Opens a 3×4 grid popup to select the tonal root (C–B). Button text updates to show selected key.
   - Scale select: 7 diatonic modes (Major, Minor, Dorian, Mixolydian, Phrygian, Lydian, Locrian).
+  - One shared `TARGET` button arms zoom on both boards; the next note tapped on either board consumes the arm and zooms only that board.
   - All controls are in the center column; per-fretboard controls (root note, display mode, annotations) are completely hidden.
 - **Resize handling**: Each fretboard viewport observes its parent container; the layout automatically sizes fretboards to fill available space.
 - **Cleanup**: On mode exit, disconnect resize observers, tear down UI instances, and close audio context.

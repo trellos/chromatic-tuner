@@ -9,6 +9,7 @@ import {
   NOTE_TO_SEMITONE,
   FRETBOARD_DEFAULT_STATE,
   MAX_FRET,
+  getFretboardZoomViewport,
 } from "../../src/fretboard-logic.js";
 import type { FretboardState } from "../../src/fretboard-logic.js";
 
@@ -165,5 +166,38 @@ describe("getDiatonicHarmonyMidi", () => {
     // F# is not in C major, should fall back to chromatic
     const result = getDiatonicHarmonyMidi(66, 2, cRootSemitone, cMajorIntervals);
     expect(result).toBe(68); // chromatic fallback
+  });
+});
+
+
+describe("getFretboardZoomViewport", () => {
+  it("frames D on A string fret 5 as ADG strings and frets 4-7", () => {
+    const viewport = getFretboardZoomViewport(1, 5);
+    expect(viewport).toEqual({
+      stringStart: 0,
+      stringCount: 3,
+      fretStart: 4,
+      fretCount: 4,
+    });
+  });
+
+  it("clamps low-edge roots to keep a full 3x4 window", () => {
+    const viewport = getFretboardZoomViewport(0, 0);
+    expect(viewport).toEqual({
+      stringStart: 0,
+      stringCount: 3,
+      fretStart: 0,
+      fretCount: 4,
+    });
+  });
+
+  it("clamps high-edge roots to keep a full 3x4 window", () => {
+    const viewport = getFretboardZoomViewport(5, MAX_FRET);
+    expect(viewport).toEqual({
+      stringStart: 3,
+      stringCount: 3,
+      fretStart: 9,
+      fretCount: 4,
+    });
   });
 });

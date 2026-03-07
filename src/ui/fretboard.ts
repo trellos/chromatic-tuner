@@ -1,9 +1,11 @@
 import {
   getFretboardDots,
   getFretboardMidiAtPosition,
+  getFretboardZoomViewport,
   getKeyModeDegreeQuality,
   normalizeKeyModeType,
   normalizeChordType,
+  MAX_FRET,
   NOTE_TO_SEMITONE,
   type AnnotationType,
   type CharacteristicType,
@@ -52,6 +54,8 @@ export type FretboardUiOptions = {
   onPlayPress?: () => void;
   onFretPress?: (event: { midi: number; stringIndex: number; fret: number }) => void;
   fretPressEvent?: "click" | "pointerdown";
+  showZoomControl?: boolean;
+  onZoomArmedChange?: (armed: boolean) => void;
 };
 
 export type FretboardUi = {
@@ -60,6 +64,9 @@ export type FretboardUi = {
   render: (nextState: FretboardState) => void;
   pulseTargets: (targets: FretboardPlaybackTarget[], durationMs?: number) => void;
   setLooperElement: (looperEl: HTMLElement | null) => void;
+  setZoomArmed: (armed: boolean) => void;
+  clearZoom: () => void;
+  zoomToPosition: (position: { stringIndex: number; fret: number }) => void;
 };
 
 export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptions): FretboardUi {
@@ -71,10 +78,12 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const openIndicatorsLayer = rootEl.querySelector<HTMLElement>(".fretboard-open-indicators");
   const playButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-play]");
   const hideButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-hide]");
+  const zoomButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-zoom-target]");
   const hiddenSummaryButton = rootEl.querySelector<HTMLButtonElement>("[data-fretboard-summary]");
   const hideableSections = rootEl.querySelectorAll<HTMLElement>("[data-fretboard-hideable]");
   const controls = rootEl.querySelector<HTMLElement>(".fretboard-controls");
   const layout = rootEl.querySelector<HTMLElement>(".fretboard-layout");
+  const board = rootEl.querySelector<HTMLElement>(".fretboard-board");
   let looperSlot = rootEl.querySelector<HTMLElement>(".fretboard-looper-slot");
   if (!looperSlot && layout) {
     looperSlot = document.createElement("div");
@@ -90,6 +99,11 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
   const markerPulseTimeouts = new WeakMap<HTMLElement, number>();
 
   const showControls = options.showControls ?? true;
+  const showZoomControl = options.showZoomControl ?? showControls;
+  const fullViewport = { stringStart: 0, stringCount: 6, fretStart: 0, fretCount: MAX_FRET } as const;
+  let zoomArmed = false;
+  let zoomViewport: ReturnType<typeof getFretboardZoomViewport> | null = null;
+  let lastTap = { marker: "", atMs: 0 };
   const fretPressEvent = options.fretPressEvent ?? "pointerdown";
   controls?.toggleAttribute("hidden", !showControls);
 
@@ -148,6 +162,7 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     rootEl.classList.toggle("fretboard-controls-hidden", controlsHidden);
     layout?.classList.toggle("fretboard-controls-hidden", controlsHidden);
     controls?.toggleAttribute("data-controls-hidden", controlsHidden);
+    setZoomButtonState();
   };
 
   const setSummaryText = (): void => {
@@ -212,6 +227,64 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
         triggerMarkerPulse(marker, Boolean(target.isRoot), durationMs);
       });
     });
+  };
+
+  const emitZoomArmed = (): void => {
+    options.onZoomArmedChange?.(zoomArmed);
+  };
+
+  const setZoomButtonState = (): void => {
+    if (!zoomButton) return;
+    zoomButton.toggleAttribute("hidden", !showZoomControl || controlsHidden);
+    zoomButton.classList.toggle("is-active", zoomArmed);
+    zoomButton.setAttribute("aria-pressed", String(zoomArmed));
+    zoomButton.textContent = zoomArmed ? "TARGET ON" : "TARGET";
+  };
+
+  const applyViewport = (): void => {
+    if (!board) return;
+    if (!zoomViewport) {
+      board.classList.remove("is-zoomed");
+      board.style.removeProperty("--fretboard-zoom-scale-x");
+      board.style.removeProperty("--fretboard-zoom-scale-y");
+      board.style.removeProperty("--fretboard-zoom-translate-x");
+      board.style.removeProperty("--fretboard-zoom-translate-y");
+      return;
+    }
+
+    const fullStringSpan = Math.max(1, fullViewport.stringCount - 1);
+    const windowStringSpan = Math.max(1, zoomViewport.stringCount - 1);
+    const normalizedStringStart = zoomViewport.stringStart / fullStringSpan;
+
+    const fullFretSpan = Math.max(1, fullViewport.fretCount);
+    const windowFretSpan = Math.max(1, zoomViewport.fretCount);
+    const normalizedFretStart = zoomViewport.fretStart / fullFretSpan;
+
+    board.classList.add("is-zoomed");
+    board.style.setProperty("--fretboard-zoom-scale-x", String(fullStringSpan / windowStringSpan));
+    board.style.setProperty("--fretboard-zoom-scale-y", String(fullFretSpan / windowFretSpan));
+    board.style.setProperty("--fretboard-zoom-translate-x", `${-normalizedStringStart * 100}%`);
+    board.style.setProperty("--fretboard-zoom-translate-y", `${-normalizedFretStart * 100}%`);
+  };
+
+  const clearZoom = (): void => {
+    zoomViewport = null;
+    applyViewport();
+  };
+
+  const zoomToPosition = (position: { stringIndex: number; fret: number }): void => {
+    zoomViewport = getFretboardZoomViewport(position.stringIndex, position.fret, {
+      fretCount: 4,
+      stringCount: 3,
+    });
+    applyViewport();
+  };
+
+  const setZoomArmed = (armed: boolean): void => {
+    if (zoomArmed === armed) return;
+    zoomArmed = armed;
+    setZoomButtonState();
+    emitZoomArmed();
   };
 
   const renderControls = () => {
@@ -292,6 +365,8 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     renderDots();
     setSummaryText();
     applyControlVisibility();
+    applyViewport();
+    setZoomButtonState();
   };
 
   const onMarkerPress = (target: EventTarget | null) => {
@@ -303,6 +378,17 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     const stringIndex = Number.parseInt(marker.dataset.stringIndex ?? "", 10);
     const fret = Number.parseInt(marker.dataset.fret ?? "", 10);
     if (!Number.isFinite(midi) || !Number.isFinite(stringIndex) || !Number.isFinite(fret)) return;
+
+    const markerKey = `${stringIndex}:${fret}:${midi}`;
+    const now = performance.now();
+    const isDoubleTap = markerKey === lastTap.marker && now - lastTap.atMs < 280;
+    lastTap = { marker: markerKey, atMs: now };
+
+    if (zoomArmed || isDoubleTap) {
+      zoomToPosition({ stringIndex, fret });
+      setZoomArmed(false);
+    }
+
     options.onFretPress?.({ midi, stringIndex, fret });
   };
 
@@ -398,8 +484,35 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
       },
       { signal }
     );
+    zoomButton?.addEventListener(
+      "click",
+      () => {
+        setZoomArmed(!zoomArmed);
+      },
+      { signal }
+    );
     dotsLayer?.addEventListener(fretPressEvent, onMarkerInteraction, { signal });
     openIndicatorsLayer?.addEventListener(fretPressEvent, onMarkerInteraction, { signal });
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!zoomViewport) return;
+        const target = event.target as HTMLElement | null;
+        if (!target) return;
+        if (target.closest(".fretboard-board") || target.closest("[data-fretboard-zoom-target]")) return;
+        clearZoom();
+      },
+      { signal, capture: true }
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key !== "Escape") return;
+        clearZoom();
+        setZoomArmed(false);
+      },
+      { signal }
+    );
 
     render(state);
   };
@@ -412,6 +525,8 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     );
     lingering.forEach((marker) => clearMarkerPulse(marker));
     rootEl.querySelectorAll(".fretboard-dot-pulse").forEach((pulse) => pulse.remove());
+    setZoomArmed(false);
+    clearZoom();
   };
 
   const setLooperElement = (looperEl: HTMLElement | null): void => {
@@ -425,5 +540,5 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     looperSlot.hidden = true;
   };
 
-  return { enter, exit, render, pulseTargets, setLooperElement };
+  return { enter, exit, render, pulseTargets, setLooperElement, setZoomArmed, clearZoom, zoomToPosition };
 }

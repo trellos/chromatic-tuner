@@ -101,6 +101,26 @@
   width: 100%;
 }
 
+
+.ej-target-btn {
+  background: rgba(0, 245, 212, 0.12);
+  border: 1px solid rgba(0, 245, 212, 0.5);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  min-height: 38px;
+  width: 100%;
+}
+
+.ej-target-btn.is-active {
+  background: rgba(0, 245, 212, 0.34);
+  border-color: rgba(0, 245, 212, 0.9);
+  color: #02131e;
+}
+
 /* Key button */
 .ej-key-chip {
   position: relative;
