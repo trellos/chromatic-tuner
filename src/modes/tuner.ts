@@ -420,7 +420,7 @@ async function enterTunerMode(): Promise<void> {
       if (SHOW_STATUS) setStatus(`No pitch (rms=${rms.toFixed(4)}, conf=${confidence.toFixed(2)})`);
     },
     onPitch: (result) => {
-      const { freqHz, confidence, rms, tau, cmnd, effSr, zcHz, isIOS: resIOS, scriptPitchHz, scriptWallSr } = result;
+      const { freqHz, confidence, rms, tau, cmnd, effSr, zcHz } = result;
 
       const midi = freqToMidi(freqHz);
       const centsRaw = wrapCents(centsOffFromMidi(freqHz, midi));
@@ -467,11 +467,6 @@ async function enterTunerMode(): Promise<void> {
         if (tau !== null && cmnd !== null) debugParts.push(`tau=${tau.toFixed(1)} cmnd=${cmnd.toFixed(3)}`);
         if (effSr !== null) debugParts.push(`effSR=${effSr.toFixed(0)}`);
         if (zcHz !== null) debugParts.push(`zc=${zcHz.toFixed(2)}`);
-        if (resIOS) {
-          const sp = scriptPitchHz !== null ? scriptPitchHz.toFixed(2) : "null";
-          debugParts.push(`sp=${sp}`);
-          if (scriptWallSr !== null) debugParts.push(`wallSR=${scriptWallSr.toFixed(0)}`);
-        }
         const debug = debugParts.length ? ` ${debugParts.join(" ")}` : "";
         setStatus(`Hz=${freqHz.toFixed(2)} rms=${rms.toFixed(4)} conf=${confidence.toFixed(2)}${debug}`);
       }
