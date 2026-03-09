@@ -1,10 +1,4 @@
 import type { ModeDefinition } from "./types.js";
-import { createCircleGuitarPlayer } from "../audio/circle-guitar-player.js";
-import {
-  createCircleOfFifthsUi,
-  getCircleChordMidis,
-  type CircleOfFifthsUi,
-} from "../ui/circle-of-fifths.js";
 import { pitchService } from "../app/pitch-detection.js";
 import { seigaihaBridge } from "../app/seigaiha-bridge.js";
 
@@ -19,13 +13,6 @@ let centsEl: HTMLElement | null = null;
 let liveRegionEl: HTMLElement | null = null;
 let strobeVisualizerEl: HTMLElement | null = null;
 let tunaFieldEl: HTMLElement | null = null;
-let tunerVisualButtons: NodeListOf<HTMLButtonElement> | null = null;
-let tunerCircleHostEl: HTMLElement | null = null;
-
-let tunerVisualMode: "strobe" | "circle" = "strobe";
-let tunerCircleUi: CircleOfFifthsUi | null = null;
-let tunerCircleRandomnessTimer: number | null = null;
-const tunerCircleAudio = createCircleGuitarPlayer();
 
 type PitchSample = { midi: number; cents: number; hz: number; conf: number; rms: number };
 
@@ -242,51 +229,6 @@ function updateStrobeVisualizer(centsValue: number | null, isDetecting: boolean)
   updateStrobeVisualizerRotation(centsValue, isDetecting);
 }
 
-function setTunerVisualMode(mode: "strobe" | "circle"): void {
-  tunerVisualMode = mode;
-  strobeVisualizerEl?.classList.toggle("is-hidden", mode !== "strobe");
-  tunerCircleHostEl?.classList.toggle("is-hidden", mode !== "circle");
-  tunerVisualButtons?.forEach((button) => {
-    const isActive = button.dataset.tunerVisual === mode;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
-  });
-}
-
-function clearTunerCircleRandomness(): void {
-  if (tunerCircleRandomnessTimer !== null) {
-    window.clearTimeout(tunerCircleRandomnessTimer);
-    tunerCircleRandomnessTimer = null;
-  }
-  seigaihaBridge.setModeRandomness(0);
-}
-
-function pulseTunerCircleRandomness(durationMs: number): void {
-  if (tunerCircleRandomnessTimer !== null) {
-    window.clearTimeout(tunerCircleRandomnessTimer);
-  }
-  seigaihaBridge.pulse();
-  seigaihaBridge.setModeRandomness(0.7);
-  tunerCircleRandomnessTimer = window.setTimeout(() => {
-    tunerCircleRandomnessTimer = null;
-    seigaihaBridge.setModeRandomness(0);
-  }, durationMs);
-}
-
-function ensureTunerCircleUi(): void {
-  if (!tunerCircleHostEl || tunerCircleUi) return;
-  tunerCircleUi = createCircleOfFifthsUi(tunerCircleHostEl, {
-    onOuterTap: (note) => {
-      pulseTunerCircleRandomness(440);
-      void tunerCircleAudio.playMidi(note.midi, 420);
-    },
-    onSecondaryTap: (chord) => {
-      pulseTunerCircleRandomness(680);
-      void tunerCircleAudio.playChord(getCircleChordMidis(chord), 660);
-    },
-  });
-}
-
 function stopAnimationLoop(): void {
   if (animationFrameId !== null) {
     cancelAnimationFrame(animationFrameId);
@@ -312,8 +254,6 @@ async function enterTunerMode(): Promise<void> {
   liveRegionEl = document.getElementById("tuner-live");
   strobeVisualizerEl = document.getElementById("strobe-visualizer");
   tunaFieldEl = document.getElementById("tuna-field");
-  tunerVisualButtons = document.querySelectorAll<HTMLButtonElement>("[data-tuner-visual]");
-  tunerCircleHostEl = document.querySelector<HTMLElement>("[data-tuner-circle-host]");
 
   tunerUiAbort?.abort();
   tunerUiAbort = new AbortController();
@@ -323,19 +263,6 @@ async function enterTunerMode(): Promise<void> {
   initializeStrobeVisualizer();
   createTunaField();
   setStatus("Idle");
-  ensureTunerCircleUi();
-  setTunerVisualMode(tunerVisualMode);
-
-  tunerVisualButtons?.forEach((button) => {
-    button.addEventListener(
-      "click",
-      () => {
-        const mode = button.dataset.tunerVisual === "circle" ? "circle" : "strobe";
-        setTunerVisualMode(mode);
-      },
-      { signal }
-    );
-  });
 
   if (SHOW_STATUS) {
     setStatus("Initializing audio...");
@@ -412,9 +339,6 @@ async function enterTunerMode(): Promise<void> {
     onSilence: (rms, confidence) => {
       resetPitchState();
       seigaihaBridge.setDetuneMagnitude(null);
-      tunerCircleUi?.setPrimaryByMidi(null);
-      tunerCircleUi?.setTuningCents(null);
-      clearTunerCircleRandomness();
       updateStrobeVisualizer(null, false);
       setReading(null, null);
       if (SHOW_STATUS) setStatus(`No pitch (rms=${rms.toFixed(4)}, conf=${confidence.toFixed(2)})`);
@@ -457,8 +381,6 @@ async function enterTunerMode(): Promise<void> {
 
       const note = midiToNoteName(lockedMidi);
       seigaihaBridge.setDetuneMagnitude(Math.abs(centsEma));
-      tunerCircleUi?.setPrimaryByMidi(lockedMidi);
-      tunerCircleUi?.setTuningCents(centsEma);
       updateStrobeVisualizer(centsEma, true);
       setReading(note, `${centsEma >= 0 ? "+" : ""}${centsEma.toFixed(1)} cents`);
 
@@ -482,10 +404,6 @@ function exitTunerMode(): void {
   pitchService.stop();
   setReading(null, null);
   updateStrobeVisualizer(null, false);
-  tunerCircleUi?.setPrimaryByMidi(null);
-  tunerCircleUi?.setTuningCents(null);
-  clearTunerCircleRandomness();
-  void tunerCircleAudio.destroy();
   seigaihaBridge.setDetuneMagnitude(null);
   resetPitchState();
   // Clear element references so the module has no live DOM handles.
@@ -495,8 +413,6 @@ function exitTunerMode(): void {
   liveRegionEl = null;
   strobeVisualizerEl = null;
   tunaFieldEl = null;
-  tunerVisualButtons = null;
-  tunerCircleHostEl = null;
 }
 
 // Mode factory for the Chromatic Tuner screen and lifecycle hooks.
