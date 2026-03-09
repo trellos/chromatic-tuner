@@ -132,15 +132,14 @@ export function createSeigaihaWebGlRenderer(): SeigaihaWebGlRenderer {
   }
 
   const canvas = ensureFullscreenCanvas();
-  const context =
-    canvas.getContext("webgl", {
-      alpha: false,
-      antialias: false,
-      depth: false,
-      stencil: false,
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: false,
-    }) ?? canvas.getContext("experimental-webgl");
+  const context = canvas.getContext("webgl", {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false,
+  });
 
   if (!(context instanceof WebGLRenderingContext)) {
     return createNoopRenderer(canvas);

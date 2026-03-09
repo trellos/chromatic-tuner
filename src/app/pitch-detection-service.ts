@@ -1,8 +1,7 @@
 // Pitch detection service: mic acquisition, AudioWorklet loading, audio graph
-// construction, iOS ScriptProcessor fallback, and test-tone support.
+// construction, and test-tone support.
 // Extracted from tuner.ts to be reusable across modes.
 import { createAudioContextService } from "./audio-context-service.js";
-import { yinDetectMain } from "../audio/yin-core.js";
 
 class AudioInteractionRequiredError extends Error {
   constructor(message = "Audio requires a user interaction to start.") {
@@ -19,9 +18,6 @@ export type PitchResult = {
   cmnd: number | null;
   effSr: number | null;
   zcHz: number | null;
-  isIOS: boolean;
-  scriptPitchHz: number | null;
-  scriptWallSr: number | null;
 };
 
 export type PitchDetectionListener = {
@@ -37,23 +33,6 @@ export type PitchDetectionService = {
   readonly isActive: boolean;
 };
 
-function computeRms(x: Float32Array): number {
-  let sumSq = 0;
-  for (let i = 0; i < x.length; i++) {
-    const v = x[i] ?? 0;
-    sumSq += v * v;
-  }
-  return Math.sqrt(sumSq / x.length);
-}
-
-function createHannWindow(n: number): Float32Array {
-  const w = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    w[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1)));
-  }
-  return w;
-}
-
 export function createPitchDetectionService(): PitchDetectionService {
   const audioCtxService = createAudioContextService();
   const { isIOS } = audioCtxService;
@@ -61,10 +40,6 @@ export function createPitchDetectionService(): PitchDetectionService {
   let audioContext: AudioContext | null = null;
   let micStream: MediaStream | null = null;
   let workletNode: AudioWorkletNode | null = null;
-  let scriptNode: ScriptProcessorNode | null = null;
-  let scriptPitchHz: number | null = null;
-  let scriptPitchConf = 0;
-  let scriptWallSr: number | null = null;
   let useTestTone = false;
   let testOsc: OscillatorNode | null = null;
   let micGainNode: GainNode | null = null;
@@ -99,7 +74,6 @@ export function createPitchDetectionService(): PitchDetectionService {
     }
     audioContext = null;
     workletNode = null;
-    scriptNode = null;
     lastAudioMessageAt = 0;
     awaitingAudioUnlock = false;
     updateDiagnostics();
@@ -191,119 +165,6 @@ export function createPitchDetectionService(): PitchDetectionService {
     gainNode.connect(workletNode);
     workletNode.connect(ctx.destination);
 
-    if (isIOS) {
-      // TODO(deprecation): ScriptProcessorNode is deprecated (runs on main thread, may glitch
-      // under heavy UI load). Remove once AudioWorklet is confirmed reliable on all supported
-      // iOS Safari versions. Track at: https://caniuse.com/audio-worklet
-      scriptNode = ctx.createScriptProcessor(2048, 1, 1);
-      const windowSize = 4096;
-      const ringSize = 16384;
-      const ring = new Float32Array(ringSize);
-      let writeIndex = 0;
-      const analysisBuf = new Float32Array(windowSize);
-      const lpBuf = new Float32Array(windowSize);
-      const diff = new Float32Array(windowSize / 2);
-      const cmnd = new Float32Array(windowSize / 2);
-      const diffLp = new Float32Array(windowSize / 2);
-      const cmndLp = new Float32Array(windowSize / 2);
-      const hannWindow = createHannWindow(windowSize);
-      const hopFrames = Math.floor(ctx.sampleRate / 20);
-      let framesUntilAnalysis = hopFrames;
-      let wallSampleCounter = 0;
-      let wallLastTime = performance.now();
-      const lpCutoff = 500;
-      const lpAlpha =
-        (2 * Math.PI * lpCutoff) / (ctx.sampleRate + 2 * Math.PI * lpCutoff);
-
-      const pushBlock = (input: Float32Array) => {
-        const n = input.length;
-        let i = 0;
-        while (i < n) {
-          const spaceToEnd = ringSize - writeIndex;
-          const chunk = Math.min(spaceToEnd, n - i);
-          ring.set(input.subarray(i, i + chunk), writeIndex);
-          writeIndex += chunk;
-          if (writeIndex >= ringSize) writeIndex -= ringSize;
-          i += chunk;
-        }
-      };
-
-      const copyLatestWindow = (dest: Float32Array) => {
-        let idx = writeIndex - dest.length;
-        while (idx < 0) idx += ringSize;
-        for (let i = 0; i < dest.length; i++) {
-          dest[i] = ring[idx] ?? 0;
-          idx++;
-          if (idx >= ringSize) idx = 0;
-        }
-      };
-
-      scriptNode.onaudioprocess = (ev) => {
-        const input = ev.inputBuffer.getChannelData(0);
-        if (!input || input.length === 0) return;
-        pushBlock(input);
-        wallSampleCounter += input.length;
-        const nowMs = performance.now();
-        const dt = (nowMs - wallLastTime) / 1000;
-        if (dt >= 0.2) {
-          const measured = wallSampleCounter / dt;
-          if (Number.isFinite(measured) && measured > 1000) {
-            const alpha = 0.2;
-            scriptWallSr =
-              scriptWallSr == null
-                ? measured
-                : scriptWallSr + alpha * (measured - scriptWallSr);
-          }
-          wallSampleCounter = 0;
-          wallLastTime = nowMs;
-        }
-        framesUntilAnalysis -= input.length;
-        if (framesUntilAnalysis > 0) return;
-        framesUntilAnalysis += hopFrames;
-        copyLatestWindow(analysisBuf);
-        const rms = computeRms(analysisBuf);
-        if (rms < 0.002) {
-          scriptPitchHz = null;
-          scriptPitchConf = 0;
-          return;
-        }
-
-        // Simple low-pass to emphasize fundamentals for acoustic guitar.
-        let y = lpBuf[0] ?? 0;
-        for (let i = 0; i < analysisBuf.length; i++) {
-          const x = analysisBuf[i] ?? 0;
-          y = y + lpAlpha * (x - y);
-          lpBuf[i] = y;
-        }
-
-        const srForAnalysis = scriptWallSr ?? ctx.sampleRate;
-        const full = yinDetectMain(analysisBuf, srForAnalysis, diff, cmnd, hannWindow);
-        const low = yinDetectMain(lpBuf, srForAnalysis, diffLp, cmndLp, hannWindow);
-
-        // Prefer the low-passed estimate if it is confident and not wildly different.
-        let chosen = full;
-        if (low.freqHz !== null && low.confidence > 0.6) {
-          if (full.freqHz == null || low.confidence >= full.confidence + 0.05) {
-            chosen = low;
-          } else if (full.freqHz !== null) {
-            const ratio = full.freqHz / low.freqHz;
-            if (ratio > 1.2 && ratio < 2.2) {
-              chosen = low;
-            }
-          }
-        }
-
-        scriptPitchHz = chosen.freqHz;
-        scriptPitchConf = chosen.confidence;
-      };
-
-      gainNode.connect(scriptNode);
-      const spSink = ctx.createGain();
-      spSink.gain.value = 0;
-      scriptNode.connect(spSink);
-      spSink.connect(ctx.destination);
-    }
-
     workletNode.port.onmessage = (ev) => {
       lastAudioMessageAt = performance.now();
       updateDiagnostics();
@@ -319,19 +180,13 @@ export function createPitchDetectionService(): PitchDetectionService {
       }
 
       if (data?.type === "pitch") {
-        let freqHz: number | null = data.freqHz ?? null;
-        let confidence: number = Number(data.confidence ?? 0);
+        const freqHz: number | null = data.freqHz ?? null;
+        const confidence: number = Number(data.confidence ?? 0);
         const rms: number = Number(data.rms ?? 0);
         const tau: number | null = Number.isFinite(data.tau) ? Number(data.tau) : null;
         const cmnd: number | null = Number.isFinite(data.cmnd) ? Number(data.cmnd) : null;
         const effSr: number | null = Number.isFinite(data.effSr) ? Number(data.effSr) : null;
         const zcHz: number | null = Number.isFinite(data.zcHz) ? Number(data.zcHz) : null;
-
-        // On iOS, prefer the ScriptProcessor result when it is confident.
-        if (isIOS && scriptPitchHz !== null && scriptPitchConf > 0.5) {
-          freqHz = scriptPitchHz;
-          confidence = scriptPitchConf;
-        }
 
         if (freqHz == null) {
           l.onSilence(rms, confidence);
@@ -346,9 +201,6 @@ export function createPitchDetectionService(): PitchDetectionService {
           cmnd,
           effSr,
           zcHz,
-          isIOS,
-          scriptPitchHz: isIOS ? scriptPitchHz : null,
-          scriptWallSr: isIOS ? scriptWallSr : null,
         });
       }
     };
