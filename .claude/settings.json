@@ -23,7 +23,9 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(npx vitest run tests/unit/ui-composite-looper.test.ts)",
       "Bash(npm install --save-dev jsdom)",
-      "Bash(npx vitest run)"
+      "Bash(npx vitest run)",
+      "Bash(findstr /i \"pass\\\\|fail\\\\|error\\\\|timeout\\\\|PASS\\\\|FAIL\\\\|ERROR\")",
+      "Bash(node -e \"const p=require\\(''./package.json''\\); console.log\\(p.scripts[''test:e2e'']\\)\")"
     ]
   },
   "enabledPlugins": {

@@ -23,8 +23,9 @@ import { seigaihaBridge } from "../app/seigaiha-bridge.js";
 import { setCarouselHidden } from "../app/carousel-bridge.js";
 import { createSessionTransport } from "../app/session-transport.js";
 import {
-  decodeWildTunaTrackPayload,
-  encodeWildTunaTrackPayload,
+  decodeWildTunaTrackParam,
+  encodeWildTunaTrackPayloadV2,
+  decodeDrumTrackPayload,
   type WildTunaTrackPayload,
 } from "../app/share-payloads.js";
 
@@ -134,7 +135,10 @@ function serializeWildTunaShareUrl(
       { id: "fretboard", measures: fretboardLooper.getMeasureSlots() },
     ],
   };
-  const encoded = encodeWildTunaTrackPayload(payload);
+  const drumDecoded = decodeDrumTrackPayload(payload.drum);
+  const encoded = drumDecoded.ok
+    ? encodeWildTunaTrackPayloadV2(payload, drumDecoded.value)
+    : encodeWildTunaTrackPayloadV2(payload, { version: 1, bpm: 120, kit: "rock", steps: "0".repeat(64) });
   const url = new URL(window.location.href);
   url.searchParams.set("mode", "wild-tuna");
   url.searchParams.set("track", encoded);
@@ -622,7 +626,7 @@ export function createWildTunaMode(): ModeDefinition {
       const params = new URLSearchParams(window.location.search);
       const trackParam = params.get("track");
       if (trackParam) {
-        const parsed = decodeWildTunaTrackPayload(trackParam);
+        const parsed = decodeWildTunaTrackParam(trackParam);
         if (parsed.ok) {
           const payload = parsed.value;
           await drumUi.loadTrackPayload(payload.drum);
