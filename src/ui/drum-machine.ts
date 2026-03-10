@@ -66,16 +66,16 @@ export type DrumMachineUi = {
   rootEl: HTMLElement;
 };
 
-// Icons from Heroicons (MIT): https://heroicons.com
+// Icons from Iconoir (MIT): https://iconoir.com
 const DRUM_PLAY_ICON_SVG = `
-  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+  <svg width="24" height="24" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
 `;
 
 const DRUM_STOP_ICON_SVG = `
-  <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path>
+  <svg width="24" height="24" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <path d="M21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
 `;
 
@@ -188,9 +188,9 @@ function buildDrumDOM() {
   shareButton.type = "button";
   shareButton.setAttribute("aria-label", "Share track");
   shareButton.setAttribute("data-drum-share", "");
-  shareButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path d="M12 3L8.2 6.8a1 1 0 0 0 1.4 1.4L11 6.8V14a1 1 0 1 0 2 0V6.8l1.4 1.4a1 1 0 1 0 1.4-1.4L12 3z" />
-    <path d="M7 11a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2.2a1 1 0 0 0 0 2H17v6H7v-6h2.2a1 1 0 1 0 0-2H7z" />
+  shareButton.innerHTML = `<svg width="24" height="24" stroke-width="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <path d="M20 13V19C20 20.1046 19.1046 21 18 21H6C4.89543 21 4 20.1046 4 19V13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 15V3M12 3L8.5 6.5M12 3L15.5 6.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
   // Play/stop button

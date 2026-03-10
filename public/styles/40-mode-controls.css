@@ -47,33 +47,14 @@
 }
 
 .fullscreen-icon {
-  display: inline-block;
+  display: inline-flex;
   height: 16px;
-  position: relative;
   width: 16px;
 }
 
-.fullscreen-icon::before,
-.fullscreen-icon::after {
-  border: 2px solid rgba(226, 232, 240, 0.9);
-  content: "";
-  height: 6px;
-  position: absolute;
-  width: 6px;
-}
-
-.fullscreen-icon::before {
-  border-bottom: none;
-  border-right: none;
-  left: -1px;
-  top: -1px;
-}
-
-.fullscreen-icon::after {
-  border-left: none;
-  border-top: none;
-  bottom: -1px;
-  right: -1px;
+.fullscreen-icon svg {
+  height: 100%;
+  width: 100%;
 }
 
 .mode-screen[data-mode="drum-machine"] > .drum-fullscreen-toggle {
