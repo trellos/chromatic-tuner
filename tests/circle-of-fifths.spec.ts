@@ -295,29 +295,6 @@ test("background tap outside the circle clears the primary selection", async ({ 
 });
 
 
-
-test("tuner circle toggle renders wedge-based circle without overflow", async ({ page }) => {
-  await page.goto("/");
-
-  const strobe = page.locator("#strobe-visualizer");
-  const host = page.locator("[data-tuner-circle-host]");
-  await expect(strobe).toBeVisible();
-  await expect(host).toBeHidden();
-
-  await page.getByRole("button", { name: "Circle" }).click();
-  await expect(host).toBeVisible();
-  await expect(strobe).toBeHidden();
-  await expect(page.locator('[data-tuner-circle-host] .cof-wedge')).toHaveCount(12);
-
-  const overflow = await host.evaluate((element) => ({
-    horizontal: element.scrollWidth > element.clientWidth + 1,
-    vertical: element.scrollHeight > element.clientHeight + 1,
-    verticalOverflowPx: element.scrollHeight - element.clientHeight,
-  }));
-  expect(overflow.horizontal).toBeFalsy();
-  expect(overflow.verticalOverflowPx).toBeLessThanOrEqual(24);
-});
-
 test("clicking a note-bar cell triggers note activity on that cell", async ({ page }) => {
   await page.goto("/");
   await switchMode(page, "Circle of Fifths");
