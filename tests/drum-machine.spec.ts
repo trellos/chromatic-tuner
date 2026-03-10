@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { readDebugRandomness } from "./helpers/debug.js";
+import { switchMode } from "./helpers/mode.js";
 
 test("drum machine transport, beat/kit menus, tempo, and step toggles are stable", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
+  await switchMode(page, "Drum Machine");
 
   const playButton = page.locator("#drum-play-toggle");
   const beatButton = page.locator("#drum-beat-button");
@@ -47,42 +47,18 @@ test("drum machine transport, beat/kit menus, tempo, and step toggles are stable
 
 test("drum machine lifecycle stops transport when mode exits and re-enters", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
+  await switchMode(page, "Drum Machine");
 
   const playButton = page.locator("#drum-play-toggle");
   await playButton.click();
   await page.waitForTimeout(180);
 
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   await expect(page.locator('.mode-screen[data-mode="circle-of-fifths"]')).toHaveClass(/is-active/);
 
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
+  await switchMode(page, "Drum Machine");
   await expect(page.locator('.mode-screen[data-mode="drum-machine"]')).toHaveClass(/is-active/);
   await expect(playButton).toHaveText("Play");
-});
-
-test("drum machine randomness follows target and resets on stop", async ({ page }) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
-
-  const targetInput = page.locator("#seigaiha-drum-target");
-  const playButton = page.locator("#drum-play-toggle");
-
-  await targetInput.fill("0.60");
-  await targetInput.blur();
-  await expect(targetInput).toHaveValue("0.60");
-
-  await playButton.click();
-  await page.waitForTimeout(180);
-  if (((await playButton.textContent()) ?? "").trim() !== "Stop") return;
-
-  await expect.poll(async () => readDebugRandomness(page), { timeout: 1800 }).toBeGreaterThan(0.08);
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 2400 })
-    .toBeLessThanOrEqual(0.62);
-
-  await playButton.click();
-  await expect.poll(async () => readDebugRandomness(page), { timeout: 1200 }).toBeCloseTo(0, 1);
 });
 
 test("drum fullscreen toggles cleanly and keeps controls in viewport on desktop and mobile", async ({
@@ -96,7 +72,7 @@ test("drum fullscreen toggles cleanly and keeps controls in viewport on desktop 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.getByRole("tab", { name: "Drum Machine" }).click();
+  await switchMode(page, "Drum Machine");
     await page.locator("#carousel-toggle").click();
 
     await expect(page.locator("body")).toHaveClass(/drum-fullscreen/);

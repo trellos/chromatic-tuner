@@ -88,8 +88,8 @@ body {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
   padding: 24px;
-  padding-top: calc(24px + env(safe-area-inset-top, 0px));
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
   position: relative;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -685,20 +685,20 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 .mode-chip {
   align-items: center;
   appearance: none;
-  background: rgba(11, 16, 32, 0.82);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  background: rgba(11, 16, 32, 0.82);
   border: 1px solid var(--mode-accent-border);
   border-radius: 999px;
   box-shadow: 0 0 18px var(--mode-accent-glow), 0 4px 16px rgba(4, 8, 16, 0.55);
   cursor: pointer;
   display: inline-flex;
-  min-height: 44px;
   font-family: "IBM Plex Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
   font-size: 11px;
   font-weight: 700;
   gap: 6px;
   letter-spacing: 0.22em;
+  min-height: 44px;
   padding: 7px 16px 7px 20px;
   position: relative;
   text-transform: uppercase;
@@ -727,12 +727,11 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
 
 /* Mode Picker overlay */
 .mode-picker {
-  background: rgba(11, 16, 32, 0.94);
-  backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  background: rgba(11, 16, 32, 0.94);
   border: 1px solid var(--mode-accent-border);
   border-radius: 16px;
-  top: calc(100% + 10px);
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), 0 0 16px var(--mode-accent-glow);
   display: flex;
   flex-direction: column;
@@ -744,6 +743,7 @@ body.wild-tuna-enter-fullscreen .wild-tuna-fish {
   padding: 6px;
   pointer-events: none;
   position: absolute;
+  top: calc(100% + 10px);
   transform: translateX(-50%) translateY(-6px);
   transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.35s ease, box-shadow 0.35s ease;
   z-index: 100;

@@ -166,12 +166,14 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
 }
 
 .fretboard-board.is-zoomed .fretboard-dot {
-  font-size: clamp(14px, 2.2vw, 18px);
-  width: clamp(36px, 5vw, 52px);
+  font-size: clamp(12px, 1.55vw, 14px);
+  transform: translate(-50%, -50%) scale(var(--fretboard-dot-shape-scale-x, 1), 1);
+  width: clamp(22px, 2.8vw, 28px);
 }
 
 .fretboard-board.is-zoomed .fretboard-open-indicator {
   opacity: 0.3;
+  transform: translate(-50%, -50%) scale(var(--fretboard-dot-shape-scale-x, 1), 1);
 }
 
 .fretboard-open-indicator {
@@ -187,7 +189,7 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   touch-action: manipulation;
   transform: translate(-50%, -50%) scale(1);
   width: 12px;
-  z-index: 2;
+  z-index: calc(8 - var(--string-index));
 }
 
 /* Expand touch hit area to ~44px without affecting visual size. */
@@ -220,7 +222,7 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   touch-action: manipulation;
   transform: translate(-50%, -50%) scale(1);
   width: clamp(24px, 3vw, 32px);
-  z-index: 2;
+  z-index: calc(8 - var(--string-index));
 }
 
 /* Ensure minimum 44px touch hit area at all sizes. */

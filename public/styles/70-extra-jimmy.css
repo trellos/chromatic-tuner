@@ -13,30 +13,31 @@
 /* Three-column shell */
 .ej-shell {
   display: flex;
-  flex-direction: row;
   flex: 1;
+  flex-direction: row;
+  gap: 12px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  gap: 12px;
 }
 
 /* Neck columns — flex-grow is the animation target */
 .ej-neck {
   display: flex;
-  flex-direction: column;
   flex: 1;
-  min-width: 0;
+  flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
 /* Fretboard viewport - normal orientation */
 .ej-neck-viewport {
+  box-sizing: border-box;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding-inline: 16px;
+  padding-inline: 12px;
   position: relative;
 }
 
@@ -45,12 +46,24 @@
   flex-direction: column;
   gap: 0;
   height: 100%;
+  min-width: 0;
 }
 
 .ej-neck-viewport .fretboard-board {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   width: 100%;
+}
+
+.ej-neck-viewport .fretboard-string-labels,
+.ej-neck-viewport .fretboard-open-indicators,
+.ej-neck-viewport .fretboard-frets,
+.ej-neck-viewport .fretboard-strings,
+.ej-neck-viewport .fretboard-dots,
+.ej-neck-viewport .fretboard-inlays {
+  left: 14px;
+  right: 14px;
 }
 
 .ej-neck-viewport .fretboard-controls {
@@ -62,28 +75,28 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  gap: 8px;
   justify-content: center;
   overflow: visible;
   width: 80px;
-  gap: 8px;
   /* Ensure key popup renders above both fretboard necks */
   z-index: 10;
 }
 
 .ej-controls-inner {
+  align-items: stretch;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  align-items: stretch;
 }
 
 .ej-control-label {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
+  opacity: 0.6;
   text-align: center;
   text-transform: uppercase;
-  opacity: 0.6;
 }
 
 .ej-select {
@@ -180,4 +193,34 @@
 
 .ej-neck-label {
   display: none;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .ej-shell {
+    gap: 8px;
+  }
+
+  .ej-neck-viewport {
+    padding-inline: 6px;
+  }
+
+  .ej-neck-viewport .fretboard-string-labels,
+  .ej-neck-viewport .fretboard-open-indicators,
+  .ej-neck-viewport .fretboard-frets,
+  .ej-neck-viewport .fretboard-strings,
+  .ej-neck-viewport .fretboard-dots,
+  .ej-neck-viewport .fretboard-inlays {
+    left: 6px;
+    right: 6px;
+  }
+
+  .ej-neck-viewport .fretboard-dot {
+    font-size: 8px;
+    width: 14px;
+  }
+
+  .ej-neck-viewport .fretboard-open-indicator {
+    height: 7px;
+    width: 7px;
+  }
 }

@@ -241,6 +241,10 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     zoomButton.textContent = zoomArmed ? "TARGET ON" : "TARGET";
   };
 
+  const clamp = (value: number, min: number, max: number): number => {
+    return Math.min(max, Math.max(min, value));
+  };
+
   const applyViewport = (): void => {
     if (!board) return;
     if (!zoomViewport) {
@@ -249,22 +253,33 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
       board.style.removeProperty("--fretboard-zoom-scale-y");
       board.style.removeProperty("--fretboard-zoom-translate-x");
       board.style.removeProperty("--fretboard-zoom-translate-y");
+      board.style.removeProperty("--fretboard-dot-shape-scale-x");
       return;
     }
 
     const fullStringSpan = Math.max(1, fullViewport.stringCount - 1);
     const windowStringSpan = Math.max(1, zoomViewport.stringCount - 1);
-    const normalizedStringStart = zoomViewport.stringStart / fullStringSpan;
+    const paddedStringSpan = Math.min(fullStringSpan, windowStringSpan + 1);
+    const maxStringStart = Math.max(0, fullStringSpan - paddedStringSpan);
+    const stringStartWithPadding = clamp(zoomViewport.stringStart - 0.5, 0, maxStringStart);
 
     const fullFretSpan = Math.max(1, fullViewport.fretCount);
     const windowFretSpan = Math.max(1, zoomViewport.fretCount);
-    const normalizedFretStart = zoomViewport.fretStart / fullFretSpan;
+    const paddedFretSpan = Math.min(fullFretSpan, windowFretSpan + 1);
+    const maxFretStart = Math.max(0, fullFretSpan - paddedFretSpan);
+    const fretStartWithPadding = clamp(zoomViewport.fretStart - 0.5, 0, maxFretStart);
+
+    const zoomScaleX = fullStringSpan / paddedStringSpan;
+    const zoomScaleY = fullFretSpan / paddedFretSpan;
 
     board.classList.add("is-zoomed");
-    board.style.setProperty("--fretboard-zoom-scale-x", String(fullStringSpan / windowStringSpan));
-    board.style.setProperty("--fretboard-zoom-scale-y", String(fullFretSpan / windowFretSpan));
-    board.style.setProperty("--fretboard-zoom-translate-x", `${-normalizedStringStart * 100}%`);
-    board.style.setProperty("--fretboard-zoom-translate-y", `${-normalizedFretStart * 100}%`);
+    board.style.setProperty("--fretboard-zoom-scale-x", String(zoomScaleX));
+    board.style.setProperty("--fretboard-zoom-scale-y", String(zoomScaleY));
+    board.style.setProperty("--fretboard-zoom-translate-x", `${-(stringStartWithPadding / fullStringSpan) * 100}%`);
+    board.style.setProperty("--fretboard-zoom-translate-y", `${-(fretStartWithPadding / fullFretSpan) * 100}%`);
+    // Parent layer zoom uses independent X/Y scales; compensate markers so
+    // circular hit targets remain circular instead of stretching into ovals.
+    board.style.setProperty("--fretboard-dot-shape-scale-x", String(zoomScaleY / zoomScaleX));
   };
 
   const clearZoom = (): void => {

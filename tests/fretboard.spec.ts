@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { getChordTapPlaybackTargets, getKeyTapPlaybackTargets } from "../src/fretboard-logic.js";
 
+async function switchMode(page: import("@playwright/test").Page, label: string): Promise<void> {
+  await page.locator("#mode-chip").click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
+}
+
 async function assertElementFullyInViewport(
   page: import("@playwright/test").Page,
   selector: string
@@ -159,7 +164,7 @@ async function installFretboardAudioAttemptTracker(
 
 test("fretboard mode defaults to C major scale with note labels", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const fretboard = page.locator('.mode-screen[data-mode="fretboard"]');
   await expect(fretboard).toHaveClass(/is-active/);
@@ -213,7 +218,7 @@ test("fretboard key tap on C high-e plays 3 on G and 5 on B", async () => {
 
 test("fretboard interaction updates characteristic options and degree labels", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   await page.locator('[data-fretboard-display="chord"]').click();
   await expect(page.locator('#fretboard-characteristic option[value="suspended-fourth"]')).toHaveCount(1);
@@ -248,7 +253,7 @@ test("fretboard interaction updates characteristic options and degree labels", a
 
 test("fretboard hide button replaces selectors with a tappable summary field", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const hideButton = page.locator("[data-fretboard-hide]");
   const summary = page.locator("[data-fretboard-summary]");
@@ -280,7 +285,7 @@ test("fretboard key mode shows seven modes with major/minor labels and diatonic 
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   await page.locator('[data-fretboard-display="key"]').click();
   await expect(page.locator('[data-fretboard-display="key"]')).toHaveClass(/is-active/);
@@ -303,13 +308,14 @@ test("fretboard key mode shows seven modes with major/minor labels and diatonic 
     nodes.map((node) => node.textContent?.trim())
   );
   expect(noteLabels).toContain("C");
-  expect(noteLabels).toContain("E");
+  expect(noteLabels).toContain("Em");
+  expect(noteLabels).toContain("B°");
   expect(noteLabels).not.toContain("C#");
 });
 
 test("fretboard note dots expose midi metadata and are tappable", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const firstDot = page.locator(".fretboard-dot").first();
   await expect(firstDot).toHaveAttribute("data-midi", /^\d+$/);
@@ -324,7 +330,7 @@ test("fretboard note dots expose midi metadata and are tappable", async ({ page 
 
 test("fretboard open-string indicators expose midi metadata and are tappable", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const firstOpen = page.locator(".fretboard-open-indicator").first();
   await expect(firstOpen).toHaveAttribute("data-midi", /^\d+$/);
@@ -342,7 +348,7 @@ test("fretboard play button ramps seigaiha randomness and returns to zero", asyn
 }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "debug randomness assertion is Chromium-only");
   await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
   await page.locator('[data-fretboard-display="chord"]').click();
 
   const playButton = page.locator("[data-fretboard-play]");
@@ -377,7 +383,7 @@ test("fretboard mobile portrait fits all controls and reaches fret 12", async ({
   test.skip(testInfo.project.name !== "Mobile Safari", "mobile portrait coverage only");
 
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
   await expect(fretboardScreen).toHaveClass(/is-active/);
@@ -420,7 +426,7 @@ test("fretboard UI stays fully visible across desktop and portrait aspect ratios
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+    await switchMode(page, "Fretboard");
 
     const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
     await expect(fretboardScreen).toHaveClass(/is-active/);
@@ -461,7 +467,7 @@ test("fretboard taps play guitar sample across browser engines", async ({ page, 
 
   await installFretboardAudioCounters(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => {
@@ -499,7 +505,7 @@ test("fretboard chord taps play triads rooted on tapped string", async ({ page, 
 
   await installFretboardAudioCounters(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
   await page.locator('[data-fretboard-display="chord"]').click();
 
   const tappedLowE = page.locator('.fretboard-dot[data-string-index="0"]').first();
@@ -527,7 +533,7 @@ test("fretboard key taps play diatonic triads including top-string voicings", as
 
   await installFretboardAudioCounters(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
   await page.locator('[data-fretboard-display="key"]').click();
 
   const lowStringDot = page.locator('.fretboard-dot[data-string-index="0"]').first();
@@ -565,7 +571,7 @@ test("fretboard tap attempts audio playback on WebKit-family browsers", async ({
 
   await installFretboardAudioAttemptTracker(page);
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const hasAudioApi = await page.evaluate(
     () => Boolean((window as any).AudioContext || (window as any).webkitAudioContext)
@@ -622,7 +628,7 @@ test("mobile safari KEY tap enters key mode without mode-swiping to metronome", 
   test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage only");
 
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
   const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
@@ -644,7 +650,7 @@ test("mobile safari KEY tap enters key mode without mode-swiping to metronome", 
 
 test("fretboard target button zooms to tapped note and outside tap restores full board", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const board = page.locator(".mode-screen[data-mode='fretboard'] .fretboard-board").first();
   const targetButton = page.locator("[data-fretboard-zoom-target]").first();
@@ -665,6 +671,11 @@ test("fretboard target button zooms to tapped note and outside tap restores full
   const after = await targetDot.boundingBox();
   expect(after).toBeTruthy();
   expect(after!.width).toBeGreaterThan(before!.width);
+  expect(after!.width).toBeLessThan(70);
+  expect(Math.abs((after!.width / after!.height) - 1)).toBeLessThan(0.2);
+
+  const overflowState = await board.evaluate((element) => window.getComputedStyle(element).overflow);
+  expect(overflowState).toBe("hidden");
 
   await outsideControl.click();
   await expect(board).not.toHaveClass(/is-zoomed/);
@@ -674,7 +685,7 @@ test("mobile target zoom can be armed and dismissed by outside tap", async ({ pa
   test.skip(testInfo.project.name !== "Mobile Safari", "mobile zoom coverage");
 
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard", exact: true }).click();
+  await switchMode(page, "Fretboard");
 
   const board = page.locator('.mode-screen[data-mode="fretboard"] .fretboard-board').first();
   const targetButton = page.locator("[data-fretboard-zoom-target]").first();

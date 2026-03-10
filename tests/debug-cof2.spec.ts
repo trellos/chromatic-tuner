@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { switchMode } from "./helpers/mode.js";
 test("debug cof wedge positions in wild-tuna", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Wild Tuna" }).click();
+  await switchMode(page, "Wild Tuna");
   await page.locator("[data-wild-tuna-fullscreen]").click();
   await page.waitForTimeout(300);
   const result = await page.evaluate(() => {

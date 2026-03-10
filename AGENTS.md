@@ -26,7 +26,7 @@
 - `HIDE` collapses all controls to a single summary button; no selector/action rows should remain visible while hidden.
 - Hidden summary appears rotated near the high-E side of the board and restores controls on tap.
 - `createFretboardUi` supports `setLooperElement(...)`; attached looper UI is rendered in the board looper slot (under the 12th-fret area), not over the controls.
-- Fretboard zoom: `TARGET` arms a one-shot zoom, and the next tapped note zooms to a 3-string / 4-fret window around that note.
+- Fretboard zoom: `TARGET` arms a one-shot zoom, and the next tapped note zooms to a 3-string / 4-fret window around that note with a slight overscan (~half fret/string) for context.
 - Zoom exits when tapping outside the board or pressing Escape.
 - In Extra Jimmy, toggling the shared `TARGET` button off clears zoom on both boards.
 

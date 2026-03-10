@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+async function switchMode(page: import("@playwright/test").Page, label: string): Promise<void> {
+  await page.locator("#mode-chip").click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
+}
+
 async function assertElementFullyInViewport(
   page: import("@playwright/test").Page,
   selector: string
@@ -97,7 +102,7 @@ test("extra-jimmy mode displays two fretboards with controls", async ({ page }) 
   await page.goto("/");
 
   // Navigate to Extra Jimmy mode
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   // Verify mode is active
   const modeScreen = page.locator('.mode-screen[data-mode="extra-jimmy"]');
@@ -157,7 +162,7 @@ test("extra-jimmy mode displays two fretboards with controls", async ({ page }) 
 
 test("extra-jimmy mode has properly sized fretboards", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   // Verify both boards have decent height (not squished to top)
   const lowBoard = await page.locator('[data-ej-neck="low"] .fretboard-board');
@@ -173,7 +178,7 @@ test("extra-jimmy mode has properly sized fretboards", async ({ page }) => {
 
 test("extra-jimmy mode harmony controls work", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   // Check harmony selector exists and has default value
   const harmonySelect = page.locator('[data-ej-harmony]');
@@ -186,7 +191,7 @@ test("extra-jimmy mode harmony controls work", async ({ page }) => {
 
 test("extra-jimmy mode key popup works", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const keyTrigger = page.locator('[data-ej-key-trigger]');
   const keyPopup = page.locator('[data-ej-key-popup]');
@@ -211,7 +216,7 @@ test("extra-jimmy mode key popup works", async ({ page }) => {
 
 test("extra-jimmy mode plays harmony on both fretboards", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const lowViewport = page.locator('[data-ej-neck="low"] .ej-neck-viewport');
   const highViewport = page.locator('[data-ej-neck="high"] .ej-neck-viewport');
@@ -243,7 +248,7 @@ test("extra-jimmy mode third harmony (default) displays dots on both boards", as
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   // Default harmony is 3rd (value "2")
   const harmonySelect = page.locator('[data-ej-harmony]');
@@ -264,7 +269,7 @@ test("extra-jimmy mode changes harmony interval and updates UI", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const harmonySelect = page.locator('[data-ej-harmony]');
 
@@ -292,7 +297,7 @@ test("extra-jimmy mode all harmony intervals are selectable", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const harmonySelect = page.locator('[data-ej-harmony]');
 
@@ -315,7 +320,7 @@ test("extra-jimmy mode all harmony intervals are selectable", async ({
 
 test("extra-jimmy mode can select different keys from popup", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const keyTrigger = page.locator('[data-ej-key-trigger]');
 
@@ -344,7 +349,7 @@ test("extra-jimmy mode can select different keys from popup", async ({ page }) =
 
 test("extra-jimmy mode key popup has 12 note buttons", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const keyTrigger = page.locator('[data-ej-key-trigger]');
   const keyPopup = page.locator('[data-ej-key-popup]');
@@ -377,7 +382,7 @@ test("extra-jimmy mode key selection persists across interactions", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const keyTrigger = page.locator('[data-ej-key-trigger]');
 
@@ -407,7 +412,7 @@ test("extra-jimmy mode scale selector changes both fretboards", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const lowViewport = page.locator('[data-ej-neck="low"] .ej-neck-viewport');
   const highViewport = page.locator('[data-ej-neck="high"] .ej-neck-viewport');
@@ -440,7 +445,7 @@ test("extra-jimmy mode scale selector changes both fretboards", async ({
 
 test("extra-jimmy mode all scale modes are selectable", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const scaleSelect = page.locator('[data-ej-scale]');
   const modes = [
@@ -477,7 +482,7 @@ test("extra-jimmy mode all scale modes are selectable", async ({ page }) => {
 test("extra-jimmy mode fits within viewport on desktop", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   // Wait for mode to fully render
   await page.waitForTimeout(200);
@@ -502,7 +507,7 @@ test("extra-jimmy mode fits within viewport on desktop", async ({ page }) => {
 test("extra-jimmy mode fits on tablet viewport", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   await page.waitForTimeout(200);
 
@@ -525,7 +530,7 @@ test("extra-jimmy mode fits on tablet viewport", async ({ page }) => {
 test("extra-jimmy mode fits on wide desktop", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   await page.waitForTimeout(200);
 
@@ -547,7 +552,7 @@ test("extra-jimmy mode fretboard viewports avoid scrollbars and keep dots fully 
 }) => {
   await page.setViewportSize({ width: 1536, height: 960 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   await page.waitForTimeout(200);
 
@@ -571,7 +576,7 @@ test("extra-jimmy mode is responsive across viewport sizes", async ({ page }) =>
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+    await switchMode(page, "Extra Jimmy");
 
     await page.waitForTimeout(150);
 
@@ -611,7 +616,7 @@ test("extra-jimmy mode low fretboard tap pulses harmony on high board", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const lowViewport = page.locator('[data-ej-neck="low"] .ej-neck-viewport');
   const highViewport = page.locator('[data-ej-neck="high"] .ej-neck-viewport');
@@ -643,7 +648,7 @@ test("extra-jimmy mode low fretboard tap pulses harmony on high board", async ({
 
 test("extra-jimmy mode starts note playback on pointer down", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const lowFirstDot = page.locator('[data-ej-neck="low"] .fretboard-dot').first();
   const highFirstDot = page.locator('[data-ej-neck="high"] .fretboard-dot').first();
@@ -686,7 +691,7 @@ test("extra-jimmy mode starts note playback on pointer down", async ({ page }) =
 });
 test("extra-jimmy mode can tap multiple times in sequence", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const lowViewport = page.locator('[data-ej-neck="low"] .ej-neck-viewport');
   const lowDots = lowViewport.locator(".fretboard-dot");
@@ -706,7 +711,7 @@ test("extra-jimmy mode both fretboards update when key changes", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const lowViewport = page.locator('[data-ej-neck="low"] .ej-neck-viewport');
   const highViewport = page.locator('[data-ej-neck="high"] .ej-neck-viewport');
@@ -750,7 +755,7 @@ test("extra-jimmy mode can change multiple controls in sequence", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   // Change harmony
   const harmonySelect = page.locator('[data-ej-harmony]');
@@ -797,7 +802,7 @@ test("extra-jimmy mode can change multiple controls in sequence", async ({
 
 test("extra-jimmy uses one shared target button to zoom the next tapped neck", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const targetButton = page.locator("[data-ej-zoom-target]");
   await expect(targetButton).toHaveCount(1);
@@ -818,7 +823,7 @@ test("extra-jimmy uses one shared target button to zoom the next tapped neck", a
 
 test("extra-jimmy shared target toggles off and clears zoom on both boards", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Extra Jimmy", exact: true }).click();
+  await switchMode(page, "Extra Jimmy");
 
   const targetButton = page.locator("[data-ej-zoom-target]");
   const lowBoard = page.locator('[data-ej-neck="low"] .fretboard-board');

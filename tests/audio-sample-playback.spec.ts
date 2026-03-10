@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { switchMode } from "./helpers/mode.js";
 
 async function installAudioDelayAndOscillatorCounter(page: Page) {
   await page.addInitScript(() => {
@@ -58,7 +59,7 @@ test("metronome starts with decoded sample playback instead of oscillator fallba
   await installAudioDelayAndOscillatorCounter(page);
   await page.goto("/");
 
-  await page.getByRole("tab", { name: "Metronome" }).click();
+  await switchMode(page, "Metronome");
   const toggle = page.locator(
     '.mode-screen[data-mode="metronome"] [data-action="toggle"]'
   );
@@ -78,7 +79,7 @@ test("drum machine starts with decoded kit playback instead of oscillator fallba
   await installAudioDelayAndOscillatorCounter(page);
   await page.goto("/");
 
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
+  await switchMode(page, "Drum Machine");
   const play = page.locator("#drum-play-toggle");
   await play.click();
   await expect(play).toHaveText("Stop");

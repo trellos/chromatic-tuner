@@ -121,12 +121,18 @@ export function createExtraJimmyMode(): ModeDefinition {
     zoomTargetButton.textContent = zoomArmed ? "TARGET ON" : "TARGET";
   };
 
-  const setSharedZoomArmed = (armed: boolean) => {
-    if (zoomArmed === armed) return;
+  const setSharedZoomArmed = (armed: boolean, clearExistingZoom = false) => {
+    if (zoomArmed === armed) {
+      if (clearExistingZoom && !armed) {
+        lowUi?.clearZoom();
+        highUi?.clearZoom();
+      }
+      return;
+    }
     zoomArmed = armed;
     lowUi?.setZoomArmed(armed);
     highUi?.setZoomArmed(armed);
-    if (!armed) {
+    if (!armed && clearExistingZoom) {
       lowUi?.clearZoom();
       highUi?.clearZoom();
     }
@@ -220,7 +226,7 @@ export function createExtraJimmyMode(): ModeDefinition {
       zoomTargetButton?.addEventListener(
         "click",
         () => {
-          setSharedZoomArmed(!zoomArmed);
+          setSharedZoomArmed(!zoomArmed, zoomArmed);
         },
         { signal }
       );
@@ -293,8 +299,7 @@ export function createExtraJimmyMode(): ModeDefinition {
       modeAbort = null;
 
       // Shut down both fretboard UI instances and clear references.
-      lowUi?.clearZoom();
-      highUi?.clearZoom();
+      setSharedZoomArmed(false, true);
       lowUi?.exit();
       highUi?.exit();
       lowUi = null;

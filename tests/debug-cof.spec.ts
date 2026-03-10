@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { switchMode } from "./helpers/mode.js";
 test("debug COF overflow measurements", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   await page.waitForTimeout(300);
   const circleScreen = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const result = await circleScreen.evaluate((element) => {

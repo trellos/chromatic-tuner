@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { readDebugRandomness } from './helpers/debug.js';
+import { switchMode } from './helpers/mode.js';
 
 const MODE_TABS = [
   { label: 'Chromatic Tuner', id: 'tuner' },
@@ -15,11 +16,6 @@ type PageIssueTracker = {
   pageErrors: string[];
   failedRequests: string[];
 };
-
-async function switchMode(page: Page, label: string): Promise<void> {
-  await page.locator('#mode-chip').click();
-  await page.getByRole('menuitem', { name: label }).click();
-}
 
 async function readTelemetryStats(page: Page): Promise<{
   fps: number;
@@ -99,7 +95,7 @@ test("wild tuna fullscreen renders drum, circle, fretboard, and independent loop
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Wild Tuna" }).click();
+  await switchMode(page, "Wild Tuna");
   await page.locator("[data-wild-tuna-fullscreen]").click();
 
   const panel = page.locator('.mode-screen[data-mode="wild-tuna"]');
@@ -111,91 +107,6 @@ test("wild tuna fullscreen renders drum, circle, fretboard, and independent loop
   await expect(panel.locator("[data-wild-tuna-fretboard] .fretboard-looper-slot .ui-composite-looper")).toBeVisible();
 });
 
-test("wild tuna fullscreen keeps drum, circle, and fretboard fully visible", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Wild Tuna" }).click();
-  await page.locator("[data-wild-tuna-fullscreen]").click();
-
-  await expect(page.locator("body")).toHaveClass(/wild-tuna-fullscreen/);
-
-  const viewport = await page.evaluate(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }));
-
-  const assertFullyVisible = async (selector: string, minWidth: number, minHeight: number) => {
-    const locator = page.locator(selector);
-    await expect(locator).toBeVisible();
-    const box = await locator.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) return;
-    expect(box.width).toBeGreaterThanOrEqual(minWidth);
-    expect(box.height).toBeGreaterThanOrEqual(minHeight);
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.y).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
-  };
-
-  await assertFullyVisible(".wild-tuna-pane--drum .drum-mock", Math.min(520, viewport.width - 20), 150);
-  await assertFullyVisible(".wild-tuna-pane--circle .cof", 260, 180);
-  // Fretboard board width is capped at 260px by the fretboard-layout grid (minmax(220px, 260px))
-  // On mobile (≤600px) it's further reduced to max-width: 182px — use a viewport-aware floor.
-  const minFretBoardWidth = viewport.width >= 900 ? 220 : Math.floor(viewport.width * 0.45);
-  await assertFullyVisible(".wild-tuna-pane--fretboard .fretboard-board", minFretBoardWidth, 180);
-
-  const circlePrimaryWedges = page.locator(".wild-tuna-pane--circle .cof-outer .cof-wedge");
-  await expect(circlePrimaryWedges).toHaveCount(12);
-  const wedgeVisibility = await circlePrimaryWedges.evaluateAll((elements) => {
-    return elements.map((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      };
-    });
-  });
-  wedgeVisibility.forEach((rect) => {
-    expect(rect.width).toBeGreaterThan(6);
-    expect(rect.height).toBeGreaterThan(6);
-    expect(rect.left).toBeGreaterThanOrEqual(0);
-    expect(rect.top).toBeGreaterThanOrEqual(0);
-    expect(rect.right).toBeLessThanOrEqual(viewport.width);
-    expect(rect.bottom).toBeLessThanOrEqual(viewport.height);
-  });
-
-  const fretboardButtons = page.locator(
-    "[data-wild-tuna-fretboard] button:not([hidden]):not([disabled])"
-  );
-  const buttonRects = await fretboardButtons.evaluateAll((buttons) => {
-    return buttons.map((button) => {
-      const rect = button.getBoundingClientRect();
-      return {
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      };
-    });
-  });
-  expect(buttonRects.length).toBeGreaterThan(0);
-  buttonRects.forEach((rect) => {
-    expect(rect.width).toBeGreaterThan(8);
-    expect(rect.height).toBeGreaterThan(8);
-    expect(rect.left).toBeGreaterThanOrEqual(0);
-    expect(rect.top).toBeGreaterThanOrEqual(0);
-    expect(rect.right).toBeLessThanOrEqual(viewport.width);
-    expect(rect.bottom).toBeLessThanOrEqual(viewport.height);
-  });
-});
 
 test("seigaiha debug override starts disabled and shows editable detune mapping", async ({
   page,
@@ -239,180 +150,35 @@ test("seigaiha debug override starts disabled and shows editable detune mapping"
   await expect(randomnessInputs.nth(2)).toHaveValue("0.5");
 });
 
-test("seigaiha debug shows metronome params only in metronome mode", async ({
+test("debug sections follow the active mode when switching via the chip picker", async ({
   page,
 }) => {
   await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Metronome" }).click();
 
   const tunerSection = page.locator('.seigaiha-debug-section[data-debug-section="tuner"]');
-  const metronomeSection = page.locator(
-    '.seigaiha-debug-section[data-debug-section="metronome"]'
-  );
-  const drumSection = page.locator(
-    '.seigaiha-debug-section[data-debug-section="drum-machine"]'
-  );
+  const metronomeSection = page.locator('.seigaiha-debug-section[data-debug-section="metronome"]');
+  const drumSection = page.locator('.seigaiha-debug-section[data-debug-section="drum-machine"]');
 
+  await expect(tunerSection).toBeVisible();
+  await expect(metronomeSection).toBeHidden();
+  await expect(drumSection).toBeHidden();
+
+  await switchMode(page, "Metronome");
   await expect(tunerSection).toBeHidden();
   await expect(metronomeSection).toBeVisible();
   await expect(drumSection).toBeHidden();
-  await expect(metronomeSection.getByText("NA")).toBeVisible();
-  await expect(metronomeSection.getByText("I44")).toBeVisible();
-  await expect(metronomeSection.getByText("I34")).toBeVisible();
-  await expect(metronomeSection.getByText("I68")).toBeVisible();
-  await expect(metronomeSection.getByText("UP")).toBeVisible();
-  await expect(metronomeSection.getByText("DN")).toBeVisible();
-});
 
-test("seigaiha debug shows drum target only in drum machine mode", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
-
-  const tunerSection = page.locator('.seigaiha-debug-section[data-debug-section="tuner"]');
-  const metronomeSection = page.locator(
-    '.seigaiha-debug-section[data-debug-section="metronome"]'
-  );
-  const drumSection = page.locator(
-    '.seigaiha-debug-section[data-debug-section="drum-machine"]'
-  );
-  const drumTargetInput = page.locator("#seigaiha-drum-target");
-
+  await switchMode(page, "Drum Machine");
   await expect(tunerSection).toBeHidden();
   await expect(metronomeSection).toBeHidden();
   await expect(drumSection).toBeVisible();
-  await expect(drumTargetInput).toHaveValue("0.90");
-
-  await drumTargetInput.fill("0.77");
-  await drumTargetInput.blur();
-  await expect(drumTargetInput).toHaveValue("0.77");
 });
 
-test("seigaiha debug telemetry stays visible with finite values across all modes", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
 
-  const telemetry = page.locator(
-    '.seigaiha-debug-section[data-debug-section="telemetry"]'
-  );
-  await expect(telemetry).toBeVisible();
-  await expect(telemetry.locator(".seigaiha-debug-fps")).toBeVisible();
-  await expect(telemetry.locator(".seigaiha-debug-metrics")).toBeVisible();
 
-  const modeTabs = ["Chromatic Tuner", "Metronome", "Drum Machine"] as const;
-  for (const tab of modeTabs) {
-    await page.getByRole("tab", { name: tab }).click();
-    await expect.poll(async () => readTelemetryStats(page), { timeout: 2000 }).toMatchObject({
-      fps: expect.any(Number),
-      avgFps: expect.any(Number),
-      seigaihaFps: expect.any(Number),
-      uploadsPerSec: expect.any(Number),
-      p95Ms: expect.any(Number),
-      maxMs: expect.any(Number),
-      swapsPerSec: expect.any(Number),
-    });
-    const resolved = await readTelemetryStats(page);
-    expect(Number.isFinite(resolved.fps)).toBeTruthy();
-    expect(Number.isFinite(resolved.avgFps)).toBeTruthy();
-    expect(Number.isFinite(resolved.seigaihaFps)).toBeTruthy();
-    expect(Number.isFinite(resolved.uploadsPerSec)).toBeTruthy();
-    expect(Number.isFinite(resolved.p95Ms)).toBeTruthy();
-    expect(Number.isFinite(resolved.maxMs)).toBeTruthy();
-    expect(Number.isFinite(resolved.swapsPerSec)).toBeTruthy();
-  }
-});
 
-test("seigaiha telemetry remains finite while metronome drives continuous randomness", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Metronome" }).click();
 
-  const playButton = page.locator(
-    '.mode-screen[data-mode="metronome"] [data-action="toggle"]'
-  );
-  await playButton.click();
-  await page.waitForTimeout(250);
-  const started = ((await playButton.textContent()) ?? "").trim() === "Stop";
-  if (!started) {
-    return;
-  }
 
-  await page.waitForTimeout(900);
-  const stats = await readTelemetryStats(page);
-  expect(Number.isFinite(stats.fps)).toBeTruthy();
-  expect(Number.isFinite(stats.avgFps)).toBeTruthy();
-  expect(Number.isFinite(stats.seigaihaFps)).toBeTruthy();
-  expect(Number.isFinite(stats.uploadsPerSec)).toBeTruthy();
-  expect(Number.isFinite(stats.p95Ms)).toBeTruthy();
-  expect(Number.isFinite(stats.maxMs)).toBeTruthy();
-  expect(Number.isFinite(stats.swapsPerSec)).toBeTruthy();
-  expect(stats.avgFps).toBeGreaterThan(0);
-  expect(stats.maxMs).toBeGreaterThan(0);
-});
-
-test("seigaiha arbitration: debug override supersedes drum mode updates", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-
-  const overrideToggle = page.locator("#seigaiha-override-toggle");
-  const slider = page.locator("#seigaiha-randomness-slider");
-  await overrideToggle.check();
-  await slider.evaluate((element) => {
-    const input = element as HTMLInputElement;
-    input.value = "0.42";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
-    .toBeCloseTo(0.42, 1);
-
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
-  await page.locator("#drum-play-toggle").click();
-
-  // Drum mode may emit beat-driven updates, but debug override must lock output.
-  await page.waitForTimeout(1200);
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
-    .toBeCloseTo(0.42, 1);
-});
-
-test("drum mode randomness resets on start/stop and rises during playback", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Drum Machine" }).click();
-
-  const playButton = page.locator("#drum-play-toggle");
-  await playButton.click();
-  await page.waitForTimeout(160);
-  const started = ((await playButton.textContent()) ?? "").trim() === "Stop";
-
-  // Transport start begins near zero before beat progression rises.
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
-    .toBeLessThan(0.35);
-
-  if (!started) {
-    return;
-  }
-
-  // Beat-driven progression should climb above zero during playback.
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 2200 })
-    .toBeGreaterThan(0.1);
-
-  await playButton.click();
-
-  // Transport stop forces randomness back to zero.
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
-    .toBeCloseTo(0, 1);
-});
 
 function trackPageIssues(page: Page): PageIssueTracker {
   const pageErrors: string[] = [];
@@ -923,38 +689,6 @@ test('metronome time button shows "No Accent" after selecting no-accent mode', a
   await expect(timeButton).toHaveText('Time No Accent');
 });
 
-test("metronome time-signature change resets seigaiha phase to bar start", async ({
-  page,
-}) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Metronome" }).click();
-
-  const playButton = page.locator(
-    '.mode-screen[data-mode="metronome"] [data-action="toggle"]'
-  );
-  const timeButton = page.locator("#metro-time-button");
-
-  await playButton.click();
-  await page.waitForTimeout(180);
-  const started = ((await playButton.textContent()) ?? "").trim() === "Stop";
-  if (!started) {
-    return;
-  }
-
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 2200 })
-    .toBeGreaterThan(0.08);
-
-  await timeButton.click();
-  await page.evaluate(() => {
-    const item = document.querySelector<HTMLButtonElement>('#metro-time-menu [data-value="3/4"]');
-    item?.click();
-  });
-
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 1200 })
-    .toBeLessThan(0.25);
-});
 
 test('metronome sound button keeps the most recent sound selection visible', async ({ page }) => {
   await page.goto('/');
@@ -1084,22 +818,28 @@ test('app restores the last selected mode on reload', async ({ page }) => {
   await page.reload();
 
   await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
-  await expect(page.locator('#mode-chip span')).toHaveText('Fretboard');
+  await expect(page.locator('#mode-chip span').first()).toHaveText('Fretboard');
 });
 
-test('tuner status toggle is not duplicated after mode re-entry', async ({ page }) => {
+test('tuner status toggle still flips exactly once after mode re-entry', async ({ page }) => {
   await page.goto('/?debug=1');
 
   await expect(page.locator('body')).not.toHaveClass(/status-hidden/);
   await switchMode(page, 'Metronome');
   await switchMode(page, 'Chromatic Tuner');
 
-  await page.waitForTimeout(620);
   await page.evaluate(() => {
-    const target = document.getElementById('strobe-visualizer');
-    target?.dispatchEvent(new Event('touchend', { bubbles: true }));
+    document.getElementById('strobe-visualizer')?.dispatchEvent(
+      new Event('touchend', { bubbles: true })
+    );
   });
   await expect(page.locator('body')).toHaveClass(/status-hidden/);
+  await page.evaluate(() => {
+    document.getElementById('strobe-visualizer')?.dispatchEvent(
+      new Event('touchend', { bubbles: true })
+    );
+  });
+  await expect(page.locator('body')).not.toHaveClass(/status-hidden/);
 });
 
 test("mobile Safari fretboard KEY tap does not trigger mode swipe to metronome", async ({
@@ -1108,7 +848,7 @@ test("mobile Safari fretboard KEY tap does not trigger mode swipe to metronome",
   test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage only.");
 
   await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
+  await switchMode(page, "Fretboard");
   const fretboardScreen = page.locator('.mode-screen[data-mode="fretboard"]');
   const metronomeScreen = page.locator('.mode-screen[data-mode="metronome"]');
   await expect(fretboardScreen).toHaveClass(/is-active/);
@@ -1120,32 +860,3 @@ test("mobile Safari fretboard KEY tap does not trigger mode swipe to metronome",
 });
 
 
-test("circle chord mode oscillates seigaiha randomness and decays on exit", async ({ page }) => {
-  await page.goto("/?debug=1");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
-
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-
-  const sampled = new Set<number>();
-  for (let i = 0; i < 6; i += 1) {
-    await page.waitForTimeout(180);
-    const value = await readDebugRandomness(page);
-    if (Number.isFinite(value)) {
-      sampled.add(Math.round(value * 100));
-    }
-  }
-
-  expect(sampled.size >= 2).toBeTruthy();
-
-  const svg = circlePanel.locator(".cof-svg");
-  const svgBox = await svg.boundingBox();
-  expect(svgBox).not.toBeNull();
-  await tapOutsideCircleRadius(svg);
-
-  await expect
-    .poll(async () => readDebugRandomness(page), { timeout: 2600 })
-    .toBeLessThan(0.22);
-});

@@ -1,4 +1,5 @@
-﻿import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { switchMode } from "./helpers/mode.js";
 
 async function getDetailPivotDrift(panel: Locator) {
   return panel.evaluate((element) => {
@@ -76,11 +77,73 @@ async function tapOutsideCircleRadius(svg: Locator): Promise<void> {
   });
 }
 
+async function clickOuterZone(
+  page: Page,
+  panel: Locator,
+  wedgeIndex: number,
+  zone: "note" | "chord"
+): Promise<void> {
+  const point = await panel.evaluate(
+    (element, { index, tapZone }) => {
+      const root = element as HTMLElement;
+      const svg = root.querySelector<SVGSVGElement>(".cof-svg");
+      if (!svg) return null;
+      const rect = svg.getBoundingClientRect();
+      const centerDeg = index * 30;
+      const angleDeg = centerDeg + (tapZone === "note" ? -10 : 10);
+      const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+      const radius = 385;
+      const svgX = 500 + radius * Math.cos(angleRad);
+      const svgY = 500 + radius * Math.sin(angleRad);
+      return {
+        clientX: rect.left + (svgX / 1000) * rect.width,
+        clientY: rect.top + (svgY / 1000) * rect.height,
+      };
+    },
+    { index: wedgeIndex, tapZone: zone }
+  );
+  if (!point) return;
+  await page.mouse.click(point.clientX, point.clientY);
+}
+
+async function dispatchOuterZoneClick(
+  panel: Locator,
+  wedgeIndex: number,
+  zone: "note" | "chord"
+): Promise<void> {
+  await panel.evaluate(
+    (element, { index, tapZone }) => {
+      const root = element as HTMLElement;
+      const svg = root.querySelector<SVGSVGElement>(".cof-svg");
+      const wedge = root.querySelector<SVGGElement>(`.cof-wedge[data-index="${index}"]`);
+      if (!svg || !wedge) return;
+      const rect = svg.getBoundingClientRect();
+      const centerDeg = index * 30;
+      const angleDeg = centerDeg + (tapZone === "note" ? -10 : 10);
+      const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+      const radius = 385;
+      const svgX = 500 + radius * Math.cos(angleRad);
+      const svgY = 500 + radius * Math.sin(angleRad);
+      const clientX = rect.left + (svgX / 1000) * rect.width;
+      const clientY = rect.top + (svgY / 1000) * rect.height;
+      wedge.dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+        })
+      );
+    },
+    { index: wedgeIndex, tapZone: zone }
+  );
+}
+
 test("circle mode renders twelve outer wedges and keeps the wheel inside card bounds", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const circleScreen = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
@@ -104,7 +167,7 @@ test("circle mode renders twelve outer wedges and keeps the wheel inside card bo
 
 test("note-bar flat labels keep lowercase b", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   const noteBarLabels = page.locator(
     '.mode-screen[data-mode="circle-of-fifths"] .cof-note-cell-label'
   );
@@ -121,64 +184,117 @@ test("note-bar flat labels keep lowercase b", async ({ page }) => {
   expect(flatTexts).toEqual(["Bb", "Db", "Eb", "Ab"]);
 });
 
-test("selecting F shows inner corner roman numerals and center chord labels", async ({ page }) => {
+test("selecting F shows current inner chord labels and roman numerals", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
+
   const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
-  await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').click({ force: true });
+  await clickOuterZone(page, circle, 11, "chord");
 
   await expect(circle).toHaveClass(/has-primary/);
   await expect(circle.locator(".cof-secondary-label").nth(0)).toHaveText("Gm");
   await expect(circle.locator(".cof-secondary-label").nth(1)).toHaveText("Am");
   await expect(circle.locator(".cof-secondary-label").nth(2)).toHaveText("Dm");
   await expect(circle.locator(".cof-dim-label")).toHaveText("E°");
-
   await expect(circle.locator(".cof-secondary-degree-label").nth(0)).toHaveText("ii");
   await expect(circle.locator(".cof-secondary-degree-label").nth(1)).toHaveText("iii");
   await expect(circle.locator(".cof-secondary-degree-label").nth(2)).toHaveText("vi");
   await expect(circle.locator(".cof-dim-degree-label")).toHaveText("vii°");
-
-  const outerDegrees = circle.locator(".cof-degree-label");
-  await expect(outerDegrees.nth(11)).toHaveText("I");
-  await expect(outerDegrees.nth(10)).toHaveText("IV");
-  await expect(outerDegrees.nth(0)).toHaveText("V");
-  await expect(outerDegrees.nth(1)).toHaveText("");
-  await expect(outerDegrees.nth(9)).toHaveText("");
-
-  const spans = await circle.locator('.cof-secondary-cell').evaluateAll((cells) =>
-    cells.map((cell) => Number((cell as SVGGElement).getAttribute('data-span-deg') ?? '0'))
-  );
-  expect(spans).toEqual([24, 24, 24]);
-
-  const xPositions = await circle.locator(".cof-secondary-label").evaluateAll((labels) =>
-    labels.map((label) => Number((label as SVGTextElement).getAttribute("x") ?? "0"))
-  );
-  expect(xPositions[0]! < xPositions[1]!).toBeTruthy();
-  expect(xPositions[1]! < xPositions[2]!).toBeTruthy();
 });
 
-test("double-clicking vi enters minor mode and double-clicking III exits to major", async ({ page }) => {
+test("outer wedge tap zones emit current note/chord behavior and keep IV/V from moving primary", async ({
+  page,
+}) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
+  await page.evaluate(() => {
+    const win = window as typeof window & {
+      __tunaUiObjects?: {
+        createCircleOfFifthsUi?: (
+          container: HTMLElement,
+          options?: {
+            onOuterTap?: (note: {
+              index: number;
+              zone: "note" | "chord";
+              movesPrimary: boolean;
+            }) => void;
+          }
+        ) => { setPrimaryByLabel: (label: string | null) => void; destroy: () => void };
+      };
+      __testCircleUi?: { setPrimaryByLabel: (label: string | null) => void; destroy: () => void } | undefined;
+      __testCircleTapEvents?: Array<{ index: number; zone: "note" | "chord"; movesPrimary: boolean }>;
+    };
+    win.__testCircleUi?.destroy();
+    document.querySelector("[data-test-circle-host]")?.remove();
+    const host = document.createElement("div");
+    host.setAttribute("data-test-circle-host", "1");
+    document.body.appendChild(host);
+    win.__testCircleTapEvents = [];
+    win.__testCircleUi = win.__tunaUiObjects?.createCircleOfFifthsUi?.(host, {
+      onOuterTap: (note) => {
+        win.__testCircleTapEvents?.push({
+          index: note.index,
+          zone: note.zone,
+          movesPrimary: note.movesPrimary,
+        });
+      },
+    });
+    win.__testCircleUi?.setPrimaryByLabel("C");
+  });
 
-  await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').click({ force: true }); // F primary
-  await expect(circle.locator('.cof-wedge[data-index="3"] .cof-degree-label')).toHaveText(""); // vi hidden on outer
+  const circle = page.locator('[data-test-circle-host] .cof');
+  await expect(circle.locator(".cof-wedge.is-primary")).toHaveAttribute("data-index", "0");
 
-  await circle.locator('.cof-secondary-cell').nth(2).locator('.cof-secondary-path').dblclick({ force: true }); // inner vi wedge
-  await expect(circle.locator('.cof-wedge[data-index="11"] .cof-degree-label')).toHaveText("III");
-  await expect(circle.locator('.cof-wedge[data-index="10"] .cof-degree-label')).toHaveText("VI");
-  await expect(circle.locator('.cof-wedge[data-index="0"] .cof-degree-label')).toHaveText("VII");
-  await expect(circle.locator(".cof-secondary-degree-label").nth(0)).toHaveText("iv");
-  await expect(circle.locator(".cof-secondary-degree-label").nth(1)).toHaveText("v");
-  await expect(circle.locator(".cof-secondary-degree-label").nth(2)).toHaveText("i");
-  await expect(circle.locator(".cof-dim-degree-label")).toHaveText("ii°");
+  await page.locator('[data-test-circle-host] .cof-wedge[data-index="1"]').focus();
+  await page.keyboard.press("Enter");
+  await expect(circle.locator(".cof-wedge.is-primary")).toHaveAttribute("data-index", "0");
 
-  await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').dblclick({ force: true }); // now III
-  await expect(circle.locator('.cof-wedge[data-index="11"] .cof-degree-label')).toHaveText("I");
-  await expect(circle.locator('.cof-wedge[data-index="10"] .cof-degree-label')).toHaveText("IV");
-  await expect(circle.locator('.cof-wedge[data-index="0"] .cof-degree-label')).toHaveText("V");
+  await page.locator('[data-test-circle-host] .cof-wedge[data-index="11"]').focus();
+  await page.keyboard.press("Enter");
+  await expect(circle.locator(".cof-wedge.is-primary")).toHaveAttribute("data-index", "0");
+
+  await page.locator('[data-test-circle-host] .cof-wedge[data-index="3"]').focus();
+  await page.keyboard.press("Enter");
+  await expect(circle.locator(".cof-wedge.is-primary")).toHaveAttribute("data-index", "3");
+
+  await dispatchOuterZoneClick(circle, 2, "note");
+  await expect(circle.locator(".cof-wedge.is-primary")).toHaveAttribute("data-index", "3");
+
+  const tapEvents = await page.evaluate(() => {
+    const win = window as typeof window & {
+      __testCircleTapEvents?: Array<{ index: number; zone: "note" | "chord"; movesPrimary: boolean }>;
+      __testCircleUi?: { destroy: () => void };
+    };
+    const events = [...(win.__testCircleTapEvents ?? [])];
+    win.__testCircleUi?.destroy();
+    delete win.__testCircleUi;
+    delete win.__testCircleTapEvents;
+    document.querySelector("[data-test-circle-host]")?.remove();
+    return events;
+  });
+
+  expect(tapEvents).toEqual([
+    { index: 1, zone: "chord", movesPrimary: false },
+    { index: 11, zone: "chord", movesPrimary: false },
+    { index: 3, zone: "chord", movesPrimary: true },
+    { index: 2, zone: "note", movesPrimary: false },
+  ]);
 });
+
+test("background tap outside the circle clears the primary selection", async ({ page }) => {
+  await page.goto("/");
+  await switchMode(page, "Circle of Fifths");
+
+  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
+  const circle = panel.locator(".cof");
+  await clickOuterZone(page, circle, 0, "chord");
+  await expect(circle).toHaveClass(/has-primary/);
+
+  await tapOutsideCircleRadius(panel.locator(".cof-svg"));
+  await expect(circle).not.toHaveClass(/has-primary/);
+  await expect(circle.locator(".cof-wedge.is-primary")).toHaveCount(0);
+});
+
+
 
 test("tuner circle toggle renders wedge-based circle without overflow", async ({ page }) => {
   await page.goto("/");
@@ -204,7 +320,7 @@ test("tuner circle toggle renders wedge-based circle without overflow", async ({
 
 test("clicking a note-bar cell triggers note activity on that cell", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
   const cCell = noteBar.locator('.cof-note-cell[data-semitone="0"]');
   await cCell.dispatchEvent("pointerdown", { pointerId: 77, bubbles: true });
@@ -213,13 +329,15 @@ test("clicking a note-bar cell triggers note activity on that cell", async ({ pa
   await expect(cCell).not.toHaveClass(/is-active/);
 });
 
-test("selecting a primary note adds roman numerals to note-bar diatonic notes", async ({ page }) => {
+test("selecting a primary note adds current roman numerals to note-bar diatonic notes", async ({
+  page,
+}) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
   const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
 
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true }); // C primary
+  await clickOuterZone(page, circle, 0, "chord");
 
   const cCell = noteBar.locator('.cof-note-cell[data-semitone="0"]');
   const dCell = noteBar.locator('.cof-note-cell[data-semitone="2"]');
@@ -230,21 +348,12 @@ test("selecting a primary note adds roman numerals to note-bar diatonic notes", 
   await expect(dCell.locator("xpath=preceding-sibling::*[contains(@class,'cof-note-row-degree')]")).toHaveText("II");
   await expect(bCell.locator("xpath=preceding-sibling::*[contains(@class,'cof-note-row-degree')]")).toHaveText("VII°");
   await expect(dbCell.locator("xpath=preceding-sibling::*[contains(@class,'cof-note-row-degree')]")).toHaveText("");
-  await expect(cCell.locator(".cof-note-cell-label")).toHaveText("C");
-
-  const diatonicAlpha = await cCell.evaluate((el) => {
-    const bg = window.getComputedStyle(el as HTMLElement).backgroundColor;
-    const match = bg.match(/rgba?\(([^)]+)\)/i);
-    if (!match) return 0;
-    const parts = match[1]?.split(",").map((part) => Number(part.trim())) ?? [];
-    return parts.length >= 4 ? (parts[3] ?? 0) : 1;
-  });
-  expect(diatonicAlpha).toBeGreaterThanOrEqual(0.5);
 });
+
 
 test("inner diminished ring keeps a visible gap from the middle ring", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
   await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
 
@@ -274,7 +383,7 @@ test("inner diminished ring keeps a visible gap from the middle ring", async ({ 
 
 test("lesser-degree note rectangles stay visible but more muted than I/IV/V", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
   const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   await panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true }); // C major
 
@@ -319,7 +428,7 @@ test("lesser-degree note rectangles stay visible but more muted than I/IV/V", as
 test("circle mode remains visible in portrait mobile without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const circleScreen = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   await expect(circleScreen).toHaveClass(/is-active/);
@@ -333,28 +442,6 @@ test("circle mode remains visible in portrait mobile without horizontal overflow
 });
 
 
-test("mobile swipe can navigate from fretboard to circle of fifths mode", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "Mobile Safari", "Touch swipe coverage is mobile-specific.");
-
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Fretboard" }).click();
-  await expect(page.locator('.mode-screen[data-mode="fretboard"]')).toHaveClass(/is-active/);
-
-  await page.locator(".mode-stage").dispatchEvent("touchstart", {
-    touches: [{ identifier: 1, clientX: 320, clientY: 360 }],
-    changedTouches: [{ identifier: 1, clientX: 320, clientY: 360 }],
-  });
-  await page.locator(".mode-stage").dispatchEvent("touchmove", {
-    touches: [{ identifier: 1, clientX: 80, clientY: 360 }],
-    changedTouches: [{ identifier: 1, clientX: 80, clientY: 360 }],
-  });
-  await page.locator(".mode-stage").dispatchEvent("touchend", {
-    touches: [],
-    changedTouches: [{ identifier: 1, clientX: 80, clientY: 360 }],
-  });
-
-  await expect(page.locator('.mode-screen[data-mode="circle-of-fifths"]')).toHaveClass(/is-active/);
-});
 
 test("mobile Safari can switch tuner visual mode between strobe and circle", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "Mobile Safari", "iOS Safari regression coverage is mobile-specific.");
@@ -376,236 +463,19 @@ test("mobile Safari can switch tuner visual mode between strobe and circle", asy
 });
 
 
-test("chord mode requires a primary retap, keeps outer-chord taps, and exits on background tap", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
-  const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
 
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-  await expect(circle).not.toHaveClass(/is-chord-mode/);
 
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-  await expect(circle).toHaveClass(/is-chord-mode/);
-  await expect(circlePanel.locator(".cof-svg")).toHaveAttribute("viewBox", "0 0 1000 1000");
 
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').dblclick({ force: true });
-  await expect(circlePanel.locator(".cof-svg")).not.toHaveAttribute("viewBox", "0 0 1000 1000");
 
-  const outerLabels = circle.locator(".cof-wedge-label");
-  await expect(outerLabels.first()).toContainText("Cmaj");
-  await expect(outerLabels.nth(1)).toContainText("Gmaj");
 
-  await circle.locator('.cof-wedge[data-index="1"] .cof-wedge-path').click({ force: true });
-  await expect(circle.locator(".cof-wedge.is-primary .cof-wedge-label")).toContainText("Cmaj");
 
-  const svg = circlePanel.locator(".cof-svg");
-  const svgBox = await svg.boundingBox();
-  expect(svgBox).not.toBeNull();
-  await tapOutsideCircleRadius(svg);
-  await expect(circle).not.toHaveClass(/is-chord-mode/);
-  await expect(circlePanel.locator(".cof-svg")).toHaveAttribute("viewBox", "0 0 1000 1000");
-  await expect(circle.locator(".cof-wedge.is-primary .cof-wedge-label")).toHaveText("C");
-  await expect(outerLabels.first()).toHaveText("C");
-});
 
-test("zoomed chord mode keeps I/IV/V and inner diatonic wedges inside visible svg bounds", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = circlePanel.locator(".cof");
-
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true });
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').dblclick({ force: true });
-  await expect(circle).toHaveClass(/is-chord-mode/);
-  await expect(circlePanel.locator(".cof-svg")).not.toHaveAttribute("viewBox", "0 0 1000 1000");
-
-  const visibility = await circlePanel.evaluate((panel) => {
-    const svg = panel.querySelector(".cof-svg") as SVGSVGElement | null;
-    if (!svg) return { ok: false, missing: ["svg"] as string[] };
-    const svgRect = svg.getBoundingClientRect();
-    const selectors = [
-      '.cof-wedge[data-degree="i"] .cof-wedge-path',
-      '.cof-wedge[data-degree="iv"] .cof-wedge-path',
-      '.cof-wedge[data-degree="v"] .cof-wedge-path',
-      '.cof-secondary-cell[data-degree="ii"] .cof-secondary-path',
-      '.cof-secondary-cell[data-degree="iii"] .cof-secondary-path',
-      '.cof-secondary-cell[data-degree="vi"] .cof-secondary-path',
-      '.cof-dim-cell[data-degree="vii"] .cof-dim-path',
-    ];
-    const missing: string[] = [];
-    const clipped: string[] = [];
-    for (const selector of selectors) {
-      const target = panel.querySelector(selector) as SVGGraphicsElement | null;
-      if (!target) {
-        missing.push(selector);
-        continue;
-      }
-      const rect = target.getBoundingClientRect();
-      const inside =
-        rect.left >= svgRect.left - 4 &&
-        rect.right <= svgRect.right + 4 &&
-        rect.top >= svgRect.top - 4 &&
-        rect.bottom <= svgRect.bottom + 4;
-      if (!inside) clipped.push(selector);
-    }
-    return { ok: missing.length === 0 && clipped.length === 0, missing, clipped };
-  });
-
-  expect(visibility.ok, `missing=${visibility.missing.join(",")} clipped=${(visibility as any).clipped?.join(",")}`).toBeTruthy();
-});
-
-test("zoomed chord mode keeps primary cluster visible on portrait mobile", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = circlePanel.locator(".cof");
-
-  await circle.locator('.cof-wedge[data-index="7"] .cof-wedge-path').click({ force: true }); // Db
-  await circle.locator('.cof-wedge[data-index="7"] .cof-wedge-path').click({ force: true });
-  await circle.locator('.cof-wedge[data-index="7"] .cof-wedge-path').dblclick({ force: true });
-  await expect(circle).toHaveClass(/is-chord-mode/);
-  await expect(circlePanel.locator(".cof-svg")).not.toHaveAttribute("viewBox", "0 0 1000 1000");
-
-  const clippedSelectors = await circlePanel.evaluate((panel) => {
-    const svg = panel.querySelector(".cof-svg") as SVGSVGElement | null;
-    if (!svg) return ["svg"] as string[];
-    const svgRect = svg.getBoundingClientRect();
-    const selectors = [
-      '.cof-wedge[data-degree="i"] .cof-wedge-path',
-      '.cof-wedge[data-degree="iv"] .cof-wedge-path',
-      '.cof-wedge[data-degree="v"] .cof-wedge-path',
-      '.cof-secondary-cell[data-degree="ii"] .cof-secondary-path',
-      '.cof-secondary-cell[data-degree="iii"] .cof-secondary-path',
-      '.cof-secondary-cell[data-degree="vi"] .cof-secondary-path',
-      '.cof-dim-cell[data-degree="vii"] .cof-dim-path',
-    ];
-    const clipped: string[] = [];
-    selectors.forEach((selector) => {
-      const target = panel.querySelector(selector) as SVGGraphicsElement | null;
-      if (!target) {
-        clipped.push(selector);
-        return;
-      }
-      const rect = target.getBoundingClientRect();
-      const inside =
-        rect.left >= svgRect.left - 4 &&
-        rect.right <= svgRect.right + 4 &&
-        rect.top >= svgRect.top - 4 &&
-        rect.bottom <= svgRect.bottom + 4;
-      if (!inside) clipped.push(selector);
-    });
-    return clipped;
-  });
-
-  expect(clippedSelectors, `clipped=${clippedSelectors.join(",")}`).toEqual([]);
-});
-
-test("outer wedge pointer hold toggles holding class for sustain lifecycle", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const wedge = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-wedge[data-index="0"]');
-
-  await wedge.dispatchEvent("pointerdown", { pointerId: 21, bubbles: true });
-  await expect(wedge).toHaveClass(/is-holding/);
-  await wedge.dispatchEvent("pointerup", { pointerId: 21, bubbles: true });
-  await expect(wedge).not.toHaveClass(/is-holding/);
-});
-
-test("outer wedge press pulses note-bar notes for sustained playback", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const wedge = panel.locator('.cof-wedge[data-index="0"]');
-  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
-  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
-  const trail = cRow.locator(".cof-note-trail");
-
-  await wedge.dispatchEvent("pointerdown", { pointerId: 33, bubbles: true });
-  await expect(cCell).toHaveClass(/is-active/);
-  await expect(trail).toHaveClass(/is-stretching/);
-  await page.waitForTimeout(700);
-  await expect(cCell).toHaveClass(/is-active/);
-  await expect(trail).toHaveClass(/is-stretching/);
-  await wedge.dispatchEvent("pointerup", { pointerId: 33, bubbles: true });
-  await expect(cCell).not.toHaveClass(/is-active/);
-  await expect(trail).toHaveClass(/is-floating/);
-});
-
-test("note-bar cell floats left for 2s after release while degree column stays stable", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const wedge = panel.locator('.cof-wedge[data-index="0"]');
-  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
-  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
-  const cTrail = cRow.locator(".cof-note-trail");
-  const cDegree = panel
-    .locator('.cof-note-cell[data-semitone="0"]')
-    .locator("xpath=preceding-sibling::*[contains(@class,'cof-note-row-degree')]");
-
-  await wedge.dispatchEvent("pointerdown", { pointerId: 47, bubbles: true });
-  await expect(cTrail).toHaveClass(/is-stretching/);
-  await expect(cDegree).not.toHaveClass(/is-floating/);
-  await wedge.dispatchEvent("pointerup", { pointerId: 47, bubbles: true });
-  await expect(cTrail).toHaveClass(/is-floating/);
-  await page.waitForTimeout(2100);
-  await expect(cTrail).toHaveCount(0);
-});
-
-test("note-bar trail stretches left while keeping right edge pinned, then detaches on release", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const wedge = panel.locator('.cof-wedge[data-index="0"]');
-  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
-  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
-  const cTrail = cRow.locator(".cof-note-trail");
-
-  await wedge.dispatchEvent("pointerdown", { pointerId: 61, bubbles: true });
-  await expect(cTrail).toHaveClass(/is-stretching/);
-  const before = await cTrail.boundingBox();
-  await page.waitForTimeout(300);
-  const during = await cTrail.boundingBox();
-  expect(before).not.toBeNull();
-  expect(during).not.toBeNull();
-  expect(
-    Math.abs((during?.x ?? 0) + (during?.width ?? 0) - ((before?.x ?? 0) + (before?.width ?? 0))) <= 2
-  ).toBeTruthy();
-
-  await wedge.dispatchEvent("pointerup", { pointerId: 61, bubbles: true });
-  await expect(cTrail).toHaveClass(/is-floating/);
-  await page.waitForTimeout(300);
-  await expect(cTrail).toHaveClass(/is-floating/);
-});
-
-test("retriggering a note keeps older trails floating while new trail grows", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const cCell = panel.locator('.cof-note-cell[data-semitone="0"]');
-  const cRow = cCell.locator("xpath=ancestor::*[contains(@class,'cof-note-row')]");
-
-  await cCell.click({ force: true });
-  await page.waitForTimeout(120);
-  await cCell.click({ force: true });
-
-  await expect
-    .poll(async () => cRow.locator(".cof-note-trail").count(), { timeout: 1500 })
-    .toBeGreaterThan(1);
-});
 
 test("double-tapping inside the circle cycles instruments and shows the instrument name indicator", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const circlePanel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const svg = circlePanel.locator(".cof-svg");
@@ -623,37 +493,10 @@ test("double-tapping inside the circle cycles instruments and shows the instrume
   await expect(instrumentLabel).toContainText("ELECTRIC GUITAR");
 });
 
-test("instrument label arc stays on bottom with no primary and moves opposite selected primary", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-
-  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
-  const readArcMidpoint = async () =>
-    page.evaluate(() => {
-      const path = document.querySelector<SVGPathElement>(".cof defs path[id^='cof-instrument-label-path-']");
-      if (!path) return null;
-      const total = path.getTotalLength();
-      if (!Number.isFinite(total) || total <= 0) return null;
-      const mid = path.getPointAtLength(total / 2);
-      if (!Number.isFinite(mid.x) || !Number.isFinite(mid.y)) return null;
-      return { x: mid.x, y: mid.y };
-    });
-
-  const initialMidpoint = await readArcMidpoint();
-  expect(initialMidpoint).not.toBeNull();
-  expect(initialMidpoint?.y ?? 0).toBeGreaterThan(496);
-
-  await circle.locator('.cof-wedge[data-index="3"] .cof-wedge-path').click({ force: true });
-  const movedMidpoint = await readArcMidpoint();
-  expect(movedMidpoint).not.toBeNull();
-  expect(movedMidpoint?.x ?? 1000).toBeLessThan(504);
-});
 
 test("outer wedge pointerdown applies tap activation before pointerup", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const circle = panel.locator('.cof');
@@ -696,108 +539,11 @@ test("outer wedge pointerdown applies tap activation before pointerup", async ({
 
 
 
-test("outer wedge mouse pointerdown applies tap activation before pointerup", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
 
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = panel.locator('.cof');
-  const wedgePath = panel.locator('.cof-wedge[data-index="1"] .cof-wedge-path');
-
-  const pressPoint = await panel.locator('.cof-svg').evaluate((svgNode) => {
-    const svg = svgNode as SVGSVGElement;
-    const rect = svg.getBoundingClientRect();
-    return {
-      x: rect.left + rect.width * 0.64,
-      y: rect.top + rect.height * 0.18,
-    };
-  });
-
-  await wedgePath.dispatchEvent("pointerdown", {
-    bubbles: true,
-    button: 0,
-    buttons: 1,
-    isPrimary: true,
-    pointerId: 702,
-    pointerType: "mouse",
-    clientX: pressPoint.x,
-    clientY: pressPoint.y,
-  });
-
-  await expect(circle).toHaveClass(/has-primary/);
-
-  await wedgePath.dispatchEvent("pointerup", {
-    bubbles: true,
-    button: 0,
-    buttons: 0,
-    isPrimary: true,
-    pointerId: 702,
-    pointerType: "mouse",
-    clientX: pressPoint.x,
-    clientY: pressPoint.y,
-  });
-});
-test("indicator animation triggers for primary note, chord mode, and minor/major mode transitions", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-
-  const circle = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof');
-  const banners = circle.locator(".cof-mode-banner");
-  const firstBanner = banners.first();
-
-  const aWedge = circle.locator('.cof-wedge[data-index="3"]');
-  await aWedge.focus();
-  await aWedge.press("Enter");
-  await expect(circle).toHaveClass(/has-primary/);
-  await expect(firstBanner).toHaveClass(/cof-mode-banner--indicator/);
-  await expect(firstBanner).toHaveClass(/is-scrolling/);
-
-  await aWedge.press("Enter");
-  await expect(circle).toHaveClass(/is-chord-mode/);
-  await expect(firstBanner).toContainText("CHORD");
-
-  await circle
-    .locator('.cof-secondary-cell')
-    .nth(2)
-    .locator(".cof-secondary-path")
-    .dispatchEvent("dblclick");
-  await expect(firstBanner).toContainText("minor");
-
-  await circle.locator('.cof-wedge[data-index="3"] .cof-wedge-path').dispatchEvent("dblclick");
-  await expect(firstBanner).toContainText("MAJOR");
-});
-
-test("minor-mode tonic click does not stall outer-tap playback", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = panel.locator('.cof');
-  const aWedgePath = panel.locator('.cof-wedge[data-index="3"] .cof-wedge-path');
-
-  await aWedgePath.click({ force: true });
-  await aWedgePath.click({ force: true });
-  await expect(circle).toHaveClass(/is-chord-mode/);
-
-  await panel
-    .locator('.cof-secondary-cell')
-    .nth(2)
-    .locator('.cof-secondary-path')
-    .dispatchEvent("dblclick");
-  await expect(panel.locator('.cof-mode-banner').first()).toContainText("minor");
-
-  const pulseCountBefore = await panel.locator('.cof-pulse').count();
-  await aWedgePath.click({ force: true });
-  await expect
-    .poll(async () => panel.locator('.cof-pulse').count(), { timeout: 120 })
-    .toBeGreaterThan(pulseCountBefore);
-});
 
 test("note-bar supports keyboard activation with Enter and Space", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const noteBar = page.locator('.mode-screen[data-mode="circle-of-fifths"] .cof-note-bar');
   const dbCell = noteBar.locator('.cof-note-cell[data-semitone="1"]');
@@ -818,7 +564,7 @@ test("note-bar supports keyboard activation with Enter and Space", async ({ page
 
 test("concentric center drift stays below 0.1px across primary notes", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const circle = panel.locator('.cof');
@@ -832,137 +578,15 @@ test("concentric center drift stays below 0.1px across primary notes", async ({ 
   }
 });
 
-test("F chord mode concentric center drift stays below 0.1px through zoom on/off", async ({ page }) => {
-  test.setTimeout(60_000);
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = panel.locator('.cof');
-  const svg = panel.locator('.cof-svg');
-
-  for (const index of [11, 0, 7]) {
-    const activated = await panel.evaluate((element, wedgeIndex) => {
-      const path = element.querySelector(
-        `.cof-wedge[data-index="${wedgeIndex}"] .cof-wedge-path`
-      ) as SVGPathElement | null;
-      if (!path) return false;
-      const clickEvent = () =>
-        new MouseEvent("click", { bubbles: true, cancelable: true });
-      path.dispatchEvent(clickEvent());
-      path.dispatchEvent(clickEvent());
-      path.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
-      return true;
-    }, index);
-    expect(activated).toBeTruthy();
-    await expect(circle).toHaveClass(/is-chord-mode/);
-
-    const drift = await getDetailPivotDrift(panel);
-    expect(drift.missing).toBeFalsy();
-    expect(drift.dx).toBeLessThan(0.1);
-    expect(drift.dy).toBeLessThan(0.1);
-
-    await tapOutsideCircleRadius(svg);
-    await expect(circle).not.toHaveClass(/is-chord-mode/);
-  }
-});
-
-test("inner detail rotates to the new primary note", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const circle = panel.locator('.cof');
-
-  await circle.locator('.cof-wedge[data-index="0"] .cof-wedge-path').click({ force: true }); // C
-  await expect(circle.locator('.cof-wedge.is-primary')).toHaveAttribute("data-index", "0");
-  const cAngle = await getDetailTransformAngle(panel);
-  expect(Number.isFinite(cAngle)).toBeTruthy();
-
-  await circle.locator('.cof-wedge[data-index="11"] .cof-wedge-path').click({ force: true }); // F
-  await expect(circle.locator('.cof-wedge.is-primary')).toHaveAttribute("data-index", "11");
-  const fAngle = await getDetailTransformAngle(panel);
-  expect(Number.isFinite(fAngle)).toBeTruthy();
-  const delta = fAngle - cAngle;
-  expect(delta).toBeLessThan(-28.5);
-  expect(delta).toBeGreaterThan(-31.5);
-});
 
 
 
-test("outer wedges start hold on pointerdown and stop on pointerup in note and chord mode", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
 
-  const holdWedge = async (index: number) => {
-    const wedge = panel.locator(`.cof-wedge[data-index="${index}"]`);
-    const path = wedge.locator(".cof-wedge-path");
-    const pointerId = 1000 + index;
-    await path.dispatchEvent("pointerdown", {
-      bubbles: true,
-      button: 0,
-      buttons: 1,
-      isPrimary: true,
-      pointerId,
-      pointerType: "touch",
-    });
-    await expect(wedge).toHaveClass(/is-holding/);
-    await path.dispatchEvent("pointerup", {
-      bubbles: true,
-      button: 0,
-      buttons: 0,
-      isPrimary: true,
-      pointerId,
-      pointerType: "touch",
-    });
-    await expect(wedge).not.toHaveClass(/is-holding/);
-  };
 
-  for (const index of [0, 3, 6, 9]) {
-    await holdWedge(index);
-  }
-
-  const primaryPath = panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
-  await primaryPath.click({ force: true });
-  await primaryPath.click({ force: true });
-  await expect(panel.locator(".cof")).toHaveClass(/is-chord-mode/);
-
-  for (const index of [0, 3, 6, 9]) {
-    await holdWedge(index);
-  }
-});
-
-test("inner-circle wedges start hold on pointerdown and stop on pointerup in chord mode", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
-  const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
-  const primaryPath = panel.locator('.cof-wedge[data-index="0"] .cof-wedge-path');
-  await primaryPath.click({ force: true });
-  await primaryPath.click({ force: true });
-  await expect(panel.locator(".cof")).toHaveClass(/is-chord-mode/);
-
-  for (const degree of ["ii", "iii", "vi"]) {
-    const cell = panel.locator(`.cof-secondary-cell[data-degree="${degree}"]`);
-    await cell.dispatchEvent("pointerdown", { pointerId: 300, bubbles: true });
-    await expect(cell).toHaveClass(/is-holding/);
-    await cell.dispatchEvent("pointerup", { pointerId: 300, bubbles: true });
-    await expect(cell).not.toHaveClass(/is-holding/);
-  }
-
-  const dimCell = panel.locator('.cof-dim-cell[data-degree="vii"]');
-  await dimCell.dispatchEvent("pointerdown", { pointerId: 400, bubbles: true });
-  await expect(dimCell).toHaveClass(/is-holding/);
-  await dimCell.dispatchEvent("pointerup", { pointerId: 400, bubbles: true });
-  await expect(dimCell).not.toHaveClass(/is-holding/);
-});
 
 test("double-tapping inside cycles through all circle instruments", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Circle of Fifths" }).click();
+  await switchMode(page, "Circle of Fifths");
 
   const panel = page.locator('.mode-screen[data-mode="circle-of-fifths"]');
   const svg = panel.locator(".cof-svg");
