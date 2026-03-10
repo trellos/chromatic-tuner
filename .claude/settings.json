@@ -3,9 +3,8 @@
     "allow": [
       "Bash(npm test)",
       "Bash(git stash)",
-      "Bash(npm run test:e2e -- --grep \"wild tuna fullscreen keeps drum\")",
       "Bash(git stash pop)",
-      "Bash(npm run test:e2e -- --grep \"wild tuna fullscreen keeps drum|circle mode remains visible|circle mode renders twelve\")",
+      "Bash(npm run test:e2e",
       "Bash(grep -n \"wild-tuna-pane\\\\|wild-tuna-fullscreen\\\\|wild-tuna-layout\" public/styles/*.css)",
       "Bash(npx playwright test --grep \"wild tuna fullscreen keeps drum\" --reporter=list)",
       "Bash(npx playwright test --grep \"circle mode remains visible in portrait|circle mode renders twelve\" --reporter=list)",
@@ -17,15 +16,19 @@
       "Bash(npx playwright test tests/ui.spec.ts --grep \"wild tuna fullscreen keeps drum\")",
       "Bash(ls -la /c/dev/chromatic-tuner/public/*.css)",
       "Bash(wc -l /c/dev/chromatic-tuner/public/styles/*.css)",
-      "Bash(npm install --save-dev vitest)",
-      "Bash(ls public/style*.css)",
-      "Bash(ls public/*.css)",
-      "Bash(echo \"EXIT:$?\")",
+      "Bash(ls)",
       "Bash(npx vitest run tests/unit/ui-composite-looper.test.ts)",
-      "Bash(npm install --save-dev jsdom)",
       "Bash(npx vitest run)",
       "Bash(findstr /i \"pass\\\\|fail\\\\|error\\\\|timeout\\\\|PASS\\\\|FAIL\\\\|ERROR\")",
-      "Bash(node -e \"const p=require\\(''./package.json''\\); console.log\\(p.scripts[''test:e2e'']\\)\")"
+      "Bash(node -e \"const p=require\\(''./package.json''\\); console.log\\(p.scripts[''test:e2e'']\\)\")",
+      "Bash(grep -n \"\\\\.mode-dot\\\\|mode-carousel\\\\|tablist\" /c/dev/chromatic-tuner/public/*.css /c/dev/chromatic-tuner/public/styles/*.css)",
+      "WebSearch",
+      "Bash(done)",
+      "Read(//tmp/**)",
+      "Bash(grep -E '^\\(play|stop\\)\\\\.svg$')",
+      "Bash(curl:*)",
+      "WebFetch",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://raw.githubusercontent.com/iconoir-icons/iconoir/main/icons/regular/delete-circle.svg\")"
     ]
   },
   "enabledPlugins": {
