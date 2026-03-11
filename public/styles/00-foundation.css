@@ -613,6 +613,58 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-board {
   min-height: 0;
 }
 
+/* Wild Tuna fullscreen close button — top-left of drum pane, hidden until fullscreen. */
+.wt-fullscreen-close {
+  display: none;
+}
+
+body.wild-tuna-fullscreen .wt-fullscreen-close {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  color: #f8fafc;
+  cursor: pointer;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  left: 10px;
+  position: absolute;
+  top: 10px;
+  width: 36px;
+  z-index: 20;
+}
+
+body.wild-tuna-fullscreen .wt-fullscreen-close:hover,
+body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
+  background: rgba(15, 23, 42, 0.82);
+}
+
+body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Prevent drum controls from overflowing the drum-ui card in the narrow Wild Tuna drum pane. */
+.wild-tuna-pane--drum .drum-ui {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px 12px;
+}
+
+.wild-tuna-pane--drum .drum-play {
+  flex-grow: 1;
+  min-height: 34px;
+  min-width: 60px;
+  padding: 8px 12px;
+}
+
+.wild-tuna-pane--drum .drum-kit-trigger {
+  width: auto;
+}
+
 @media (max-width: 900px) {
   .wild-tuna-composite {
     gap: 8px;

@@ -330,6 +330,7 @@ export function createWildTunaMode(): ModeDefinition {
   const fretboardHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-fretboard]");
   const timelineHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-timeline]");
   const fullscreenTrigger = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-fullscreen]");
+  const fullscreenClose = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-close]");
   let modeAbort: AbortController | null = null;
   let timelineUi: ReturnType<typeof buildWildTunaTimeline> | null = null;
   let drumUi: ReturnType<typeof createDrumMachineUi> | null = null;
@@ -408,6 +409,9 @@ export function createWildTunaMode(): ModeDefinition {
       if (fullscreenTrigger) {
         fullscreenTrigger.addEventListener("click", () => setCarouselHidden(true), { signal: modeAbort.signal });
       }
+      if (fullscreenClose) {
+        fullscreenClose.addEventListener("click", () => setCarouselHidden(false), { signal: modeAbort.signal });
+      }
       if (!drumHost || !circleHost || !circleLooperHost || !fretboardHost) return;
 
       const fretboardTemplate = document.querySelector<HTMLTemplateElement>("#fretboard-template");
@@ -478,6 +482,8 @@ export function createWildTunaMode(): ModeDefinition {
         },
       });
       drumHost.replaceChildren(drumUi.rootEl);
+      // Re-append the close button after replaceChildren wipes the drum host.
+      if (fullscreenClose) drumHost.appendChild(fullscreenClose);
 
       // Transport coordinator owns event ordering and shared measure index for both loopers.
       sessionTransport.onStart(() => {
@@ -637,6 +643,8 @@ export function createWildTunaMode(): ModeDefinition {
           // fretboard state: re-enter with restored initialState is not possible post-construction,
           // but fretboardState is updated via onStateChange so we apply it by re-creating the UI
           // would require a refactor; for now, fretboard display state is not restored from URL.
+          // Entering via a share URL always opens fullscreen so the player sees the full layout immediately.
+          setCarouselHidden(true);
         }
       }
     },
