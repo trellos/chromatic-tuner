@@ -463,6 +463,7 @@ body.drum-fullscreen .mode-stage {
 
 .wild-tuna-pane--drum {
   grid-row: 1;
+  overflow: visible;
 }
 
 .wild-tuna-timeline {
@@ -584,7 +585,9 @@ body.wild-tuna-fullscreen .wild-tuna-card {
 body.wild-tuna-fullscreen .wild-tuna-composite {
   display: grid;
   flex: 1;
+  max-width: 100%;
   min-height: 0;
+  overflow: visible;
 }
 
 body.wild-tuna-fullscreen .mode-screen[data-mode="wild-tuna"] {
@@ -645,24 +648,48 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
   outline-offset: 2px;
 }
 
-/* Prevent drum controls from overflowing the drum-ui card in the narrow Wild Tuna drum pane. */
+/* Drum controls bar in Wild Tuna drum pane: constrain to card width, keep all items visible. */
+.wild-tuna-pane--drum .drum-rotator {
+  /* Removing filter avoids Chrome's filter-induced paint-clipping of overflow children. */
+  filter: none;
+}
+
 .wild-tuna-pane--drum .drum-ui {
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  overflow: hidden;
-  padding: 8px 12px;
+  /* Force the card to span the full rotator width so items distribute evenly. */
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  gap: 6px;
+  justify-content: space-between;
+  /* Use 100% so the card is always as wide as its flex-column parent (drum-rotator). */
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  padding: 8px 14px;
+  width: 100%;
 }
 
 .wild-tuna-pane--drum .drum-play {
-  flex-grow: 1;
+  flex-shrink: 0;
   min-height: 34px;
   min-width: 60px;
   padding: 8px 12px;
 }
 
 .wild-tuna-pane--drum .drum-kit-trigger {
+  flex-shrink: 1;
+  max-width: 120px;
+  min-width: 0;
+  overflow: hidden;
   width: auto;
+}
+
+.wild-tuna-pane--drum .drum-beat-picker {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.wild-tuna-pane--drum .drum-tempo {
+  flex-shrink: 0;
 }
 
 @media (max-width: 900px) {

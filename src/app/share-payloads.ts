@@ -148,6 +148,7 @@ export function decodeWildTunaTrackPayload(encoded: string): DecodeResult<WildTu
 //         per note: [6] midi - 40 (covers range 40–103)
 
 const FORMAT_VERSION_V2 = 2;
+const FORMAT_VERSION_V3 = 3;
 
 const KIT_IDS = ["rock", "electro", "house", "lofi", "latin", "woodblock"] as const;
 
@@ -306,9 +307,149 @@ export function decodeWildTunaTrackPayloadV2(
   }
 }
 
+// V3 bit stream layout — identical to V2 except:
+//   after [1] annotation: [1] isEightStep flag
+//   drum grid: (isEightStep ? 32 : 64) bits instead of always 64
+//
+// This allows encoding 8-step (eighth-note) drum patterns in the share URL.
+
+export function encodeWildTunaTrackPayloadV3(
+  payload: WildTunaTrackPayload,
+  drumPayload: DrumTrackPayload,
+): string {
+  const w = new BitWriter();
+
+  w.write(FORMAT_VERSION_V3, 4);
+  w.write(Math.max(0, Math.min(120, drumPayload.bpm - 60)), 7);
+
+  const kitIdx = KIT_IDS.indexOf(drumPayload.kit as typeof KIT_IDS[number]);
+  w.write(kitIdx >= 0 ? kitIdx : 0, 3);
+
+  const rootIdx = NOTE_NAMES.indexOf(payload.fret.root);
+  w.write(rootIdx >= 0 ? rootIdx : 0, 4);
+
+  const displayIdx = DISPLAY_TYPES.indexOf(payload.fret.display);
+  w.write(displayIdx >= 0 ? displayIdx : 0, 2);
+
+  const charList = CHAR_LISTS[payload.fret.display] as CharacteristicType[];
+  const charIdx = charList.indexOf(payload.fret.characteristic);
+  w.write(charIdx >= 0 ? charIdx : 0, 8);
+
+  const annotIdx = ANNOTATION_TYPES.indexOf(payload.fret.annotation);
+  w.write(annotIdx >= 0 ? annotIdx : 0, 1);
+
+  // Step mode flag: 1 = 8-step, 0 = 16-step (inferred from steps string length)
+  const steps = drumPayload.steps;
+  const isEightStep = steps.length === 32;
+  w.write(isEightStep ? 1 : 0, 1);
+
+  // Drum grid: 32 or 64 bits
+  const gridBits = isEightStep ? 32 : 64;
+  for (let i = 0; i < gridBits; i++) {
+    w.write(steps[i] === "1" ? 1 : 0, 1);
+  }
+
+  for (const loopId of ["circle", "fretboard"] as const) {
+    const loopData = payload.loops.find((l) => l.id === loopId);
+    const measures = loopData?.measures ?? [];
+    w.write(Math.min(measures.length, 7), 3);
+    for (const measure of measures) {
+      const events = measure.events;
+      w.write(Math.min(events.length, 31), 5);
+      for (const event of events) {
+        w.write(Math.max(0, Math.min(15, event.startStep)), 4);
+        w.write(Math.max(0, Math.min(15, event.endStep - 1)), 4);
+        const noteCount = Math.max(1, Math.min(8, event.midis.length));
+        w.write(noteCount - 1, 3);
+        for (let n = 0; n < noteCount; n++) {
+          const midi = event.midis[n] ?? event.midis[0] ?? MIDI_OFFSET;
+          w.write(Math.max(0, Math.min(63, midi - MIDI_OFFSET)), MIDI_BITS);
+        }
+      }
+    }
+  }
+
+  return bytesToBase64Url(w.toBytes());
+}
+
+export function decodeWildTunaTrackPayloadV3(
+  encoded: string,
+): DecodeResult<{ payload: WildTunaTrackPayload; drumPayload: DrumTrackPayload }> {
+  const bytes = base64UrlToBytes(encoded);
+  if (!bytes) return { ok: false, reason: "invalid-base64" };
+
+  try {
+    const r = new BitReader(bytes);
+
+    const version = r.read(4);
+    if (version !== FORMAT_VERSION_V3) return { ok: false, reason: "unsupported-version" };
+
+    const bpm = r.read(7) + 60;
+    const kitIdx = r.read(3);
+    const kit = KIT_IDS[kitIdx] ?? "rock";
+
+    const rootIdx = r.read(4);
+    const root = NOTE_NAMES[rootIdx] ?? "C";
+
+    const displayIdx = r.read(2);
+    const display = DISPLAY_TYPES[displayIdx] ?? "scale";
+
+    const charIdx = r.read(8);
+    const charList = CHAR_LISTS[display] as CharacteristicType[];
+    const characteristic = (charList[charIdx] ?? charList[0]) as CharacteristicType;
+
+    const annotIdx = r.read(1);
+    const annotation = ANNOTATION_TYPES[annotIdx] ?? "notes";
+
+    // Step mode flag
+    const isEightStep = r.read(1) === 1;
+    const gridBits = isEightStep ? 32 : 64;
+
+    let stepsStr = "";
+    for (let i = 0; i < gridBits; i++) stepsStr += r.read(1) === 1 ? "1" : "0";
+
+    const drumPayload: DrumTrackPayload = { version: 1, bpm, kit, steps: stepsStr };
+
+    const loops: WildTunaLoopPayload[] = [];
+    for (const loopId of ["circle", "fretboard"] as const) {
+      const measureCount = r.read(3);
+      const measures: CompositeLooperMeasureSlot[] = [];
+      for (let m = 0; m < measureCount; m++) {
+        const eventCount = r.read(5);
+        const events: CompositeLooperMeasureSlot["events"] = [];
+        for (let e = 0; e < eventCount; e++) {
+          const startStep = r.read(4);
+          const endStep = r.read(4) + 1;
+          const noteCount = r.read(3) + 1;
+          const midis: number[] = [];
+          for (let n = 0; n < noteCount; n++) {
+            midis.push(r.read(MIDI_BITS) + MIDI_OFFSET);
+          }
+          events.push({ startStep, endStep, midis });
+        }
+        measures.push({ events });
+      }
+      loops.push({ id: loopId, measures });
+    }
+
+    const fret: FretboardState = { root, display, characteristic, annotation };
+    const drumEncoded = toBase64Url(JSON.stringify(drumPayload));
+
+    return {
+      ok: true,
+      value: {
+        payload: { v: 1, drum: drumEncoded, fret, loops },
+        drumPayload,
+      },
+    };
+  } catch {
+    return { ok: false, reason: "schema-mismatch" };
+  }
+}
+
 /**
- * Attempt to decode a Wild Tuna track URL parameter, trying v2 bit-packed
- * format first, then falling back to v1 JSON format.
+ * Attempt to decode a Wild Tuna track URL parameter, trying v3 then v2 bit-packed
+ * format, then falling back to v1 JSON format.
  */
 export function decodeWildTunaTrackParam(
   encoded: string,
@@ -317,6 +458,10 @@ export function decodeWildTunaTrackParam(
   const bytes = base64UrlToBytes(encoded);
   if (bytes && bytes.length > 0) {
     const version = (bytes[0]! >> 4) & 0xf;
+    if (version === FORMAT_VERSION_V3) {
+      const result = decodeWildTunaTrackPayloadV3(encoded);
+      if (result.ok) return { ok: true, value: result.value.payload };
+    }
     if (version === FORMAT_VERSION_V2) {
       const result = decodeWildTunaTrackPayloadV2(encoded);
       if (result.ok) return { ok: true, value: result.value.payload };

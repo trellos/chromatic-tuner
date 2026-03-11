@@ -1,7 +1,7 @@
 import type { LooperRecorder } from "./looper-recordable.js";
 import { clamp } from "../utils.js";
 
-const STEPS_PER_MEASURE = 16;
+const DEFAULT_STEPS_PER_MEASURE = 16;
 const MAX_MEASURES = 4;
 const MIN_EVENT_STEPS = 1;
 const SAFE_MEASURE_DURATION_MS = 2000;
@@ -36,6 +36,8 @@ export type CompositeLooperMeasureSlot = {
 
 export type CompositeLooperOptions = {
   getMeasureDurationMs: () => number;
+  /** Returns the current step resolution per measure (8 or 16). Defaults to 16 if omitted. */
+  getStepsPerMeasure?: () => number;
   onPlaybackEvent: (event: {
     measureIndex: number;
     midis: number[];
@@ -43,6 +45,13 @@ export type CompositeLooperOptions = {
   }) => void;
   /** Called when the REC button is pressed while idle, before arming. Coordinator uses this to stop other loopers. */
   onRecButtonPressed?: () => void;
+  /**
+   * Called whenever in-progress recording state changes: a note is quantized,
+   * a new measure starts recording, or recording stops. Receives the measure
+   * index being recorded (-1 when not recording) and a snapshot of the events
+   * committed so far in the current measure.
+   */
+  onRecordingProgress?: (measureIndex: number, events: Array<{ midis: number[]; startStep: number; endStep: number }>) => void;
 };
 
 export type CompositeLooper = LooperRecorder & {
@@ -72,6 +81,8 @@ function hasStoredContent(slots: MeasureSlot[]): boolean {
 }
 
 export function createUiCompositeLooper(options: CompositeLooperOptions): CompositeLooper {
+  const stepsPerMeasure = () => options.getStepsPerMeasure?.() ?? DEFAULT_STEPS_PER_MEASURE;
+
   const rootEl = document.createElement("section");
   rootEl.className = "ui-composite-looper";
   rootEl.setAttribute("aria-label", "Loop recorder");
@@ -145,28 +156,36 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     const ratio = (eventPerfMs - currentMeasureStartPerfMs) / Math.max(1, currentMeasureDurationMs);
     // Round to nearest step boundary so notes played slightly ahead of the beat
     // snap forward (to the beat) rather than backward (to the previous grid slot).
-    return clamp(Math.round(ratio * STEPS_PER_MEASURE), 0, STEPS_PER_MEASURE - 1);
+    return clamp(Math.round(ratio * stepsPerMeasure()), 0, stepsPerMeasure() - 1);
   };
 
   const getQuantizedEndStep = (eventPerfMs: number, startStep: number): number => {
     if (currentMeasureStartPerfMs === null) {
-      return clamp(startStep + MIN_EVENT_STEPS, 1, STEPS_PER_MEASURE);
+      return clamp(startStep + MIN_EVENT_STEPS, 1, stepsPerMeasure());
     }
     const ratio = (eventPerfMs - currentMeasureStartPerfMs) / Math.max(1, currentMeasureDurationMs);
     // Round end to nearest step boundary, then enforce minimum note duration.
-    const rawEnd = Math.round(ratio * STEPS_PER_MEASURE);
+    const rawEnd = Math.round(ratio * stepsPerMeasure());
     const minEnd = startStep + MIN_EVENT_STEPS;
-    return clamp(rawEnd, minEnd, STEPS_PER_MEASURE);
+    return clamp(rawEnd, minEnd, stepsPerMeasure());
+  };
+
+  const notifyRecordingProgress = (): void => {
+    if (!options.onRecordingProgress) return;
+    options.onRecordingProgress(
+      recordingMeasureIndex ?? -1,
+      currentRecordingEvents.map((e) => ({ ...e, midis: [...e.midis] }))
+    );
   };
 
   const pushQuantizedEvent = (midis: number[], startStep: number, endStep: number): void => {
     const cleanedMidis = sanitizeMidis(midis);
     if (!cleanedMidis.length) return;
-    const normalizedStart = clamp(startStep, 0, STEPS_PER_MEASURE - 1);
+    const normalizedStart = clamp(startStep, 0, stepsPerMeasure() - 1);
     const normalizedEnd = clamp(
       endStep,
       normalizedStart + MIN_EVENT_STEPS,
-      STEPS_PER_MEASURE
+      stepsPerMeasure()
     );
     if (normalizedEnd <= normalizedStart) return;
     currentRecordingEvents.push({
@@ -174,6 +193,7 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       startStep: normalizedStart,
       endStep: normalizedEnd,
     });
+    notifyRecordingProgress();
   };
 
   const isRecordingOpen = (): boolean => {
@@ -191,7 +211,7 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
 
   const closeAllActiveNotesAtMeasureEnd = (): void => {
     activeRecordedNotesBySource.forEach((active) => {
-      pushQuantizedEvent(active.midis, active.startStep, STEPS_PER_MEASURE);
+      pushQuantizedEvent(active.midis, active.startStep, stepsPerMeasure());
       active.startStep = 0;
     });
   };
@@ -222,12 +242,14 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     recordedMeasuresInPass = 0;
     activeRecordedNotesBySource.clear();
     currentRecordingEvents = [];
+    notifyRecordingProgress();
   };
 
   const startRecordingMeasure = (measureIndex: number): void => {
     recordingMeasureIndex = measureIndex;
     currentRecordingEvents = [];
     activeRecordedNotesBySource.clear();
+    notifyRecordingProgress();
     // Flush notes that were played while armed (before this boundary) into step 0
     // so they aren't silently dropped. Schedule a close timeout per entry so
     // pre-arm pulses get correct duration rather than spanning the full measure.
@@ -263,7 +285,7 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     if (isRecordingOpen()) return;
     const slot = measureSlots[measureIndex];
     if (!slot || slot.events.length === 0) return;
-    const stepDurationMs = currentMeasureDurationMs / STEPS_PER_MEASURE;
+    const stepDurationMs = currentMeasureDurationMs / stepsPerMeasure();
     slot.events.forEach((event) => {
       const eventDelayMs = Math.max(
         0,
@@ -388,6 +410,7 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
         recordState = "idle";
         recordingMeasureIndex = null;
         recordedMeasuresInPass = 0;
+        notifyRecordingProgress();
       }
       rootEl.classList.remove("is-beat-pulse");
       updateUi();

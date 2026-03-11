@@ -24,7 +24,7 @@ import { setCarouselHidden } from "../app/carousel-bridge.js";
 import { createSessionTransport } from "../app/session-transport.js";
 import {
   decodeWildTunaTrackParam,
-  encodeWildTunaTrackPayloadV2,
+  encodeWildTunaTrackPayloadV3,
   decodeDrumTrackPayload,
   type WildTunaTrackPayload,
 } from "../app/share-payloads.js";
@@ -137,8 +137,8 @@ function serializeWildTunaShareUrl(
   };
   const drumDecoded = decodeDrumTrackPayload(payload.drum);
   const encoded = drumDecoded.ok
-    ? encodeWildTunaTrackPayloadV2(payload, drumDecoded.value)
-    : encodeWildTunaTrackPayloadV2(payload, { version: 1, bpm: 120, kit: "rock", steps: "0".repeat(64) });
+    ? encodeWildTunaTrackPayloadV3(payload, drumDecoded.value)
+    : encodeWildTunaTrackPayloadV3(payload, { version: 1, bpm: 120, kit: "rock", steps: "0".repeat(64) });
   const url = new URL(window.location.href);
   url.searchParams.set("mode", "wild-tuna");
   url.searchParams.set("track", encoded);
@@ -153,7 +153,15 @@ function serializeWildTunaShareUrl(
 //   2. If transport is already playing: arm source immediately.
 //   3. If transport is stopped: trigger a 4-beat woodblock count-in on the
 //      drum machine, then arm source and start transport together.
-function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi: () => ReturnType<typeof createDrumMachineUi> | null) {
+type LiveRecordingState = {
+  looper: CompositeLooper;
+  measureIndex: number;
+  events: Array<{ midis: number[]; startStep: number; endStep: number }>;
+} | null;
+
+function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi: () => ReturnType<typeof createDrumMachineUi> | null, getTimelineSteps: () => number) {
+  let liveRecording: LiveRecordingState = null;
+
   return {
     onRecPressed(source: CompositeLooper) {
       const drumUi = getDrumUi();
@@ -169,6 +177,14 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
         source.requestArm();
       }
     },
+    // Called by each looper's onRecordingProgress callback.
+    setLiveRecording(looper: CompositeLooper, measureIndex: number, events: Array<{ midis: number[]; startStep: number; endStep: number }>) {
+      if (measureIndex < 0) {
+        liveRecording = null;
+      } else {
+        liveRecording = { looper, measureIndex, events };
+      }
+    },
     // Seek all loopers to a specific measure index (used by timeline click).
     seekAll(measureIndex: number) {
       for (const looper of getLoopers()) looper.seekToMeasure(measureIndex);
@@ -178,11 +194,15 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
     },
     // Returns how many loopers have recorded content in each measure slot.
     // Values are 0 (empty), 1, or 2 — used for timeline fill coloring.
+    // The measure currently being recorded shows 0 (in-progress, not yet committed).
     getFillCounts(): number[] {
       const counts = Array<number>(GLOBAL_MEASURE_COUNT).fill(0);
       for (const looper of getLoopers()) {
         const slots = looper.getMeasureSlots();
         for (let i = 0; i < Math.min(slots.length, GLOBAL_MEASURE_COUNT); i++) {
+          // If this looper is actively recording this measure, treat it as empty
+          // (the old data is being overwritten; new data isn't committed yet).
+          if (liveRecording?.looper === looper && liveRecording.measureIndex === i) continue;
           if ((slots[i]?.events.length ?? 0) > 0) counts[i] = (counts[i] ?? 0) + 1;
         }
       }
@@ -191,19 +211,36 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
     // Returns a 2D array [measureIndex][stepIndex] with the total note count
     // across all loopers for that step. A note spans startStep..endStep, so
     // it contributes to every step in that range.
+    // The measure currently being recorded shows live in-progress events.
     getStepDensities(): number[][] {
-      const STEPS = 16;
+      const steps = getTimelineSteps();
       const densities: number[][] = Array.from({ length: GLOBAL_MEASURE_COUNT }, () =>
-        Array<number>(STEPS).fill(0)
+        Array<number>(steps).fill(0)
       );
       for (const looper of getLoopers()) {
         const slots = looper.getMeasureSlots();
         for (let mi = 0; mi < Math.min(slots.length, GLOBAL_MEASURE_COUNT); mi++) {
-          const events = slots[mi]?.events ?? [];
+          // Use live in-progress events for the actively-recording measure.
+          const events =
+            liveRecording?.looper === looper && liveRecording.measureIndex === mi
+              ? liveRecording.events
+              : (slots[mi]?.events ?? []);
           for (const event of events) {
             const noteCount = event.midis.length;
-            for (let s = event.startStep; s < Math.min(event.endStep, STEPS); s++) {
+            for (let s = event.startStep; s < Math.min(event.endStep, steps); s++) {
               (densities[mi] as number[])[s] = ((densities[mi] as number[])[s] ?? 0) + noteCount;
+            }
+          }
+        }
+        // If live recording is beyond current slot count, add its events too.
+        if (liveRecording?.looper === looper && liveRecording.measureIndex >= Math.min(slots.length, GLOBAL_MEASURE_COUNT)) {
+          const mi = liveRecording.measureIndex;
+          if (mi < GLOBAL_MEASURE_COUNT) {
+            for (const event of liveRecording.events) {
+              const noteCount = event.midis.length;
+              for (let s = event.startStep; s < Math.min(event.endStep, steps); s++) {
+                (densities[mi] as number[])[s] = ((densities[mi] as number[])[s] ?? 0) + noteCount;
+              }
             }
           }
         }
@@ -212,8 +249,6 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
     },
   };
 }
-
-const TIMELINE_STEPS = 16;
 
 // Maps a total note count across all instruments at one step to an opacity.
 // 0 notes → 0 (transparent), 1 → low, 2-3 → mid, 4+ → high.
@@ -226,34 +261,47 @@ function stepDensityToOpacity(noteCount: number): number {
 
 // Builds the row of measure-indicator buttons between the drum machine and
 // Circle/Fretboard panes. Each block is tappable to seek all loopers.
-// Each block contains 16 mini step-slots that light up based on note density.
+// Each block contains mini step-slot spans that light up based on note density.
 // `update(currentMeasure, fillCounts, stepDensities)` refreshes all visuals.
+// `rebuild(stepsPerBlock)` redraws with a new step count.
 function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
-  host.replaceChildren();
+  let stepsPerBlock = 16;
   const blocks: HTMLElement[] = [];
-  // stepSpans[i] is the array of 16 step-slot spans for measure i.
   const stepSpans: HTMLSpanElement[][] = [];
 
-  for (let i = 0; i < measureCount; i++) {
-    const block = document.createElement("button");
-    block.type = "button";
-    block.className = "wt-timeline-block";
-    block.dataset.measure = String(i);
-    block.setAttribute("aria-label", `Measure ${i + 1}`);
+  function buildBlocks() {
+    host.replaceChildren();
+    blocks.length = 0;
+    stepSpans.length = 0;
 
-    const spans: HTMLSpanElement[] = [];
-    for (let s = 0; s < TIMELINE_STEPS; s++) {
-      const span = document.createElement("span");
-      span.className = "wt-timeline-step";
-      block.appendChild(span);
-      spans.push(span);
+    for (let i = 0; i < measureCount; i++) {
+      const block = document.createElement("button");
+      block.type = "button";
+      block.className = "wt-timeline-block";
+      block.dataset.measure = String(i);
+      block.setAttribute("aria-label", `Measure ${i + 1}`);
+
+      const spans: HTMLSpanElement[] = [];
+      for (let s = 0; s < stepsPerBlock; s++) {
+        const span = document.createElement("span");
+        span.className = "wt-timeline-step";
+        block.appendChild(span);
+        spans.push(span);
+      }
+      stepSpans.push(spans);
+
+      host.appendChild(block);
+      blocks.push(block);
     }
-    stepSpans.push(spans);
-
-    host.appendChild(block);
-    blocks.push(block);
   }
+
+  buildBlocks();
+
   return {
+    rebuild(n: number) {
+      stepsPerBlock = n;
+      buildBlocks();
+    },
     update(currentMeasure: number, fillCounts: number[], stepDensities: number[][]) {
       blocks.forEach((block, i) => {
         block.classList.toggle("is-current", i === currentMeasure);
@@ -428,29 +476,43 @@ export function createWildTunaMode(): ModeDefinition {
           if (fretboardLooper) loopers.push(fretboardLooper);
           return loopers;
         },
-        () => drumUi
+        () => drumUi,
+        () => drumUi?.getStepsPerBar() ?? 16
       );
 
       _trackApi._reset();
 
+      const onRecordingProgress = (looper: () => CompositeLooper | null) => (
+        measureIndex: number,
+        events: Array<{ midis: number[]; startStep: number; endStep: number }>
+      ) => {
+        coordinator.setLiveRecording(looper()!, measureIndex, events);
+        const currentMeasure = sessionTransport.getMeasureIndex() % Math.max(1, coordinator.getMaxMeasureCount());
+        timelineUi?.update(currentMeasure, coordinator.getFillCounts(), coordinator.getStepDensities());
+      };
+
       circleLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
+        getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
         onPlaybackEvent: (event) => {
           _trackApi._emit({ source: "circle", ...event, startedAt: performance.now() });
           void playCircleMidis(event.midis, event.durationMs, false);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(circleLooper!),
+        onRecordingProgress: onRecordingProgress(() => circleLooper),
       });
       circleLooperHost.replaceChildren(circleLooper.rootEl);
 
       fretboardLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
+        getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
         onPlaybackEvent: (event) => {
           _trackApi._emit({ source: "fretboard", ...event, startedAt: performance.now() });
           const targets = event.midis.map((midi) => ({ midi, stringIndex: 0 }));
           void playFretTargets(targets, event.durationMs, false);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(fretboardLooper!),
+        onRecordingProgress: onRecordingProgress(() => fretboardLooper),
       });
 
       // Drum machine generates its own DOM; wild-tuna just appends drumUi.rootEl.
@@ -479,6 +541,14 @@ export function createWildTunaMode(): ModeDefinition {
               window.prompt("Copy this Wild Tuna URL", url);
             }
           })();
+        },
+        onStepsPerBarChange: (n) => {
+          timelineUi?.rebuild(n);
+          timelineUi?.update(
+            sessionTransport.getMeasureIndex() % Math.max(1, coordinator.getMaxMeasureCount()),
+            coordinator.getFillCounts(),
+            coordinator.getStepDensities()
+          );
         },
       });
       drumHost.replaceChildren(drumUi.rootEl);

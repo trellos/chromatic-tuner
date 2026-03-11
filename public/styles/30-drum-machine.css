@@ -21,7 +21,9 @@
   max-width: var(--drum-grid-width, 100%);
   min-width: var(--drum-grid-width, auto);
   padding: 10px 14px;
+  position: relative;
   width: var(--drum-grid-width, auto);
+  z-index: 2;
 }
 
 .drum-tempo {
@@ -212,6 +214,7 @@
   display: grid;
   gap: 12px;
   grid-template-columns: 70px 1fr;
+  position: relative;
 }
 
 .drum-label {
@@ -221,19 +224,49 @@
   text-transform: uppercase;
 }
 
+.drum-step-toggle {
+  min-width: 38px;
+  text-align: center;
+}
+
 .drum-steps {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(16, minmax(18px, 1fr));
+  grid-template-columns: repeat(var(--drum-step-count, 16), minmax(18px, 1fr));
+  position: relative;
+}
+
+/* Beat 2 & 4 accent: a background band behind all 4 rows' columns 2 and 4.
+   Beats are always at 25-50% and 75-100% of the step grid regardless of 8 or 16 step mode.
+   The band is scoped to .drum-steps so it aligns with the buttons, not the label column. */
+.drum-steps::before {
+  background: linear-gradient(
+    to right,
+    transparent 25%,
+    rgba(210, 213, 238, 0.35) 25%,
+    rgba(210, 213, 238, 0.35) 50%,
+    transparent 50%,
+    transparent 75%,
+    rgba(210, 213, 238, 0.35) 75%,
+    rgba(210, 213, 238, 0.35) 100%
+  );
+  border-radius: 4px;
+  content: "";
+  inset: -2px 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
 }
 
 .step {
-  aspect-ratio: 1 / 1;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
   border: 1px solid rgba(12, 16, 32, 0.2);
   border-radius: 6px;
   cursor: pointer;
+  height: 28px;
+  position: relative;
   width: 100%;
+  z-index: 1;
 }
 
 .step.is-on {
@@ -541,7 +574,7 @@ body.drum-fullscreen .drum-ui {
 
   body.drum-fullscreen .mode-screen[data-mode="drum-machine"] .drum-steps {
     gap: 4px;
-    grid-template-columns: repeat(16, minmax(14px, 1fr));
+    grid-template-columns: repeat(var(--drum-step-count, 16), minmax(14px, 1fr));
   }
 }
 

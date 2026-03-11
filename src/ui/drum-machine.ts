@@ -48,6 +48,8 @@ export type DrumMachineUiOptions = {
   }) => void;
   /** If provided, replaces the default share-URL behaviour with a custom handler. */
   onShareOverride?: () => void;
+  /** Called after the step count changes (8 or 16). */
+  onStepsPerBarChange?: (n: 8 | 16) => void;
 };
 
 export type DrumMachineUi = {
@@ -59,6 +61,7 @@ export type DrumMachineUi = {
   /** Applies a drum payload previously obtained from getTrackPayload(). Returns true on success. */
   loadTrackPayload: (payload: string) => Promise<boolean>;
   getBpm: () => number;
+  getStepsPerBar: () => number;
   isPlaying: () => boolean;
   /** Play a 4-beat woodblock count-in at current BPM, pulse the grid, then start transport and call onComplete. */
   countIn: (onComplete: () => void) => void;
@@ -118,6 +121,14 @@ function buildDrumDOM() {
   tempoEl.appendChild(tempoDownBtn);
   tempoEl.appendChild(tempoInfoEl);
   tempoEl.appendChild(tempoUpBtn);
+
+  // 8/16 step toggle
+  const stepToggleEl = document.createElement("button");
+  stepToggleEl.id = "drum-step-toggle";
+  stepToggleEl.className = "ghost-btn drum-step-toggle";
+  stepToggleEl.type = "button";
+  stepToggleEl.setAttribute("aria-label", "Toggle 8 or 16 steps per bar");
+  stepToggleEl.textContent = "16";
 
   // Beat picker
   const beatPickerEl = document.createElement("div");
@@ -201,6 +212,7 @@ function buildDrumDOM() {
   playButton.textContent = "Play";
 
   drumUiEl.appendChild(tempoEl);
+  drumUiEl.appendChild(stepToggleEl);
   drumUiEl.appendChild(beatPickerEl);
   drumUiEl.appendChild(kitPickerEl);
   drumUiEl.appendChild(shareButton);
@@ -254,6 +266,7 @@ function buildDrumDOM() {
     drumGridsEl,
     playheadEl,
     playButton,
+    stepToggleEl,
     beatButton,
     beatMenu,
     kitButton,
@@ -280,6 +293,7 @@ export function createDrumMachineUi(
     drumGridsEl,
     playheadEl,
     playButton,
+    stepToggleEl,
     beatButton,
     beatMenu,
     kitButton,
@@ -362,6 +376,7 @@ export function createDrumMachineUi(
 
   let signature = "4/4";
   let bpm = 120;
+  let stepsPerBar: 8 | 16 = 16;
   let currentBeat = "rock";
   let isPlaying = false;
   let currentKit: KitId = "rock";
@@ -494,7 +509,7 @@ export function createDrumMachineUi(
     }
   };
 
-  const getStepsPerBar = () => 16;
+  const getStepsPerBar = () => stepsPerBar;
 
   const getBeatsPerBar = () => 4;
 
@@ -532,7 +547,8 @@ export function createDrumMachineUi(
       drumMockEl.dataset.signature = value;
     }
     if (drumGridsEl) {
-      drumGridsEl.style.setProperty("--playhead-count", "16");
+      drumGridsEl.style.setProperty("--playhead-count", String(stepsPerBar));
+      drumGridsEl.style.setProperty("--drum-step-count", String(stepsPerBar));
       drumGridsEl.style.setProperty("--playhead-index", "0");
     }
     drumMockEl?.querySelectorAll(".step.is-current").forEach((step) => {
@@ -558,6 +574,38 @@ export function createDrumMachineUi(
     const step = steps[index];
     if (!step) return;
     step.classList.toggle("is-on", on);
+  };
+
+  // Rebuilds the step buttons in all rows of the active grid to match n steps,
+  // resets playhead, and updates CSS variables.
+  const setStepsPerBar = (n: 8 | 16) => {
+    if (isPlaying) stopTransport();
+    stepsPerBar = n;
+    if (stepToggleEl) stepToggleEl.textContent = String(n);
+    const grid = drumMockEl?.querySelector<HTMLElement>(`.drum-grid[data-signature="${signature}"]`);
+    if (grid) {
+      grid.querySelectorAll<HTMLElement>(".drum-row").forEach((row) => {
+        const stepsEl = row.querySelector<HTMLElement>(".drum-steps");
+        if (!stepsEl) return;
+        stepsEl.replaceChildren();
+        for (let i = 0; i < n; i++) {
+          const step = document.createElement("button");
+          step.className = "step";
+          step.type = "button";
+          stepsEl.appendChild(step);
+        }
+      });
+    }
+    currentStep = 0;
+    lastStepIndex = null;
+    if (drumGridsEl) {
+      drumGridsEl.style.setProperty("--playhead-count", String(n));
+      drumGridsEl.style.setProperty("--drum-step-count", String(n));
+      drumGridsEl.style.setProperty("--playhead-index", "0");
+    }
+    playheadEl?.classList.remove("is-active");
+    scheduleLayoutSync();
+    options.onStepsPerBarChange?.(n);
   };
 
   const beatContainsAnySound = (
@@ -622,53 +670,106 @@ export function createDrumMachineUi(
       indices.forEach((index) => setStep(row, index, true));
     };
 
-    switch (beat) {
-      case "rock":
-        applyPattern(kick, [0, 6, 8, 10]);
-        applyPattern(snare, [4, 12]);
-        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
-        applyPattern(perc, [11]);
-        break;
-      case "shuffle":
-        applyPattern(kick, [0, 6, 12]);
-        applyPattern(snare, [4, 12]);
-        applyPattern(hat, [0, 3, 4, 7, 8, 11, 12, 15]);
-        applyPattern(perc, [10]);
-        break;
-      case "disco":
-        applyPattern(kick, [0, 4, 8, 12]);
-        applyPattern(snare, [4, 12]);
-        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
-        applyPattern(perc, [2, 6, 10, 14]);
-        break;
-      case "half-time":
-        applyPattern(kick, [0, 7, 10]);
-        applyPattern(snare, [8]);
-        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
-        applyPattern(perc, [3, 11]);
-        break;
-      case "breakbeat":
-        applyPattern(kick, [0, 6, 7, 10, 12]);
-        applyPattern(snare, [4, 12, 14]);
-        applyPattern(hat, [0, 2, 3, 6, 8, 10, 11, 14]);
-        applyPattern(perc, [2, 10]);
-        break;
-      case "afrobeat":
-        applyPattern(kick, [0, 5, 8, 11, 15]);
-        applyPattern(snare, [4, 10, 12]);
-        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
-        applyPattern(perc, [3, 7, 11, 15]);
-        break;
-      case "minimal":
-        applyPattern(kick, [0, 8]);
-        applyPattern(snare, [12]);
-        applyPattern(hat, [2, 6, 10, 14]);
-        break;
-      default:
-        applyPattern(kick, [0, 6, 8, 10]);
-        applyPattern(snare, [4, 12]);
-        applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
-        break;
+    if (stepsPerBar === 8) {
+      // 8th-note (8-step) condensed patterns — 2 steps per beat.
+      switch (beat) {
+        case "rock":
+          applyPattern(kick, [0, 4]);
+          applyPattern(snare, [2, 6]);
+          applyPattern(hat, [0, 1, 2, 3, 4, 5, 6, 7]);
+          applyPattern(perc, [5]);
+          break;
+        case "shuffle":
+          applyPattern(kick, [0, 3, 6]);
+          applyPattern(snare, [2, 6]);
+          applyPattern(hat, [0, 1, 2, 3, 4, 5, 6, 7]);
+          applyPattern(perc, [5]);
+          break;
+        case "disco":
+          applyPattern(kick, [0, 2, 4, 6]);
+          applyPattern(snare, [2, 6]);
+          applyPattern(hat, [0, 1, 2, 3, 4, 5, 6, 7]);
+          applyPattern(perc, [1, 3, 5, 7]);
+          break;
+        case "half-time":
+          applyPattern(kick, [0, 3, 5]);
+          applyPattern(snare, [4]);
+          applyPattern(hat, [0, 1, 2, 3, 4, 5, 6, 7]);
+          applyPattern(perc, [1, 5]);
+          break;
+        case "breakbeat":
+          applyPattern(kick, [0, 3, 5, 6]);
+          applyPattern(snare, [2, 6, 7]);
+          applyPattern(hat, [0, 1, 3, 4, 5, 7]);
+          applyPattern(perc, [1, 5]);
+          break;
+        case "afrobeat":
+          applyPattern(kick, [0, 2, 4, 5, 7]);
+          applyPattern(snare, [2, 5, 6]);
+          applyPattern(hat, [0, 1, 2, 3, 4, 5, 6, 7]);
+          applyPattern(perc, [1, 3, 5, 7]);
+          break;
+        case "minimal":
+          applyPattern(kick, [0, 4]);
+          applyPattern(snare, [6]);
+          applyPattern(hat, [1, 3, 5, 7]);
+          break;
+        default:
+          applyPattern(kick, [0, 4]);
+          applyPattern(snare, [2, 6]);
+          applyPattern(hat, [0, 1, 2, 3, 4, 5, 6, 7]);
+          break;
+      }
+    } else {
+      // 16th-note (16-step) patterns.
+      switch (beat) {
+        case "rock":
+          applyPattern(kick, [0, 6, 8, 10]);
+          applyPattern(snare, [4, 12]);
+          applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+          applyPattern(perc, [11]);
+          break;
+        case "shuffle":
+          applyPattern(kick, [0, 6, 12]);
+          applyPattern(snare, [4, 12]);
+          applyPattern(hat, [0, 3, 4, 7, 8, 11, 12, 15]);
+          applyPattern(perc, [10]);
+          break;
+        case "disco":
+          applyPattern(kick, [0, 4, 8, 12]);
+          applyPattern(snare, [4, 12]);
+          applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+          applyPattern(perc, [2, 6, 10, 14]);
+          break;
+        case "half-time":
+          applyPattern(kick, [0, 7, 10]);
+          applyPattern(snare, [8]);
+          applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+          applyPattern(perc, [3, 11]);
+          break;
+        case "breakbeat":
+          applyPattern(kick, [0, 6, 7, 10, 12]);
+          applyPattern(snare, [4, 12, 14]);
+          applyPattern(hat, [0, 2, 3, 6, 8, 10, 11, 14]);
+          applyPattern(perc, [2, 10]);
+          break;
+        case "afrobeat":
+          applyPattern(kick, [0, 5, 8, 11, 15]);
+          applyPattern(snare, [4, 10, 12]);
+          applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+          applyPattern(perc, [3, 7, 11, 15]);
+          break;
+        case "minimal":
+          applyPattern(kick, [0, 8]);
+          applyPattern(snare, [12]);
+          applyPattern(hat, [2, 6, 10, 14]);
+          break;
+        default:
+          applyPattern(kick, [0, 6, 8, 10]);
+          applyPattern(snare, [4, 12]);
+          applyPattern(hat, [0, 2, 4, 6, 8, 10, 12, 14]);
+          break;
+      }
     }
   };
 
@@ -739,6 +840,11 @@ export function createDrumMachineUi(
     setBpm(parsed.bpm);
     if (isKitId(parsed.kit)) {
       await setKit(parsed.kit);
+    }
+    // Infer step count from payload: steps.length / 4 rows → 8 or 16.
+    const inferredSteps = Math.round(parsed.steps.length / 4);
+    if (inferredSteps === 8 || inferredSteps === 16) {
+      setStepsPerBar(inferredSteps);
     }
     return applyTrackStepBits(getActiveGrid(), parsed.steps);
   };
@@ -979,9 +1085,10 @@ export function createDrumMachineUi(
       }
       const afterCountInMs = Math.max(0, (startTime + 4 * beatDurationSec - ctx.currentTime) * 1000);
       // Arm the looper half a step early so notes anticipated slightly before the
-      // 1 beat snap to step 0 rather than being dropped. A step is one 16th note
-      // (beatDuration / 4); half a step is beatDuration / 8.
-      const halfStepMs = (beatDurationSec * 1000) / 8;
+      // 1 beat snap to step 0 rather than being dropped.
+      // stepsPerBeat = stepsPerBar / 4; half a step = beatDuration / (2 * stepsPerBeat).
+      const stepsPerBeat = Math.max(1, getStepsPerBar() / getBeatsPerBar());
+      const halfStepMs = (beatDurationSec * 1000) / (2 * stepsPerBeat);
       window.setTimeout(() => {
         drumMockEl.classList.remove("is-count-in");
         drumMockEl.classList.remove("is-count-in-beat");
@@ -1083,6 +1190,14 @@ export function createDrumMachineUi(
       );
     });
 
+    if (stepToggleEl) {
+      stepToggleEl.addEventListener(
+        "click",
+        () => { setStepsPerBar(stepsPerBar === 16 ? 8 : 16); },
+        { signal }
+      );
+    }
+
     drumMockEl.addEventListener(
       "click",
       (event) => {
@@ -1104,17 +1219,26 @@ export function createDrumMachineUi(
       );
     }
 
-    if (beatButton && beatMenu) {
-      const toggleBeatMenu = (open: boolean) => {
+    const toggleBeatMenu = (open: boolean) => {
+      if (beatMenu) {
         beatMenu.classList.toggle("is-open", open);
-        beatButton.setAttribute("aria-expanded", String(open));
-      };
+        beatButton?.setAttribute("aria-expanded", String(open));
+      }
+    };
+    const toggleKitMenu = (open: boolean) => {
+      if (kitMenu) {
+        kitMenu.classList.toggle("is-open", open);
+        kitButton?.setAttribute("aria-expanded", String(open));
+      }
+    };
 
+    if (beatButton && beatMenu) {
       beatButton.addEventListener(
         "click",
         (event) => {
           event.stopPropagation();
           const isOpen = beatMenu.classList.contains("is-open");
+          toggleKitMenu(false);
           toggleBeatMenu(!isOpen);
         },
         { signal }
@@ -1144,16 +1268,12 @@ export function createDrumMachineUi(
     }
 
     if (kitButton && kitMenu) {
-      const toggleKitMenu = (open: boolean) => {
-        kitMenu.classList.toggle("is-open", open);
-        kitButton.setAttribute("aria-expanded", String(open));
-      };
-
       kitButton.addEventListener(
         "click",
         (event) => {
           event.stopPropagation();
           const isOpen = kitMenu.classList.contains("is-open");
+          toggleBeatMenu(false);
           toggleKitMenu(!isOpen);
         },
         { signal }
@@ -1252,6 +1372,7 @@ export function createDrumMachineUi(
     getTrackPayload,
     loadTrackPayload,
     getBpm: () => bpm,
+    getStepsPerBar,
     isPlaying: () => isPlaying,
     countIn,
     destroy() {
