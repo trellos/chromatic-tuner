@@ -87,6 +87,7 @@ function buildDrumDOM() {
   const drumMockEl = document.createElement("div");
   drumMockEl.className = "drum-mock";
   drumMockEl.dataset.signature = "4/4";
+  drumMockEl.dataset.steps = "16";
 
   const rotatorEl = document.createElement("div");
   rotatorEl.className = "drum-rotator";
@@ -395,6 +396,8 @@ export function createDrumMachineUi(
   let lastStepIndex: number | null = null;
   let uiAbort: AbortController | null = null;
   let playheadTimeouts: number[] = [];
+  let countInTimeouts: number[] = [];
+  let cancelCountIn: (() => void) | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let bodyClassObserver: MutationObserver | null = null;
   let detachVisualViewportListeners: (() => void) | null = null;
@@ -581,6 +584,7 @@ export function createDrumMachineUi(
   const setStepsPerBar = (n: 8 | 16) => {
     if (isPlaying) stopTransport();
     stepsPerBar = n;
+    drumMockEl.dataset.steps = String(n);
     if (stepToggleEl) stepToggleEl.textContent = String(n);
     const grid = drumMockEl?.querySelector<HTMLElement>(`.drum-grid[data-signature="${signature}"]`);
     if (grid) {
@@ -1057,14 +1061,38 @@ export function createDrumMachineUi(
   };
 
   const countIn = (onComplete: () => void): void => {
+    // Set cancelCountIn immediately (before awaits) so clicking Stop during
+    // audio init or buffer load cancels correctly.
+    let cancelled = false;
+    countInTimeouts = [];
+    cancelCountIn = () => {
+      if (cancelled) return;
+      cancelled = true;
+      cancelCountIn = null;
+      for (const id of countInTimeouts) window.clearTimeout(id);
+      countInTimeouts = [];
+      drumMockEl.classList.remove("is-count-in");
+      drumMockEl.classList.remove("is-count-in-beat");
+      setPlayButtonState(false);
+    };
+
+    // Show the play button as "Stop" immediately so the user can cancel.
+    setPlayButtonState(true);
+
     void (async () => {
       await ensureAudio();
-      if (!audioContext || isPlaying) return;
+      if (cancelled || !audioContext || isPlaying) {
+        cancelCountIn?.();
+        return;
+      }
       const ctx = audioContext;
       const beatDurationSec = 60 / bpm;
       const buffer = await loadCountInBuffer(ctx);
+      if (cancelled) return;
+
       const startTime = ctx.currentTime + 0.05;
       drumMockEl.classList.add("is-count-in");
+
       for (let i = 0; i < 4; i++) {
         const beatTime = startTime + i * beatDurationSec;
         if (buffer) {
@@ -1077,11 +1105,12 @@ export function createDrumMachineUi(
           src.start(beatTime);
         }
         const delayMs = Math.max(0, (beatTime - ctx.currentTime) * 1000);
-        window.setTimeout(() => {
+        countInTimeouts.push(window.setTimeout(() => {
+          if (cancelled) return;
           drumMockEl.classList.remove("is-count-in-beat");
           void drumMockEl.offsetWidth;
           drumMockEl.classList.add("is-count-in-beat");
-        }, delayMs);
+        }, delayMs));
       }
       const afterCountInMs = Math.max(0, (startTime + 4 * beatDurationSec - ctx.currentTime) * 1000);
       // Arm the looper half a step early so notes anticipated slightly before the
@@ -1089,14 +1118,17 @@ export function createDrumMachineUi(
       // stepsPerBeat = stepsPerBar / 4; half a step = beatDuration / (2 * stepsPerBeat).
       const stepsPerBeat = Math.max(1, getStepsPerBar() / getBeatsPerBar());
       const halfStepMs = (beatDurationSec * 1000) / (2 * stepsPerBeat);
-      window.setTimeout(() => {
+      countInTimeouts.push(window.setTimeout(() => {
+        if (cancelled) return;
         drumMockEl.classList.remove("is-count-in");
         drumMockEl.classList.remove("is-count-in-beat");
+        cancelCountIn = null;
         onComplete();
-      }, Math.max(0, afterCountInMs - halfStepMs));
-      window.setTimeout(() => {
+      }, Math.max(0, afterCountInMs - halfStepMs)));
+      countInTimeouts.push(window.setTimeout(() => {
+        if (cancelled) return;
         void startTransport();
-      }, afterCountInMs);
+      }, afterCountInMs));
     })();
   };
 
@@ -1212,8 +1244,13 @@ export function createDrumMachineUi(
       playButton.addEventListener(
         "click",
         () => {
-          if (isPlaying) stopTransport();
-          else void startTransport();
+          if (cancelCountIn) {
+            cancelCountIn();
+          } else if (isPlaying) {
+            stopTransport();
+          } else {
+            void startTransport();
+          }
         },
         { signal }
       );
@@ -1352,6 +1389,7 @@ export function createDrumMachineUi(
   };
 
   const exit = () => {
+    cancelCountIn?.();
     stopTransport();
     uiAbort?.abort();
     uiAbort = null;

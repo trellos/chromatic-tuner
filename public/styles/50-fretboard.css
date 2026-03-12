@@ -10,20 +10,45 @@
   position: relative;
 }
 
+.wild-tuna-pane--fretboard {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
 .wild-tuna-pane--fretboard .fretboard-layout {
   align-items: stretch;
+  gap: 12px;
+  /* Board auto-sized; controls get up to 260px; whole block is centered by flex parent. */
+  grid-template-columns: auto minmax(180px, 260px);
   height: 100%;
-  padding-left: 16px;
+  padding: 0;
+  width: fit-content;
 }
 
 .wild-tuna-pane--fretboard .fretboard-board {
-  min-height: 300px;
+  /* Portrait: 6 strings wide × 12 frets tall → 1:2 aspect ratio. */
+  aspect-ratio: 1 / 2;
+  height: 100%;
+  min-height: 0;
+  width: auto;
 }
 
 .wild-tuna-pane--fretboard .fretboard-controls {
   align-content: start;
   max-height: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.wild-tuna-pane--fretboard .fretboard-dot {
+  font-size: 9px;
+  width: clamp(14px, 1.8vw, 20px);
+}
+
+.wild-tuna-pane--fretboard .fretboard-open-indicator {
+  height: 9px;
+  width: 9px;
 }
 
 /* In Wild Tuna, position the hidden-summary in the top-left so it doesn't cover the fretboard */
@@ -378,12 +403,26 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
 }
 
 .fretboard-zoom-action {
-  border: 1px solid rgba(0, 245, 212, 0.45);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(12, 16, 32, 0.2);
+  border-radius: 999px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  min-width: 92px;
+  padding: 10px 14px;
+  text-transform: uppercase;
 }
 
 .fretboard-zoom-action.is-active {
-  background: rgba(0, 245, 212, 0.32);
-  border-color: rgba(0, 245, 212, 0.8);
+  background: rgba(0, 245, 212, 0.22);
+  border-color: rgba(0, 245, 212, 0.7);
+  box-shadow:
+    0 0 0 2px rgba(0, 245, 212, 0.4),
+    0 0 10px rgba(0, 245, 212, 0.25);
 }
 
 .fretboard-hide-action {
@@ -506,7 +545,7 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
   }
 
   .wild-tuna-pane--fretboard .fretboard-layout {
-    grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+    grid-template-columns: auto minmax(160px, 220px);
   }
 
   .fretboard-board {

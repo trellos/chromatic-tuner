@@ -118,6 +118,41 @@ test("wild tuna fullscreen: all drum controls are visible and fully in-viewport 
   }
 });
 
+test("wild tuna fullscreen: drum control bar and note grid are the same width", async ({ page }) => {
+  const viewports = [
+    { width: 1280, height: 800, name: "desktop wide" },
+    { width: 768, height: 1024, name: "tablet portrait" },
+    { width: 390, height: 844, name: "mobile portrait" },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await switchMode(page, "Wild Tuna");
+    await page.locator("[data-wild-tuna-fullscreen]").click();
+    await expect(page.locator("body")).toHaveClass(/wild-tuna-fullscreen/);
+    await expect(page.locator("[data-wild-tuna-drum] .drum-ui")).toBeVisible();
+
+    const widths = await page.evaluate(() => {
+      const ctx = document.querySelector("[data-wild-tuna-drum]");
+      if (!ctx) return null;
+      const bar = ctx.querySelector<HTMLElement>(".drum-ui");
+      const grid = ctx.querySelector<HTMLElement>(".drum-grids");
+      if (!bar || !grid) return null;
+      return {
+        bar: bar.getBoundingClientRect().width,
+        grid: grid.getBoundingClientRect().width,
+      };
+    });
+
+    expect(widths, `${viewport.name}: drum elements not found`).not.toBeNull();
+    expect(
+      Math.abs(widths!.bar - widths!.grid),
+      `${viewport.name}: drum-ui width (${widths!.bar.toFixed(1)}) should equal drum-grids width (${widths!.grid.toFixed(1)})`
+    ).toBeLessThanOrEqual(2);
+  }
+});
+
 test("drum machine lifecycle stops transport when mode exits and re-enters", async ({ page }) => {
   await page.goto("/");
   await switchMode(page, "Drum Machine");

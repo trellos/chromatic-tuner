@@ -445,12 +445,15 @@ body.drum-fullscreen .mode-stage {
   display: none;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 1.1fr auto 2fr 1.6fr;
+  /* Timeline (auto) sits above the drum machine, then circle, then fretboard. */
+  grid-template-rows: auto 1.1fr 2fr 1.6fr;
   height: 100%;
   margin: 0 auto;
   max-width: min(700px, 100%);
   min-height: 0;
-  overflow: hidden;
+  /* Use visible so the timeline row (auto height) and drum pane aren't clipped. */
+  overflow: visible;
+  padding-top: 4px;
   width: 100%;
 }
 
@@ -461,14 +464,14 @@ body.drum-fullscreen .mode-stage {
   position: relative;
 }
 
-.wild-tuna-pane--drum {
+.wild-tuna-timeline {
   grid-row: 1;
-  overflow: visible;
+  min-height: 0;
 }
 
-.wild-tuna-timeline {
+.wild-tuna-pane--drum {
   grid-row: 2;
-  min-height: 0;
+  overflow: visible;
 }
 
 .wild-tuna-pane--circle {
@@ -695,7 +698,7 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
 @media (max-width: 900px) {
   .wild-tuna-composite {
     gap: 8px;
-    grid-template-rows: 1.1fr auto 2fr 1.6fr;
+    grid-template-rows: auto 1.1fr 2fr 1.6fr;
   }
 }
 

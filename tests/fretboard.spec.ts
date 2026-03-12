@@ -681,6 +681,36 @@ test("fretboard target button zooms to tapped note and outside tap restores full
   await expect(board).not.toHaveClass(/is-zoomed/);
 });
 
+test("wild tuna fullscreen: fretboard board is taller than wide", async ({ page }) => {
+  const viewports = [
+    { width: 1280, height: 800, name: "desktop wide" },
+    { width: 768, height: 1024, name: "tablet portrait" },
+    { width: 390, height: 844, name: "mobile portrait" },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+    await page.locator("#mode-chip").click();
+    await page.getByRole("menuitem", { name: "Wild Tuna", exact: true }).click();
+    await page.locator("[data-wild-tuna-fullscreen]").click();
+    await expect(page.locator("body")).toHaveClass(/wild-tuna-fullscreen/);
+
+    const dims = await page.evaluate(() => {
+      const board = document.querySelector<HTMLElement>("[data-wild-tuna-fretboard] .fretboard-board");
+      if (!board) return null;
+      const rect = board.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+
+    expect(dims, `${viewport.name}: fretboard board not found`).not.toBeNull();
+    expect(
+      dims!.height,
+      `${viewport.name}: fretboard board should be taller than wide (height=${dims!.height.toFixed(1)}, width=${dims!.width.toFixed(1)})`
+    ).toBeGreaterThan(dims!.width);
+  }
+});
+
 test("mobile target zoom can be armed and dismissed by outside tap", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "Mobile Safari", "mobile zoom coverage");
 

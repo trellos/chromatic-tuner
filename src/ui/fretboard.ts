@@ -514,7 +514,11 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
         if (!zoomViewport) return;
         const target = event.target as HTMLElement | null;
         if (!target) return;
-        if (target.closest(".fretboard-board") || target.closest("[data-fretboard-zoom-target]")) return;
+        if (
+          target.closest(".fretboard-board") ||
+          target.closest("[data-fretboard-zoom-target]") ||
+          target.closest(".fretboard-looper-slot")
+        ) return;
         clearZoom();
       },
       { signal, capture: true }
