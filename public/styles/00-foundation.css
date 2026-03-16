@@ -445,8 +445,8 @@ body.drum-fullscreen .mode-stage {
   display: none;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr);
-  /* Timeline (auto) sits above the drum machine, then circle, then fretboard. */
-  grid-template-rows: auto 1.1fr 2fr 1.6fr;
+  /* Timeline (auto) sits above the drum machine, then jam-flow canvas pane. */
+  grid-template-rows: auto 1.1fr 1fr;
   height: 100%;
   margin: 0 auto;
   max-width: min(700px, 100%);
@@ -474,12 +474,8 @@ body.drum-fullscreen .mode-stage {
   overflow: visible;
 }
 
-.wild-tuna-pane--circle {
+.wild-tuna-pane--jamflow {
   grid-row: 3;
-}
-
-.wild-tuna-pane--fretboard {
-  grid-row: 4;
 }
 
 .wild-tuna-circle-looper {
@@ -487,6 +483,82 @@ body.drum-fullscreen .mode-stage {
   position: absolute;
   top: 10px;
   z-index: 8;
+}
+
+/* ── Jam Flow ────────────────────────────────────────────────────────────── */
+.jf-wrapper {
+  background: #1a1c24;
+  bottom: 0;
+  display: flex;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.jf-canvas-wrapper {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.jf-canvas {
+  display: block;
+}
+
+.jf-note-bar-host {
+  flex-shrink: 0;
+  width: 44px;
+}
+
+.jf-note-bar {
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  left: 0;
+  padding: 4px 3px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.jf-note-btn {
+  align-items: center;
+  border: 3px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  font-size: 10px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  transition:
+    background-color 500ms ease,
+    border-color 500ms ease,
+    opacity 500ms ease;
+  user-select: none;
+}
+
+.jf-note-btn--default {
+  background: #5b32a0;
+  color: #fff;
+}
+
+.jf-note-btn--diatonic {
+  /* bg/color set inline by JS */
+}
+
+.jf-note-btn--leading {
+  /* bg/border/color set inline by JS */
+}
+
+.jf-note-btn--nondiatonic {
+  background: #2a2e3e;
+  color: #666;
+  opacity: 0.35;
 }
 
 .wild-tuna-timeline {
@@ -615,7 +687,7 @@ body.wild-tuna-fullscreen .wild-tuna-mode-shell {
   width: 100%;
 }
 
-body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-board {
+body.wild-tuna-fullscreen .wild-tuna-pane--jamflow {
   min-height: 0;
 }
 
@@ -698,7 +770,7 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
 @media (max-width: 900px) {
   .wild-tuna-composite {
     gap: 8px;
-    grid-template-rows: auto 1.1fr 2fr 1.6fr;
+    grid-template-rows: auto 1.1fr 1fr;
   }
 }
 
