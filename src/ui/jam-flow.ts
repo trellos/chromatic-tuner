@@ -642,22 +642,29 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   });
 
   function getDimensions() {
-    const rect = hostEl.getBoundingClientRect();
-    return { w: rect.width, h: rect.height };
+    // Measure the canvas wrapper directly — it is already sized to exclude the
+    // note bar by virtue of the flex layout, and its dimensions are stable once
+    // the grid has painted (unlike hostEl which may report 0 before fullscreen).
+    const rect = canvasWrapper.getBoundingClientRect();
+    const w = rect.width || canvasWrapper.clientWidth;
+    const h = rect.height || canvasWrapper.clientHeight;
+    return { w, h };
   }
 
   function resizeCanvas() {
     const { w, h } = getDimensions();
+    // Guard: skip drawing entirely until the element has real dimensions.
+    if (w <= 0 || h <= 0) return { w: 0, h: 0 };
     const dpr = window.devicePixelRatio || 1;
-    const cw = Math.max(1, Math.floor((w - NOTE_BAR_W) * dpr));
-    const ch = Math.max(1, Math.floor(h * dpr));
+    const cw = Math.floor(w * dpr);
+    const ch = Math.floor(h * dpr);
     if (canvas.width !== cw || canvas.height !== ch) {
       canvas.width = cw;
       canvas.height = ch;
-      canvas.style.width = `${w - NOTE_BAR_W}px`;
+      canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
     }
-    return { w: w - NOTE_BAR_W, h };
+    return { w, h };
   }
 
   // ── Cached layouts ────────────────────────────────────────────────────────
@@ -774,6 +781,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   function drawFrame() {
     const { w, h } = resizeCanvas();
+    if (w <= 0 || h <= 0) {
+      rafId = requestAnimationFrame(drawFrame);
+      return;
+    }
     rebuildLayouts(w, h);
     const dpr = window.devicePixelRatio || 1;
     ctx.save();

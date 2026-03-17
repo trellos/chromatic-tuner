@@ -498,7 +498,9 @@ body.drum-fullscreen .mode-stage {
 
 .jf-canvas-wrapper {
   flex: 1;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   position: relative;
 }
 
@@ -508,6 +510,7 @@ body.drum-fullscreen .mode-stage {
 
 .jf-note-bar-host {
   flex-shrink: 0;
+  position: relative;
   width: 44px;
 }
 
