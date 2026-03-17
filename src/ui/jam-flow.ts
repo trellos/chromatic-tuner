@@ -135,9 +135,10 @@ function lerpColor(a: string, b: string, t: number): string {
 
 // ── Kiku renderer ──────────────────────────────────────────────────────────
 
-// Draws a single kiku (chrysanthemum) flower on a canvas context.
-// colorB: if provided, alternate petals use colorB (for leading tones).
-// labelTop: bold chord name, labelBot: smaller roman numeral.
+// Draws a single kiku (chrysanthemum) flower.
+// Petals are fat paddle shapes: narrow neck, quickly spreads to full width,
+// maintains full width toward tip, tip is a rounded arc (not a point).
+// colorB: if provided, alternate petals use colorB (leading-tone treatment).
 function drawKiku(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -154,54 +155,71 @@ function drawKiku(
   ctx.save();
   ctx.globalAlpha = opacity;
 
+  const angSlot = (2 * Math.PI) / numPetals;
+
+  // Petal geometry
+  const neckR  = radius * 0.18;   // inner end (narrow neck)
+  const tipR   = radius * 0.86;   // outer end (tip center)
+  // Half-width fills ~84% of the angular slot at the tip
+  const tipHW  = tipR * Math.sin(angSlot * 0.42);
+  const neckHW = radius * 0.055;  // narrow but not hair-thin
+
+  // Bezier control radii — spread to full width by 22% of petal length,
+  // then hold full width to 52%, so the body is fat all the way to the tip.
+  const c1R = neckR + (tipR - neckR) * 0.22;
+  const c2R = neckR + (tipR - neckR) * 0.52;
+
   for (let i = 0; i < numPetals; i++) {
-    const angle = (i * (2 * Math.PI)) / numPetals - Math.PI / 2;
-    const perpAngle = angle + Math.PI / 2;
+    const a  = i * angSlot - Math.PI / 2;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const cp = Math.cos(a + Math.PI / 2);  // perpendicular
+    const sp = Math.sin(a + Math.PI / 2);
 
-    const tipDist = radius * 0.92;
-    const neckDist = radius * 0.15;
-    const neckHalf = radius * 0.045;
-    const tipHalf = ((Math.PI / numPetals) * tipDist * 0.88) / 2;
-
-    // Neck points (near center)
-    const nx1 = cx + Math.cos(angle) * neckDist + Math.cos(perpAngle) * neckHalf;
-    const ny1 = cy + Math.sin(angle) * neckDist + Math.sin(perpAngle) * neckHalf;
-    const nx2 = cx + Math.cos(angle) * neckDist - Math.cos(perpAngle) * neckHalf;
-    const ny2 = cy + Math.sin(angle) * neckDist - Math.sin(perpAngle) * neckHalf;
-
-    // Tip point
-    const tx = cx + Math.cos(angle) * tipDist;
-    const ty = cy + Math.sin(angle) * tipDist;
-
-    // Wide body points (at ~65% of radius)
-    const bodyDist = radius * 0.65;
-    const bx1 = cx + Math.cos(angle) * bodyDist + Math.cos(perpAngle) * tipHalf;
-    const by1 = cy + Math.sin(angle) * bodyDist + Math.sin(perpAngle) * tipHalf;
-    const bx2 = cx + Math.cos(angle) * bodyDist - Math.cos(perpAngle) * tipHalf;
-    const by2 = cy + Math.sin(angle) * bodyDist - Math.sin(perpAngle) * tipHalf;
+    // Helper: canvas x/y at (axial distance r, perpendicular offset w)
+    const X = (r: number, w: number) => cx + ca * r + cp * w;
+    const Y = (r: number, w: number) => cy + sa * r + sp * w;
 
     ctx.beginPath();
-    ctx.moveTo(nx1, ny1);
-    ctx.quadraticCurveTo(bx1, by1, tx, ty);
-    ctx.quadraticCurveTo(bx2, by2, nx2, ny2);
+    // Left neck
+    ctx.moveTo(X(neckR, neckHW), Y(neckR, neckHW));
+    // Left side: cubic bezier spreads quickly to full width, stays there to tip
+    ctx.bezierCurveTo(
+      X(c1R, tipHW), Y(c1R, tipHW),   // ctrl1: at full width by c1R
+      X(c2R, tipHW), Y(c2R, tipHW),   // ctrl2: hold full width
+      X(tipR, tipHW), Y(tipR, tipHW)  // end: left tip point
+    );
+    // Rounded cap: arc from left-tip to right-tip going outward (anticlockwise
+    // in canvas = going away from center, i.e. the "outside" semicircle)
+    ctx.arc(
+      X(tipR, 0), Y(tipR, 0),  // tip center
+      tipHW,
+      a + Math.PI / 2,          // start angle (left side)
+      a - Math.PI / 2,          // end angle (right side)
+      true                      // anticlockwise → outward arc
+    );
+    // Right side: mirror bezier back to neck
+    ctx.bezierCurveTo(
+      X(c2R, -tipHW), Y(c2R, -tipHW),
+      X(c1R, -tipHW), Y(c1R, -tipHW),
+      X(neckR, -neckHW), Y(neckR, -neckHW)
+    );
     ctx.closePath();
 
-    const fillColor = colorB && i % 2 === 1 ? colorB : colorA;
-    ctx.fillStyle = fillColor;
+    ctx.fillStyle = colorB !== undefined && i % 2 === 1 ? colorB : colorA;
     ctx.fill();
   }
 
-  // Center circle
+  // Center circle — same color as primary petals, covers the petal tails
   ctx.beginPath();
-  ctx.arc(cx, cy, radius * 0.14, 0, Math.PI * 2);
+  ctx.arc(cx, cy, radius * 0.13, 0, Math.PI * 2);
   ctx.fillStyle = colorA;
   ctx.fill();
 
   // Labels
   if (labelTop) {
-    const textColor = colorA === COLOR_ROSE || colorA === COLOR_MUSTARD
-      ? (colorA === COLOR_MUSTARD ? "#1a1c24" : COLOR_WHITE)
-      : "#1a1c24";
+    const textColor = colorA === COLOR_ROSE ? COLOR_WHITE : "#1a1c24";
+    ctx.globalAlpha = opacity;
     ctx.fillStyle = textColor;
     const fontSize = Math.max(8, Math.round(radius * 0.32));
     ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
@@ -293,6 +311,8 @@ function layoutKeyZoom(availW: number, availH: number): Pos[] {
 
 // Standard guitar tuning: string 0 (leftmost) = E(4), 1=A(9), 2=D(2), 3=G(7), 4=B(11), 5=E(4)
 const OPEN_STRING_SEMITONES = [4, 9, 2, 7, 11, 4];
+// MIDI note numbers for open strings: E2=40, A2=45, D3=50, G3=55, B3=59, E4=64
+const OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64];
 const FRET_MARKERS_SINGLE = [3, 5, 7, 9];
 const FRET_COUNT = 12;
 
@@ -300,6 +320,7 @@ type FretDot = {
   stringIndex: number;
   fret: number;
   semitone: number;
+  midi: number;
   degreeIndex: DegreeIndex;
   noteName: string;
 };
@@ -319,6 +340,7 @@ function getFretboardDots(keySemitone: number): FretDot[] {
           stringIndex: s,
           fret: f,
           semitone,
+          midi: OPEN_STRING_MIDI[s]! + f,
           degreeIndex: chord.degreeIndex,
           noteName: chord.noteName,
         });
@@ -571,6 +593,8 @@ type JamFlowMode = "circle" | "key-zoom" | "fretboard";
 export type JamFlowOptions = {
   /** Tapped a circle flower → select this key and play */
   onKeySelect?: (semitone: number) => void;
+  /** Tapped a chord flower in key-zoom mode → play the chord */
+  onChordTap?: (chord: DiatonicChord) => void;
   /** Tapped a note bar button */
   onNoteBarTap?: (semitone: number) => void;
   /** Tapped a fretboard dot */
@@ -710,7 +734,18 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
           return;
         }
       }
-    } else if (currentMode === "key-zoom") {
+    } else if (currentMode === "key-zoom" && selectedKey !== null) {
+      // Check if a flower was tapped — play chord without transitioning
+      const chords = getDiatonicChords(selectedKey);
+      for (let deg = 0; deg < 7; deg++) {
+        const pos = keyZoomPositions[deg]!;
+        const dx = mx - pos.x;
+        const dy = my - pos.y;
+        if (dx * dx + dy * dy <= pos.r * pos.r) {
+          options.onChordTap?.(chords[deg]!);
+          return;
+        }
+      }
       // Tap background → back to circle
       startTransition("key-zoom", "circle", false);
     } else if (currentMode === "fretboard" && fretboardLayout && selectedKey !== null) {
@@ -725,8 +760,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         const dx = mx - sx;
         const dy = my - fy;
         if (dx * dx + dy * dy <= r * r * 1.4) {
-          const midi = dot.semitone + 48; // rough MIDI mapping
-          options.onFretDotTap?.(midi, dot.stringIndex);
+          options.onFretDotTap?.(dot.midi, dot.stringIndex);
           addDotPulse(dot.stringIndex, dot.fret);
           return;
         }
@@ -734,7 +768,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
-  canvas.addEventListener("pointerup", handleCanvasTap);
+  canvas.addEventListener("pointerdown", handleCanvasTap);
 
   // ── Transitions ────────────────────────────────────────────────────────────
 
@@ -1120,7 +1154,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   function destroy() {
     exit();
-    canvas.removeEventListener("pointerup", handleCanvasTap);
+    canvas.removeEventListener("pointerdown", handleCanvasTap);
     noteBar.destroy();
     wrapper.remove();
   }

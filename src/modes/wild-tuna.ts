@@ -1,6 +1,6 @@
 import { createCircleGuitarPlayer } from "../audio/circle-guitar-player.js";
 import { createDrumMachineUi, type DrumMachineUi } from "../ui/drum-machine.js";
-import { createJamFlowUi, type JamFlowUi } from "../ui/jam-flow.js";
+import { createJamFlowUi, type JamFlowUi, type DiatonicChord } from "../ui/jam-flow.js";
 import {
   FRETBOARD_DEFAULT_STATE,
   type FretboardState,
@@ -442,6 +442,14 @@ export function createWildTunaMode(): ModeDefinition {
     return [root, root + 4, root + 7];
   }
 
+  // Build chord MIDI numbers from a DiatonicChord (respects major/minor/diminished quality).
+  function diatonicChordMidis(chord: DiatonicChord): number[] {
+    const root = 48 + chord.semitone;
+    if (chord.quality === "minor") return [root, root + 3, root + 7];
+    if (chord.quality === "diminished") return [root, root + 3, root + 6];
+    return [root, root + 4, root + 7]; // major
+  }
+
   return {
     id: "wild-tuna",
     title: "Wild Tuna",
@@ -572,6 +580,10 @@ export function createWildTunaMode(): ModeDefinition {
         onKeySelect: (semitone) => {
           // Playing a key flower plays its major chord
           void playCircleMidis(majorChordMidis(semitone), 640, true);
+        },
+        onChordTap: (chord) => {
+          // Tap a diatonic chord flower in key-zoom mode → play that chord
+          void playCircleMidis(diatonicChordMidis(chord), 640, true);
         },
         onNoteBarTap: (semitone) => {
           void playCircleMidis([48 + semitone], 380, true);
