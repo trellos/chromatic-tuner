@@ -136,8 +136,8 @@ function lerpColor(a: string, b: string, t: number): string {
 // ── Kiku renderer ──────────────────────────────────────────────────────────
 
 // Draws a single kiku (chrysanthemum) flower.
-// Petals are fat paddle shapes: narrow neck, quickly spreads to full width,
-// maintains full width toward tip, tip is a rounded arc (not a point).
+// Each petal is a distinct oval/ellipse radiating from the center, with clear
+// gaps between petals matching the reference chrysanthemum look.
 // colorB: if provided, alternate petals use colorB (leading-tone treatment).
 function drawKiku(
   ctx: CanvasRenderingContext2D,
@@ -157,86 +157,63 @@ function drawKiku(
 
   const angSlot = (2 * Math.PI) / numPetals;
 
-  // Petal geometry
-  const neckR  = radius * 0.18;   // inner end (narrow neck)
-  const tipR   = radius * 0.86;   // outer end (tip center)
-  // Half-width fills ~84% of the angular slot at the tip
-  const tipHW  = tipR * Math.sin(angSlot * 0.42);
-  const neckHW = radius * 0.055;  // narrow but not hair-thin
-
-  // Bezier control radii — spread to full width by 22% of petal length,
-  // then hold full width to 52%, so the body is fat all the way to the tip.
-  const c1R = neckR + (tipR - neckR) * 0.22;
-  const c2R = neckR + (tipR - neckR) * 0.52;
+  // Each petal: an ellipse centered at petalCenterR along the radial axis.
+  // halfLen: half-length along the radial direction.
+  // halfWid: half-width perpendicular, sized to leave clear gaps (~30% of slot).
+  const centerCircleR = radius * 0.26;
+  const petalCenterR  = radius * 0.64;
+  const halfLen       = radius * 0.36;
+  // Cap width so petals never overlap their neighbours regardless of count
+  const halfWid = Math.min(
+    petalCenterR * Math.sin(angSlot * 0.36),  // 72% of arc slot
+    halfLen * 0.72
+  );
 
   for (let i = 0; i < numPetals; i++) {
-    const a  = i * angSlot - Math.PI / 2;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    const cp = Math.cos(a + Math.PI / 2);  // perpendicular
-    const sp = Math.sin(a + Math.PI / 2);
+    const a = i * angSlot - Math.PI / 2;
+    const px = cx + Math.cos(a) * petalCenterR;
+    const py = cy + Math.sin(a) * petalCenterR;
 
-    // Helper: canvas x/y at (axial distance r, perpendicular offset w)
-    const X = (r: number, w: number) => cx + ca * r + cp * w;
-    const Y = (r: number, w: number) => cy + sa * r + sp * w;
-
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(a);
     ctx.beginPath();
-    // Left neck
-    ctx.moveTo(X(neckR, neckHW), Y(neckR, neckHW));
-    // Left side: cubic bezier spreads quickly to full width, stays there to tip
-    ctx.bezierCurveTo(
-      X(c1R, tipHW), Y(c1R, tipHW),   // ctrl1: at full width by c1R
-      X(c2R, tipHW), Y(c2R, tipHW),   // ctrl2: hold full width
-      X(tipR, tipHW), Y(tipR, tipHW)  // end: left tip point
-    );
-    // Rounded cap: arc from left-tip to right-tip going outward (anticlockwise
-    // in canvas = going away from center, i.e. the "outside" semicircle)
-    ctx.arc(
-      X(tipR, 0), Y(tipR, 0),  // tip center
-      tipHW,
-      a + Math.PI / 2,          // start angle (left side)
-      a - Math.PI / 2,          // end angle (right side)
-      true                      // anticlockwise → outward arc
-    );
-    // Right side: mirror bezier back to neck
-    ctx.bezierCurveTo(
-      X(c2R, -tipHW), Y(c2R, -tipHW),
-      X(c1R, -tipHW), Y(c1R, -tipHW),
-      X(neckR, -neckHW), Y(neckR, -neckHW)
-    );
-    ctx.closePath();
-
+    // radiusX = halfWid (perpendicular), radiusY = halfLen (along petal axis)
+    ctx.ellipse(0, 0, halfWid, halfLen, 0, 0, Math.PI * 2);
     ctx.fillStyle = colorB !== undefined && i % 2 === 1 ? colorB : colorA;
     ctx.fill();
+    ctx.restore();
   }
 
-  // Center circle — same color as primary petals, covers the petal tails
+  // Center circle — covers petal tails, provides label background
   ctx.beginPath();
-  ctx.arc(cx, cy, radius * 0.13, 0, Math.PI * 2);
+  ctx.arc(cx, cy, centerCircleR, 0, Math.PI * 2);
   ctx.fillStyle = colorA;
   ctx.fill();
 
+  // Determine text color: dark grey on light petals, white on rose/dark
+  const isDark = colorA === COLOR_ROSE || colorA === COLOR_BG;
+  const textColor = isDark ? COLOR_WHITE : "#484440";
+
   // Labels
   if (labelTop) {
-    const textColor = colorA === COLOR_ROSE ? COLOR_WHITE : "#1a1c24";
     ctx.globalAlpha = opacity;
     ctx.fillStyle = textColor;
-    const fontSize = Math.max(8, Math.round(radius * 0.32));
+    const fontSize = Math.max(8, Math.round(centerCircleR * 0.9));
     ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const labelY = labelBot ? cy - radius * 0.06 : cy;
+    const labelY = labelBot ? cy - centerCircleR * 0.22 : cy;
     ctx.fillText(labelTop, cx, labelY);
   }
   if (labelBot) {
-    const textColor = colorA === COLOR_ROSE ? COLOR_WHITE : "#1a1c24";
     ctx.fillStyle = textColor;
-    ctx.globalAlpha = opacity * 0.65;
-    const subSize = Math.max(6, Math.round(radius * 0.22));
-    ctx.font = `${subSize}px system-ui, sans-serif`;
+    ctx.globalAlpha = opacity * 0.72;
+    const subSize = Math.max(6, Math.round(centerCircleR * 0.62));
+    ctx.font = `bold ${subSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelBot, cx, cy + radius * 0.26);
+    ctx.fillText(labelBot, cx, cy + centerCircleR * 0.62);
   }
 
   ctx.restore();
