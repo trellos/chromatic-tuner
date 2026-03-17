@@ -86,12 +86,12 @@ const SECONDARY_WEDGE_DEG = 24;
 const DIM_WEDGE_DEG = 24;
 
 // Kiku flower dimensions per ring
-const OUTER_FLOWER_R      = OUTER_RADIUS * 0.17;
-const OUTER_PETAL_COUNT   = 20;
-const SECONDARY_FLOWER_R  = SECONDARY_OUTER_RADIUS * 0.16;
-const SECONDARY_PETAL_COUNT = 16;
-const DIM_FLOWER_R        = DIM_OUTER_RADIUS * 0.16;
-const DIM_PETAL_COUNT     = 14;
+const OUTER_FLOWER_R        = 82;
+const OUTER_PETAL_COUNT     = 16;
+const SECONDARY_FLOWER_R    = 48;
+const SECONDARY_PETAL_COUNT = 14;
+const DIM_FLOWER_R          = 30;
+const DIM_PETAL_COUNT       = 12;
 
 const INSTRUMENT_LABEL_RADIUS = DIM_INNER_RADIUS - 18;
 const SECONDARY_CENTERS = [-30, 0, 30] as const;
@@ -318,57 +318,51 @@ function describeAnnularSector(
 }
 
 
-// Returns a compound SVG path describing a kiku (chrysanthemum) flower:
-// `petalCount` rounded paddle-shaped petals radiating from (fcx, fcy),
-// plus a small centre circle.  All petals are subpaths of one `d` string
-// so the result can be used as a drop-in replacement for describeAnnularSector.
+// Returns a compound SVG path describing a kiku (chrysanthemum) flower.
+// Each petal is fan-shaped: straight sides from center → arc tip.
+// fillFraction > 1 causes slight overlap; fill-rule="evenodd" on the path
+// makes overlapping regions transparent, creating visible gaps between petals.
 function describeKikuFlower(
   fcx: number,
   fcy: number,
   flowerR: number,
   petalCount: number
 ): string {
-  const h = flowerR;                       // petal length (center → tip)
-  const w = h * 0.24;                      // half-width at widest point
-  const bulge = h * 0.55;                  // axial distance of max width
-  const degStep = 360 / petalCount;
+  // 1.12 = 112% of angular slot → slight overlap → evenodd creates white gaps
+  const fillFraction = 1.12;
+  const fillHalfAngle = fillFraction * Math.PI / petalCount;
+  // Control point radius for the quadratic bezier sides (pulls sides inward slightly)
+  const ctrlR = flowerR * 0.55;
   let d = "";
 
   for (let i = 0; i < petalCount; i++) {
-    const aRad = (i * degStep * Math.PI) / 180;
-    const sa = Math.sin(aRad);
-    const ca = Math.cos(aRad);
+    // Petal center angle; start at top (-π/2) and go clockwise
+    const a = (i * 2 * Math.PI / petalCount) - Math.PI / 2;
 
-    // Transform (axial, perp) in local petal coords → SVG (x, y).
-    // Axial increases outward from flower centre; perp is perpendicular.
-    const tx = (ax: number, pr: number) => fcx + ax * sa + pr * ca;
-    const ty = (ax: number, pr: number) => fcy - ax * ca + pr * sa;
+    const leftA  = a - fillHalfAngle;
+    const rightA = a + fillHalfAngle;
 
-    // Petal outline: base (0,0) → left side → tip → right side → base.
-    d += `M ${tx(0, 0)} ${ty(0, 0)} `;
-    // Left side widens to max
-    d += `C ${tx(h * 0.20, -w * 0.40)} ${ty(h * 0.20, -w * 0.40)},`;
-    d += ` ${tx(h * 0.40, -w)}         ${ty(h * 0.40, -w)},`;
-    d += ` ${tx(bulge,     -w)}         ${ty(bulge,     -w)} `;
-    // Left side narrows to tip
-    d += `C ${tx(h * 0.75, -w)}         ${ty(h * 0.75, -w)},`;
-    d += ` ${tx(h * 0.94, -w * 0.35)}  ${ty(h * 0.94, -w * 0.35)},`;
-    d += ` ${tx(h,          0)}          ${ty(h,          0)} `;
-    // Right side from tip
-    d += `C ${tx(h * 0.94,  w * 0.35)}  ${ty(h * 0.94,  w * 0.35)},`;
-    d += ` ${tx(h * 0.75,  w)}          ${ty(h * 0.75,  w)},`;
-    d += ` ${tx(bulge,      w)}          ${ty(bulge,      w)} `;
-    // Right side back to base
-    d += `C ${tx(h * 0.40,  w)}          ${ty(h * 0.40,  w)},`;
-    d += ` ${tx(h * 0.20,  w * 0.40)}   ${ty(h * 0.20,  w * 0.40)},`;
-    d += ` ${tx(0, 0)}                   ${ty(0, 0)} Z `;
+    // Tip arc endpoints
+    const lx = fcx + flowerR * Math.cos(leftA);
+    const ly = fcy + flowerR * Math.sin(leftA);
+    const rx = fcx + flowerR * Math.cos(rightA);
+    const ry = fcy + flowerR * Math.sin(rightA);
+
+    // Arc radius = chord half-length at the tip
+    const tipRadius = flowerR * Math.sin(fillHalfAngle);
+
+    // Quadratic bezier control points (slightly outward of the straight line)
+    const clx = fcx + ctrlR * Math.cos(leftA  * 1.04);
+    const cly = fcy + ctrlR * Math.sin(leftA  * 1.04);
+    const crx = fcx + ctrlR * Math.cos(rightA * 1.04);
+    const cry = fcy + ctrlR * Math.sin(rightA * 1.04);
+
+    // M center Q ctrl leftTip  A arc  rightTip  Q ctrl center Z
+    d += `M ${fcx} ${fcy} `;
+    d += `Q ${clx} ${cly} ${lx} ${ly} `;
+    d += `A ${tipRadius} ${tipRadius} 0 0 1 ${rx} ${ry} `;
+    d += `Q ${crx} ${cry} ${fcx} ${fcy} Z `;
   }
-
-  // Centre circle (two semi-arcs)
-  const cr = flowerR * 0.14;
-  d += `M ${fcx - cr} ${fcy} `;
-  d += `A ${cr} ${cr} 0 1 1 ${fcx + cr} ${fcy} `;
-  d += `A ${cr} ${cr} 0 1 1 ${fcx - cr} ${fcy} Z `;
 
   return d;
 }
@@ -926,9 +920,11 @@ export function createCircleOfFifthsUi(
 
     const path = createSvgEl("path", "cof-wedge-path");
     path.setAttribute("d", kikuD);
+    path.setAttribute("fill-rule", "evenodd");
     node.appendChild(path);
     const hintPath = createSvgEl("path", "cof-wedge-hint");
     hintPath.setAttribute("d", kikuD);
+    hintPath.setAttribute("fill-rule", "evenodd");
     node.appendChild(hintPath);
     // Zone gradient: smooth light-to-dark tint from CCW edge to CW edge.
     const midRadius = (OUTER_INNER_RADIUS + OUTER_RADIUS) / 2;
@@ -1122,6 +1118,7 @@ export function createCircleOfFifthsUi(
       "d",
       describeKikuFlower(secFlowerCenter.x, secFlowerCenter.y, SECONDARY_FLOWER_R, SECONDARY_PETAL_COUNT)
     );
+    path.setAttribute("fill-rule", "evenodd");
     node.appendChild(path);
 
     const text = createSvgEl("text", "cof-secondary-label");
@@ -1214,6 +1211,7 @@ export function createCircleOfFifthsUi(
   const dimFlowerCenter = polarPoint((DIM_INNER_RADIUS + DIM_OUTER_RADIUS) / 2, 0);
   const dimPath = createSvgEl("path", "cof-dim-path");
   dimPath.setAttribute("d", describeKikuFlower(dimFlowerCenter.x, dimFlowerCenter.y, DIM_FLOWER_R, DIM_PETAL_COUNT));
+  dimPath.setAttribute("fill-rule", "evenodd");
   dimNode.appendChild(dimPath);
 
   const dimText = createSvgEl("text", "cof-dim-label");
