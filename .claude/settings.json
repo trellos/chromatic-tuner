@@ -27,7 +27,9 @@
       "Bash(grep -E '^\\(play|stop\\)\\\\.svg$')",
       "Bash(curl:*)",
       "WebFetch",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://raw.githubusercontent.com/iconoir-icons/iconoir/main/icons/regular/delete-circle.svg\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://raw.githubusercontent.com/iconoir-icons/iconoir/main/icons/regular/delete-circle.svg\")",
+      "Bash(find test-results:*)",
+      "Bash(find . -name kiku*.png)"
     ],
     "additionalDirectories": [
       "\\tmp"

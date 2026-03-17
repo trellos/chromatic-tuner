@@ -319,49 +319,46 @@ function describeAnnularSector(
 
 
 // Returns a compound SVG path describing a kiku (chrysanthemum) flower.
-// Each petal is fan-shaped: straight sides from center → arc tip.
-// fillFraction > 1 causes slight overlap; fill-rule="evenodd" on the path
-// makes overlapping regions transparent, creating visible gaps between petals.
+// Matches the traditional kiku crest: a filled center circle, plus petals that
+// narrow at the base and widen to a rounded tip circle at the outer end.
 function describeKikuFlower(
   fcx: number,
   fcy: number,
   flowerR: number,
   petalCount: number
 ): string {
-  // 1.12 = 112% of angular slot → slight overlap → evenodd creates white gaps
-  const fillFraction = 1.12;
-  const fillHalfAngle = fillFraction * Math.PI / petalCount;
-  // Control point radius for the quadratic bezier sides (pulls sides inward slightly)
-  const ctrlR = flowerR * 0.55;
-  let d = "";
+  const innerR = flowerR * 0.14;  // center circle radius
+  const baseR  = flowerR * 0.22;  // radius where petals attach
+  const tipCR  = flowerR * 0.87;  // outer tip circle center radius
+  const tipR   = flowerR * 0.13;  // outer tip circle radius
+  const baseHW = flowerR * 0.024; // half-width at inner base
+
+  // Center circle sub-path
+  let d = `M ${fcx + innerR} ${fcy} A ${innerR} ${innerR} 0 1 0 ${fcx - innerR} ${fcy} A ${innerR} ${innerR} 0 1 0 ${fcx + innerR} ${fcy} Z `;
 
   for (let i = 0; i < petalCount; i++) {
-    // Petal center angle; start at top (-π/2) and go clockwise
-    const a = (i * 2 * Math.PI / petalCount) - Math.PI / 2;
+    const a  = (i * 2 * Math.PI / petalCount) - Math.PI / 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const px = -sa, py = ca; // perpendicular (90° CCW from petal axis)
 
-    const leftA  = a - fillHalfAngle;
-    const rightA = a + fillHalfAngle;
+    // Base points at radius baseR, ±baseHW perpendicular
+    const s1x = fcx + baseR * ca + baseHW * px;
+    const s1y = fcy + baseR * sa + baseHW * py;
+    const s2x = fcx + baseR * ca - baseHW * px;
+    const s2y = fcy + baseR * sa - baseHW * py;
 
-    // Tip arc endpoints
-    const lx = fcx + flowerR * Math.cos(leftA);
-    const ly = fcy + flowerR * Math.sin(leftA);
-    const rx = fcx + flowerR * Math.cos(rightA);
-    const ry = fcy + flowerR * Math.sin(rightA);
+    // Tip circle edge points at radius tipCR, ±tipR perpendicular
+    const t1x = fcx + tipCR * ca + tipR * px;
+    const t1y = fcy + tipCR * sa + tipR * py;
+    const t2x = fcx + tipCR * ca - tipR * px;
+    const t2y = fcy + tipCR * sa - tipR * py;
 
-    // Arc radius = chord half-length at the tip
-    const tipRadius = flowerR * Math.sin(fillHalfAngle);
-
-    // Quadratic bezier control points (slightly outward of the straight line)
-    const clx = fcx + ctrlR * Math.cos(leftA  * 1.04);
-    const cly = fcy + ctrlR * Math.sin(leftA  * 1.04);
-    const crx = fcx + ctrlR * Math.cos(rightA * 1.04);
-    const cry = fcy + ctrlR * Math.sin(rightA * 1.04);
-
-    // M center Q ctrl leftTip  A arc  rightTip  Q ctrl center Z
-    d += `M ${fcx} ${fcy} `;
-    d += `Q ${clx} ${cly} ${lx} ${ly} `;
-    d += `A ${tipRadius} ${tipRadius} 0 0 1 ${rx} ${ry} `;
-    d += `Q ${crx} ${cry} ${fcx} ${fcy} Z `;
+    // s2 → line to t2 → CW arc (outer tip) to t1 → line to s1 → CCW short arc back to s2
+    d += `M ${s2x} ${s2y} `;
+    d += `L ${t2x} ${t2y} `;
+    d += `A ${tipR} ${tipR} 0 0 1 ${t1x} ${t1y} `;  // sweep=1: CW through outer tip
+    d += `L ${s1x} ${s1y} `;
+    d += `A ${baseR} ${baseR} 0 0 0 ${s2x} ${s2y} Z `;  // short CCW base arc
   }
 
   return d;

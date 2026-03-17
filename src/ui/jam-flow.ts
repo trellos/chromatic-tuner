@@ -160,57 +160,79 @@ function drawKiku(
 
   const angSlot = (2 * Math.PI) / numPetals;
 
-  // halfLen: half the length of each petal along the radial axis.
-  // petalCenterR == halfLen so the inner tip of every petal lands at cx,cy.
-  // halfWid: perpendicular half-width, capped to leave ~30% gap between petals.
-  const halfLen      = radius * 0.48;
-  const petalCenterR = halfLen;
-  const halfWid = Math.min(
-    petalCenterR * Math.sin(angSlot * 0.37),  // ~74% of arc slot
-    halfLen * 0.60
-  );
+  // Kiku crest proportions: narrow shaft widens to a rounded tip circle.
+  const innerR = radius * 0.14;  // center circle radius
+  const baseR  = radius * 0.22;  // where petals attach
+  const tipCR  = radius * 0.87;  // tip circle center radius
+  const tipR   = radius * 0.13;  // tip circle radius
+  const baseHW = radius * 0.024; // half-width at inner base
 
   for (let i = 0; i < numPetals; i++) {
-    const a = i * angSlot - Math.PI / 2;
-    const px = cx + Math.cos(a) * petalCenterR;
-    const py = cy + Math.sin(a) * petalCenterR;
+    const a  = i * angSlot - Math.PI / 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const px = -sa, py = ca; // perpendicular (90° CCW from petal axis)
 
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(a);
+    const s1x = cx + baseR * ca + baseHW * px;
+    const s1y = cy + baseR * sa + baseHW * py;
+    const s2x = cx + baseR * ca - baseHW * px;
+    const s2y = cy + baseR * sa - baseHW * py;
+
+    const t1x = cx + tipCR * ca + tipR * px;
+    const t1y = cy + tipCR * sa + tipR * py;
+    const t2x = cx + tipCR * ca - tipR * px;
+    const t2y = cy + tipCR * sa - tipR * py;
+
+    const tipCX = cx + tipCR * ca;
+    const tipCY = cy + tipCR * sa;
+
     ctx.beginPath();
-    // After rotate(a), local X points radially outward.
-    // radiusX = halfLen (long axis, radial), radiusY = halfWid (perpendicular).
-    ctx.ellipse(0, 0, halfLen, halfWid, 0, 0, Math.PI * 2);
+    ctx.moveTo(s2x, s2y);
+    ctx.lineTo(t2x, t2y);
+    // Arc CW around outer tip (anticlockwise=false goes through outermost point)
+    ctx.arc(tipCX, tipCY, tipR,
+      Math.atan2(t2y - tipCY, t2x - tipCX),
+      Math.atan2(t1y - tipCY, t1x - tipCX),
+      false);
+    ctx.lineTo(s1x, s1y);
+    // Short CCW arc along base circle back to s2
+    ctx.arc(cx, cy, baseR,
+      Math.atan2(s1y - cy, s1x - cx),
+      Math.atan2(s2y - cy, s2x - cx),
+      true);
+    ctx.closePath();
     ctx.fillStyle = colorB !== undefined && i % 2 === 1 ? colorB : colorA;
     ctx.fill();
-    ctx.restore();
   }
 
+  // Center circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fillStyle = colorA;
+  ctx.fill();
+
   // Labels — drawn over the converging petal tips at flower centre.
-  // Dark grey on light petals, white on rose/dark.
-  const isDark = colorA === COLOR_ROSE || colorA === COLOR_BG;
-  const textColor = isDark ? COLOR_WHITE : "#484440";
+  // Medium grey contrasts against all petal colors (mustard, rose, white).
+  const textColor = "#888888";
   const labelR = radius * 0.26; // reference radius for font sizing
 
   if (labelTop) {
     ctx.globalAlpha = opacity;
     ctx.fillStyle = textColor;
-    const fontSize = Math.max(8, Math.round(labelR * 0.9));
+    const fontSize = Math.max(10, Math.round(labelR * 1.3));
     ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const labelY = labelBot ? cy - labelR * 0.22 : cy;
+    const labelY = labelBot ? cy - labelR * 0.3 : cy;
     ctx.fillText(labelTop, cx, labelY);
   }
   if (labelBot) {
     ctx.fillStyle = textColor;
     ctx.globalAlpha = opacity * 0.72;
-    const subSize = Math.max(6, Math.round(labelR * 0.62));
+    const subSize = Math.max(8, Math.round(labelR * 0.85));
     ctx.font = `bold ${subSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelBot, cx, cy + labelR * 0.62);
+    ctx.fillText(labelBot, cx, cy + labelR * 0.72);
   }
 
   ctx.restore();
@@ -336,13 +358,15 @@ function computeFretboardLayout(availW: number, availH: number, noteBarW: number
   const pad = 8;
   const topPad = 28; // space for open string labels
 
-  // Keep the fretboard tall but narrow: cap at 62% of available width, centered.
+  // Golden-ratio cap: fretboard width ≤ height / φ so it always reads as vertical.
+  const GOLDEN = 1.618;
   const fullW  = availW - noteBarW - pad * 2;
-  const w      = Math.round(fullW * 0.62);
+  const h      = availH - topPad - pad;
+  const maxW   = Math.floor(h / GOLDEN);
+  const w      = Math.round(Math.min(fullW, maxW));
   const xOff   = Math.round((fullW - w) / 2);
   const x      = pad + xOff;
   const y      = topPad;
-  const h      = availH - topPad - pad;
 
   const stringSpacing = w / 5; // 6 strings, 5 gaps
   const fretSpacing = h / FRET_COUNT;
