@@ -33,6 +33,9 @@ const DEGREE_ROMAN = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
 const DEGREE_PETAL_COUNTS = [18, 14, 14, 16, 16, 14, 10];
 // 0=I, 1=ii, 2=iii, 3=IV, 4=V, 5=vi, 6=vii°
 
+// Modal name for each degree (used when a chord is double-tapped to become root)
+const MODE_NAMES = ["major", "Dorian", "Phrygian", "Lydian", "Mixolydian", "minor", "Locrian"];
+
 type DegreeIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 // Color for each degree (colorA, colorB for alternating)
@@ -136,8 +139,8 @@ function lerpColor(a: string, b: string, t: number): string {
 // ── Kiku renderer ──────────────────────────────────────────────────────────
 
 // Draws a single kiku (chrysanthemum) flower.
-// Each petal is a distinct oval/ellipse radiating from the center, with clear
-// gaps between petals matching the reference chrysanthemum look.
+// Petals are ellipses whose inner tip converges at the flower centre (no
+// explicit centre circle — the converging tips create the appearance of one).
 // colorB: if provided, alternate petals use colorB (leading-tone treatment).
 function drawKiku(
   ctx: CanvasRenderingContext2D,
@@ -157,16 +160,14 @@ function drawKiku(
 
   const angSlot = (2 * Math.PI) / numPetals;
 
-  // Each petal: an ellipse centered at petalCenterR along the radial axis.
-  // halfLen: half-length along the radial direction.
-  // halfWid: half-width perpendicular, sized to leave clear gaps (~30% of slot).
-  const centerCircleR = radius * 0.26;
-  const petalCenterR  = radius * 0.64;
-  const halfLen       = radius * 0.36;
-  // Cap width so petals never overlap their neighbours regardless of count
+  // halfLen: half the length of each petal along the radial axis.
+  // petalCenterR == halfLen so the inner tip of every petal lands at cx,cy.
+  // halfWid: perpendicular half-width, capped to leave ~30% gap between petals.
+  const halfLen      = radius * 0.48;
+  const petalCenterR = halfLen;
   const halfWid = Math.min(
-    petalCenterR * Math.sin(angSlot * 0.36),  // 72% of arc slot
-    halfLen * 0.72
+    petalCenterR * Math.sin(angSlot * 0.37),  // ~74% of arc slot
+    halfLen * 0.60
   );
 
   for (let i = 0; i < numPetals; i++) {
@@ -178,42 +179,38 @@ function drawKiku(
     ctx.translate(px, py);
     ctx.rotate(a);
     ctx.beginPath();
-    // radiusX = halfWid (perpendicular), radiusY = halfLen (along petal axis)
-    ctx.ellipse(0, 0, halfWid, halfLen, 0, 0, Math.PI * 2);
+    // After rotate(a), local X points radially outward.
+    // radiusX = halfLen (long axis, radial), radiusY = halfWid (perpendicular).
+    ctx.ellipse(0, 0, halfLen, halfWid, 0, 0, Math.PI * 2);
     ctx.fillStyle = colorB !== undefined && i % 2 === 1 ? colorB : colorA;
     ctx.fill();
     ctx.restore();
   }
 
-  // Center circle — covers petal tails, provides label background
-  ctx.beginPath();
-  ctx.arc(cx, cy, centerCircleR, 0, Math.PI * 2);
-  ctx.fillStyle = colorA;
-  ctx.fill();
-
-  // Determine text color: dark grey on light petals, white on rose/dark
+  // Labels — drawn over the converging petal tips at flower centre.
+  // Dark grey on light petals, white on rose/dark.
   const isDark = colorA === COLOR_ROSE || colorA === COLOR_BG;
   const textColor = isDark ? COLOR_WHITE : "#484440";
+  const labelR = radius * 0.26; // reference radius for font sizing
 
-  // Labels
   if (labelTop) {
     ctx.globalAlpha = opacity;
     ctx.fillStyle = textColor;
-    const fontSize = Math.max(8, Math.round(centerCircleR * 0.9));
+    const fontSize = Math.max(8, Math.round(labelR * 0.9));
     ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const labelY = labelBot ? cy - centerCircleR * 0.22 : cy;
+    const labelY = labelBot ? cy - labelR * 0.22 : cy;
     ctx.fillText(labelTop, cx, labelY);
   }
   if (labelBot) {
     ctx.fillStyle = textColor;
     ctx.globalAlpha = opacity * 0.72;
-    const subSize = Math.max(6, Math.round(centerCircleR * 0.62));
+    const subSize = Math.max(6, Math.round(labelR * 0.62));
     ctx.font = `bold ${subSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelBot, cx, cy + centerCircleR * 0.62);
+    ctx.fillText(labelBot, cx, cy + labelR * 0.62);
   }
 
   ctx.restore();
@@ -359,7 +356,8 @@ function drawFretboard(
   layout: FretboardLayout,
   keySemitone: number | null,
   opacity: number,
-  showDots: boolean
+  showDots: boolean,
+  relativeOffset = 0
 ): void {
   if (opacity <= 0) return;
   ctx.save();
@@ -434,7 +432,8 @@ function drawFretboard(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       if (ch) {
-        const colors = degreeColors(ch.degreeIndex);
+        const effDeg = ((ch.degreeIndex - relativeOffset + 7) % 7) as DegreeIndex;
+        const colors = degreeColors(effDeg);
         ctx.globalAlpha = opacity;
         ctx.fillStyle = colors.colorA;
         ctx.fillText(NOTE_NAMES_FLAT[sem]!, sx, labelY);
@@ -455,8 +454,9 @@ function drawFretboard(
         ? nutY - dotRadius * 1.1  // open string: above nut
         : (fretYs[dot.fret - 1]! + fretYs[dot.fret]!) / 2;
       const r = dot.fret === 0 ? dotRadius * 0.7 : dotRadius;
-      const colors = degreeColors(dot.degreeIndex);
-      const leading = isLeadingTone(dot.degreeIndex);
+      const effDotDeg = ((dot.degreeIndex - relativeOffset + 7) % 7) as DegreeIndex;
+      const colors = degreeColors(effDotDeg);
+      const leading = isLeadingTone(effDotDeg);
 
       ctx.globalAlpha = opacity;
       ctx.beginPath();
@@ -631,6 +631,17 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   type DotPulse = { stringIndex: number; fret: number; startT: number; durationMs: number };
   const dotPulses: DotPulse[] = [];
 
+  // Relative-mode state: which degree index is currently the "root" in key-zoom
+  let relativeRootDeg: number | null = null;
+
+  // Double-tap tracking for key-zoom chord flowers
+  let lastTapDeg: number | null = null;
+  let lastTapTime = 0;
+
+  // Mode-name tessellated animation (triggered by double-tap)
+  type ModeAnim = { startT: number; modeName: string };
+  let modeAnim: ModeAnim | null = null;
+
   // Note bar
   const noteBar = buildNoteBar(noteBarHost, (semitone) => {
     options.onNoteBarTap?.(semitone);
@@ -712,18 +723,37 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         }
       }
     } else if (currentMode === "key-zoom" && selectedKey !== null) {
-      // Check if a flower was tapped — play chord without transitioning
+      // Check if a flower was tapped
       const chords = getDiatonicChords(selectedKey);
       for (let deg = 0; deg < 7; deg++) {
         const pos = keyZoomPositions[deg]!;
         const dx = mx - pos.x;
         const dy = my - pos.y;
         if (dx * dx + dy * dy <= pos.r * pos.r) {
-          options.onChordTap?.(chords[deg]!);
+          const tapNow = performance.now();
+          if (lastTapDeg === deg && tapNow - lastTapTime < 400) {
+            // Double-tap: toggle relative root
+            if (relativeRootDeg === deg) {
+              relativeRootDeg = null;
+            } else {
+              relativeRootDeg = deg;
+              modeAnim = { startT: tapNow, modeName: MODE_NAMES[deg]! };
+            }
+            lastTapDeg = null;
+          } else {
+            // Single tap: play chord, track for potential double-tap
+            lastTapDeg = deg;
+            lastTapTime = tapNow;
+            options.onChordTap?.(chords[deg]!);
+          }
           return;
         }
       }
-      // Tap background → back to circle
+      // Tap background → clear relative mode or go back to circle
+      if (relativeRootDeg !== null) {
+        relativeRootDeg = null;
+        return;
+      }
       startTransition("key-zoom", "circle", false);
     } else if (currentMode === "fretboard" && fretboardLayout && selectedKey !== null) {
       // Tap a dot
@@ -751,6 +781,11 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   function startTransition(from: JamFlowMode, to: JamFlowMode, forward: boolean) {
     if (transitionActive) return;
+    // Clear relative mode when leaving key-zoom entirely
+    if (from === "key-zoom" && to === "circle") {
+      relativeRootDeg = null;
+      lastTapDeg = null;
+    }
     transitionActive = true;
     transitionFrom = from;
     transitionTo = to;
@@ -822,17 +857,65 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     rafId = requestAnimationFrame(drawFrame);
   }
 
+  // Draws a scrolling tessellated overlay of the current mode name.
+  // Fades in, holds, then fades out over ~2.4 s. Rendered behind the flowers.
+  function drawModeAnim(now: number, w: number, h: number) {
+    if (!modeAnim) return;
+    const elapsed = now - modeAnim.startT;
+    const totalDur = 2400;
+    if (elapsed > totalDur) { modeAnim = null; return; }
+
+    const fadeInMs = 400, fadeOutMs = 400;
+    let alpha: number;
+    if (elapsed < fadeInMs) alpha = elapsed / fadeInMs;
+    else if (elapsed < totalDur - fadeOutMs) alpha = 1;
+    else alpha = 1 - (elapsed - (totalDur - fadeOutMs)) / fadeOutMs;
+
+    // Scroll left at 55 px/s
+    const scrollX = (elapsed / 1000) * 55;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.14;
+    ctx.fillStyle = COLOR_WHITE;
+    const fontSize = Math.max(11, Math.min(26, h * 0.07));
+    ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+
+    const text = modeAnim.modeName.toUpperCase();
+    const unitW = ctx.measureText(text).width + fontSize * 1.8;
+    const rowH  = fontSize * 2.6;
+    const rows  = Math.ceil(h / rowH) + 2;
+
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.clip();
+
+    for (let row = 0; row < rows; row++) {
+      const y = (row - 0.5) * rowH;
+      // Stagger odd rows by half a unit to create tessellation
+      const stagger = row % 2 === 0 ? 0 : unitW / 2;
+      const baseX = -((scrollX + stagger) % unitW);
+      for (let x = baseX; x < w + unitW; x += unitW) {
+        ctx.fillText(text, x, y);
+      }
+    }
+    ctx.restore();
+  }
+
   function drawStaticMode(mode: JamFlowMode, w: number, h: number) {
     if (mode === "circle") {
       drawCircleMode(w, h, 1);
     } else if (mode === "key-zoom") {
       if (selectedKey !== null) {
-        drawFretboard(ctx, fretboardLayout!, selectedKey, 0.2, false);
+        const relOff = relativeRootDeg ?? 0;
+        drawFretboard(ctx, fretboardLayout!, selectedKey, 0.2, false, relOff);
+        drawModeAnim(performance.now(), w, h);
         drawKeyZoomMode(w, h, 1);
       }
     } else if (mode === "fretboard") {
       if (fretboardLayout) {
-        drawFretboard(ctx, fretboardLayout, selectedKey, 1, true);
+        drawFretboard(ctx, fretboardLayout, selectedKey, 1, true, relativeRootDeg ?? 0);
       }
     }
   }
@@ -872,15 +955,23 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     for (const deg of drawOrder) {
       const chord = chords[deg]!;
       const pos = keyZoomPositions[deg]!;
-      drawKiku(
-        ctx, pos.x, pos.y, pos.r,
-        chord.petalCount,
-        chord.colorA,
-        chord.colorB,
-        chord.chordName,
-        chord.roman,
-        opacity
-      );
+
+      // If a relative root is active, remap colours/roman/petalCount
+      let colorA = chord.colorA;
+      let colorB = chord.colorB;
+      let roman  = chord.roman;
+      let petalCount = chord.petalCount;
+      if (relativeRootDeg !== null) {
+        const effDeg = ((deg - relativeRootDeg + 7) % 7) as DegreeIndex;
+        const ec = degreeColors(effDeg);
+        colorA     = ec.colorA;
+        colorB     = ec.colorB;
+        roman      = DEGREE_ROMAN[effDeg]!;
+        petalCount = DEGREE_PETAL_COUNTS[effDeg]!;
+      }
+
+      drawKiku(ctx, pos.x, pos.y, pos.r, petalCount, colorA, colorB,
+        chord.chordName, roman, opacity);
     }
   }
 
@@ -966,7 +1057,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
     // Fretboard brightens from ghost (0.2) to full
     const fretOpacity = 0.2 + t * 0.8;
-    drawFretboard(ctx, fretboardLayout, selectedKey, fretOpacity, t > 0.5);
+    const relOff = relativeRootDeg ?? 0;
+    drawFretboard(ctx, fretboardLayout, selectedKey, fretOpacity, t > 0.5, relOff);
 
     // Kiku flowers fade out
     const flowerOpacity = 1 - t;
