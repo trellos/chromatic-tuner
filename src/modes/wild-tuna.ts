@@ -369,6 +369,7 @@ export function createWildTunaMode(): ModeDefinition {
   const drumHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-drum]");
   const jamFlowHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-jamflow]");
   const circleLooperHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-circle-looper]");
+  const fretboardLooperHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-fretboard-looper]");
   const timelineHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-timeline]");
   const fullscreenTrigger = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-fullscreen]");
   const fullscreenClose = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-close]");
@@ -514,6 +515,7 @@ export function createWildTunaMode(): ModeDefinition {
         onRecButtonPressed: () => coordinator.onRecPressed(fretboardLooper!),
         onRecordingProgress: onRecordingProgress(() => fretboardLooper),
       });
+      fretboardLooperHost?.replaceChildren(fretboardLooper.rootEl);
 
       // Drum machine generates its own DOM; wild-tuna just appends drumUi.rootEl.
       drumUi = createDrumMachineUi({

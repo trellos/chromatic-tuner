@@ -335,10 +335,14 @@ type FretboardLayout = {
 function computeFretboardLayout(availW: number, availH: number, noteBarW: number): FretboardLayout {
   const pad = 8;
   const topPad = 28; // space for open string labels
-  const x = pad;
-  const y = topPad;
-  const w = availW - noteBarW - pad * 2;
-  const h = availH - topPad - pad;
+
+  // Keep the fretboard tall but narrow: cap at 62% of available width, centered.
+  const fullW  = availW - noteBarW - pad * 2;
+  const w      = Math.round(fullW * 0.62);
+  const xOff   = Math.round((fullW - w) / 2);
+  const x      = pad + xOff;
+  const y      = topPad;
+  const h      = availH - topPad - pad;
 
   const stringSpacing = w / 5; // 6 strings, 5 gaps
   const fretSpacing = h / FRET_COUNT;

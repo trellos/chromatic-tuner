@@ -482,7 +482,14 @@ body.drum-fullscreen .mode-stage {
   left: 10px;
   position: absolute;
   top: 10px;
-  z-index: 8;
+  z-index: 2;
+}
+
+.wild-tuna-fretboard-looper {
+  left: 10px;
+  position: absolute;
+  top: 10px;
+  z-index: 2;
 }
 
 /* ── Jam Flow ────────────────────────────────────────────────────────────── */
