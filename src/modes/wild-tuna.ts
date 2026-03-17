@@ -1,14 +1,8 @@
 import { createCircleGuitarPlayer } from "../audio/circle-guitar-player.js";
-import { createCircleOfFifthsUi, getCircleChordMidis, getCircleMajorChordMidis } from "../ui/circle-of-fifths.js";
 import { createDrumMachineUi, type DrumMachineUi } from "../ui/drum-machine.js";
-import { createFretboardUi } from "../ui/fretboard.js";
+import { createJamFlowUi, type JamFlowUi, type DiatonicChord } from "../ui/jam-flow.js";
 import {
-  getChordTapPlaybackTargets,
-  getKeyTapPlaybackTargets,
-  NOTE_TO_SEMITONE,
   FRETBOARD_DEFAULT_STATE,
-  type CharacteristicType,
-  type FretboardPlaybackTarget,
   type FretboardState,
 } from "../fretboard-logic.js";
 import {
@@ -373,18 +367,17 @@ export function createWildTunaMode(): ModeDefinition {
   }
 
   const drumHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-drum]");
-  const circleHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-circle]");
+  const jamFlowHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-jamflow]");
   const circleLooperHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-circle-looper]");
-  const fretboardHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-fretboard]");
+  const fretboardLooperHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-fretboard-looper]");
   const timelineHost = modeEl.querySelector<HTMLElement>("[data-wild-tuna-timeline]");
   const fullscreenTrigger = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-fullscreen]");
   const fullscreenClose = modeEl.querySelector<HTMLButtonElement>("[data-wild-tuna-close]");
   let modeAbort: AbortController | null = null;
   let timelineUi: ReturnType<typeof buildWildTunaTimeline> | null = null;
   let drumUi: ReturnType<typeof createDrumMachineUi> | null = null;
-  let circleUi: ReturnType<typeof createCircleOfFifthsUi> | null = null;
+  let jamFlowUi: JamFlowUi | null = null;
   let circleLooper: CompositeLooper | null = null;
-  let fretboardUi: ReturnType<typeof createFretboardUi> | null = null;
   let fretboardLooper: CompositeLooper | null = null;
   let fretboardState: FretboardState = { ...FRETBOARD_DEFAULT_STATE };
   const guitarPlayer = createCircleGuitarPlayer();
@@ -405,19 +398,19 @@ export function createWildTunaMode(): ModeDefinition {
     return fretSample;
   };
 
-  const playFretTargets = async (targets: FretboardPlaybackTarget[], durationMs: number, shouldRecord: boolean): Promise<void> => {
-    if (!targets.length) return;
-    if (shouldRecord) fretboardLooper?.recordPulse(targets.map((target) => target.midi), durationMs);
-    noteTracker.notesStarted(targets.length, durationMs);
+  const playFretMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
+    if (!midis.length) return;
+    if (shouldRecord) fretboardLooper?.recordPulse(midis, durationMs);
+    noteTracker.notesStarted(midis.length, durationMs);
     const ctx = await ensureAudioContext();
     if (!ctx) return;
     const sample = await ensureFretSample(ctx);
     const startAt = ctx.currentTime + 0.01;
-    targets.forEach((target) => {
+    midis.forEach((midi) => {
       if (sample) {
         const source = ctx.createBufferSource();
         source.buffer = sample;
-        source.playbackRate.value = Math.pow(2, (target.midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
+        source.playbackRate.value = Math.pow(2, (midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
         const gain = ctx.createGain();
         gain.gain.value = FRETBOARD_SAMPLE_GAIN;
         source.connect(gain);
@@ -426,7 +419,7 @@ export function createWildTunaMode(): ModeDefinition {
         source.stop(startAt + durationMs / 1000);
       }
     });
-    fretboardUi?.pulseTargets(targets, durationMs);
+    jamFlowUi?.pulseTargets(midis.map((midi) => ({ midi, stringIndex: 0 })), durationMs);
   };
 
   const playCircleMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
@@ -436,13 +429,27 @@ export function createWildTunaMode(): ModeDefinition {
     if (midis.length === 1) {
       const midi = midis[0];
       if (midi === undefined) return;
-      circleUi?.pulseNote(midi, durationMs);
+      jamFlowUi?.pulseNote(midi, durationMs);
       await guitarPlayer.playMidi(midi, durationMs);
       return;
     }
-    circleUi?.pulseChord(midis, durationMs);
+    jamFlowUi?.pulseChord(midis, durationMs);
     await guitarPlayer.playChord(midis, durationMs);
   };
+
+  // Build major chord MIDI numbers (root + M3 + P5) from a semitone (0–11).
+  function majorChordMidis(semitone: number): number[] {
+    const root = 48 + semitone;
+    return [root, root + 4, root + 7];
+  }
+
+  // Build chord MIDI numbers from a DiatonicChord (respects major/minor/diminished quality).
+  function diatonicChordMidis(chord: DiatonicChord): number[] {
+    const root = 48 + chord.semitone;
+    if (chord.quality === "minor") return [root, root + 3, root + 7];
+    if (chord.quality === "diminished") return [root, root + 3, root + 6];
+    return [root, root + 4, root + 7]; // major
+  }
 
   return {
     id: "wild-tuna",
@@ -460,12 +467,7 @@ export function createWildTunaMode(): ModeDefinition {
       if (fullscreenClose) {
         fullscreenClose.addEventListener("click", () => setCarouselHidden(false), { signal: modeAbort.signal });
       }
-      if (!drumHost || !circleHost || !circleLooperHost || !fretboardHost) return;
-
-      const fretboardTemplate = document.querySelector<HTMLTemplateElement>("#fretboard-template");
-      fretboardHost.replaceChildren(
-        fretboardTemplate ? fretboardTemplate.content.cloneNode(true) : document.createDocumentFragment()
-      );
+      if (!drumHost || !jamFlowHost || !circleLooperHost) return;
 
       // Coordinator is created first so the loopers can reference it in
       // their onRecButtonPressed callbacks (circular reference via closures).
@@ -508,12 +510,12 @@ export function createWildTunaMode(): ModeDefinition {
         getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
         onPlaybackEvent: (event) => {
           _trackApi._emit({ source: "fretboard", ...event, startedAt: performance.now() });
-          const targets = event.midis.map((midi) => ({ midi, stringIndex: 0 }));
-          void playFretTargets(targets, event.durationMs, false);
+          void playFretMidis(event.midis, event.durationMs, false);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(fretboardLooper!),
         onRecordingProgress: onRecordingProgress(() => fretboardLooper),
       });
+      fretboardLooperHost?.replaceChildren(fretboardLooper.rootEl);
 
       // Drum machine generates its own DOM; wild-tuna just appends drumUi.rootEl.
       drumUi = createDrumMachineUi({
@@ -574,114 +576,25 @@ export function createWildTunaMode(): ModeDefinition {
         }
       });
 
-      // Track whether a press-start was handled so the follow-up tap (which
-      // fires as a click after pointerup) doesn't replay the same chord.
-      let suppressOuterTap = false;
+      guitarPlayer.setInstrument("guitar-acoustic");
 
-      circleUi = createCircleOfFifthsUi(circleHost, {
-        onOuterTap: (note) => {
-          if (suppressOuterTap) {
-            suppressOuterTap = false;
-            return;
-          }
-          if (note.zone === "chord") {
-            void playCircleMidis(getCircleMajorChordMidis(note.midi), 640, true);
-          } else {
-            void playCircleMidis([note.midi], 380, true);
-          }
+      jamFlowUi = createJamFlowUi(jamFlowHost, {
+        onKeySelect: (semitone) => {
+          // Playing a key flower plays its major chord
+          void playCircleMidis(majorChordMidis(semitone), 640, true);
         },
-        onInnerDoubleTap: () => {
-          const instrumentName = guitarPlayer.cycleInstrument();
-          circleUi?.setInstrumentLabel(instrumentName);
-          circleUi?.showInnerIndicator(instrumentName);
+        onChordTap: (chord) => {
+          // Tap a diatonic chord flower in key-zoom mode → play that chord
+          void playCircleMidis(diatonicChordMidis(chord), 640, true);
         },
-        onNoteBarTap: (note) => {
-          void playCircleMidis([note.midi], 380, true);
+        onNoteBarTap: (semitone) => {
+          void playCircleMidis([48 + semitone], 380, true);
         },
-        onNoteBarPressStart: (note) => {
-          circleLooper?.recordHoldStart(`circle-note-${note.midi}`, [note.midi]);
-          circleUi?.holdNote(note.midi);
-          void guitarPlayer.startSustainMidi(note.midi);
-        },
-        onNoteBarPressEnd: (note) => {
-          circleLooper?.recordHoldEnd(`circle-note-${note.midi}`);
-          circleUi?.releaseHeldNotes();
-          guitarPlayer.stopSustain();
-        },
-        onSecondaryPressStart: (chord) => {
-          const chordMidis = getCircleChordMidis(chord);
-          circleLooper?.recordHoldStart(`circle-secondary-${chord.rootMidi}`, chordMidis);
-          circleUi?.holdChord(chordMidis);
-          void guitarPlayer.startSustainChord(chordMidis);
-        },
-        onSecondaryPressEnd: (chord) => {
-          circleLooper?.recordHoldEnd(`circle-secondary-${chord.rootMidi}`);
-          circleUi?.releaseHeldNotes();
-          guitarPlayer.stopSustain();
-        },
-        onOuterPressStart: (note) => {
-          if (note.zone === "note") {
-            // CCW zone press: play single note hold. Do not suppress the tap
-            // event — there is no follow-up click to suppress since the tap
-            // fires on press, not on release.
-            circleLooper?.recordHoldStart(`circle-single-${note.midi}`, [note.midi]);
-            circleUi?.holdNote(note.midi);
-            void guitarPlayer.startSustainMidi(note.midi);
-            return;
-          }
-          // CW zone press: chord sustain. Suppress the follow-up tap click.
-          suppressOuterTap = true;
-          const midis = getCircleMajorChordMidis(note.midi);
-          circleLooper?.recordHoldStart(`circle-major-${note.midi}`, midis);
-          circleUi?.holdChord(midis);
-          void guitarPlayer.startSustainChord(midis);
-        },
-        onOuterPressEnd: (note) => {
-          circleLooper?.recordHoldEnd(
-            note.zone === "note" ? `circle-single-${note.midi}` : `circle-major-${note.midi}`
-          );
-          circleUi?.releaseHeldNotes();
-          guitarPlayer.stopSustain();
+        onFretDotTap: (midi) => {
+          void playFretMidis([midi], 360, true);
         },
       });
-      circleUi.setInstrumentLabel(guitarPlayer.setInstrument("guitar-acoustic"));
-
-      fretboardUi = createFretboardUi(fretboardHost, {
-        initialState: FRETBOARD_DEFAULT_STATE,
-        controlsHidden: false,
-        onStateChange: (nextState) => {
-          fretboardState = nextState;
-        },
-        onPlayPress: () => {
-          const rootMidi = FRETBOARD_SAMPLE_BASE_MIDI + (NOTE_TO_SEMITONE[fretboardState.root] ?? 0);
-          void playFretTargets([{ midi: rootMidi, stringIndex: 0, isRoot: true }], 360, true);
-        },
-        onFretPress: ({ midi, stringIndex, fret }) => {
-          if (fretboardState.display === "chord") {
-            const chordTargets = getChordTapPlaybackTargets({
-              chordRoot: fretboardState.root,
-              characteristic: fretboardState.characteristic as CharacteristicType,
-              tappedMidi: midi,
-              tappedStringIndex: stringIndex,
-            });
-            void playFretTargets(chordTargets, 560, true);
-            return;
-          }
-          if (fretboardState.display === "key") {
-            const keyTargets = getKeyTapPlaybackTargets({
-              keyRoot: fretboardState.root,
-              keyMode: fretboardState.characteristic,
-              tappedMidi: midi,
-              tappedStringIndex: stringIndex,
-            });
-            void playFretTargets(keyTargets, 560, true);
-            return;
-          }
-          void playFretTargets([{ midi, stringIndex, isRoot: fret === 0 }], 360, true);
-        },
-      });
-      fretboardUi.setLooperElement(fretboardLooper.rootEl);
-      fretboardUi.enter();
+      jamFlowUi.enter();
       await drumUi.enter();
 
       if (timelineHost) {
@@ -728,19 +641,14 @@ export function createWildTunaMode(): ModeDefinition {
       drumUi?.exit();
       drumUi?.destroy();
       drumUi = null;
-      circleUi?.destroy();
-      circleUi = null;
+      jamFlowUi?.destroy();
+      jamFlowUi = null;
       circleLooper?.destroy();
       circleLooper = null;
-      fretboardUi?.setLooperElement(null);
-      fretboardUi?.exit();
-      fretboardUi = null;
       fretboardLooper?.destroy();
       fretboardLooper = null;
       if (circleLooperHost) circleLooperHost.replaceChildren();
-      if (circleHost) circleHost.replaceChildren();
       if (drumHost) drumHost.replaceChildren();
-      if (fretboardHost) fretboardHost.replaceChildren();
       if (timelineHost) timelineHost.replaceChildren();
       timelineUi = null;
     },

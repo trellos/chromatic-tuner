@@ -85,6 +85,14 @@ const ZOOM_FOCUS_RADIUS = 165;
 const SECONDARY_WEDGE_DEG = 24;
 const DIM_WEDGE_DEG = 24;
 
+// Kiku flower dimensions per ring
+const OUTER_FLOWER_R        = 82;
+const OUTER_PETAL_COUNT     = 16;
+const SECONDARY_FLOWER_R    = 48;
+const SECONDARY_PETAL_COUNT = 14;
+const DIM_FLOWER_R          = 30;
+const DIM_PETAL_COUNT       = 12;
+
 const INSTRUMENT_LABEL_RADIUS = DIM_INNER_RADIUS - 18;
 const SECONDARY_CENTERS = [-30, 0, 30] as const;
 const SECONDARY_INTERVALS = [2, 4, 9] as const; // II, III, VI
@@ -309,6 +317,52 @@ function describeAnnularSector(
   ].join(" ");
 }
 
+
+// Returns a compound SVG path describing a kiku (chrysanthemum) flower.
+// Matches the traditional kiku crest: a filled center circle, plus petals that
+// narrow at the base and widen to a rounded tip circle at the outer end.
+function describeKikuFlower(
+  fcx: number,
+  fcy: number,
+  flowerR: number,
+  petalCount: number
+): string {
+  const innerR = flowerR * 0.14;  // center circle radius
+  const baseR  = flowerR * 0.22;  // radius where petals attach
+  const tipCR  = flowerR * 0.87;  // outer tip circle center radius
+  const tipR   = flowerR * 0.13;  // outer tip circle radius
+  const baseHW = flowerR * 0.024; // half-width at inner base
+
+  // Center circle sub-path
+  let d = `M ${fcx + innerR} ${fcy} A ${innerR} ${innerR} 0 1 0 ${fcx - innerR} ${fcy} A ${innerR} ${innerR} 0 1 0 ${fcx + innerR} ${fcy} Z `;
+
+  for (let i = 0; i < petalCount; i++) {
+    const a  = (i * 2 * Math.PI / petalCount) - Math.PI / 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const px = -sa, py = ca; // perpendicular (90° CCW from petal axis)
+
+    // Base points at radius baseR, ±baseHW perpendicular
+    const s1x = fcx + baseR * ca + baseHW * px;
+    const s1y = fcy + baseR * sa + baseHW * py;
+    const s2x = fcx + baseR * ca - baseHW * px;
+    const s2y = fcy + baseR * sa - baseHW * py;
+
+    // Tip circle edge points at radius tipCR, ±tipR perpendicular
+    const t1x = fcx + tipCR * ca + tipR * px;
+    const t1y = fcy + tipCR * sa + tipR * py;
+    const t2x = fcx + tipCR * ca - tipR * px;
+    const t2y = fcy + tipCR * sa - tipR * py;
+
+    // s2 → line to t2 → CW arc (outer tip) to t1 → line to s1 → CCW short arc back to s2
+    d += `M ${s2x} ${s2y} `;
+    d += `L ${t2x} ${t2y} `;
+    d += `A ${tipR} ${tipR} 0 0 1 ${t1x} ${t1y} `;  // sweep=1: CW through outer tip
+    d += `L ${s1x} ${s1y} `;
+    d += `A ${baseR} ${baseR} 0 0 0 ${s2x} ${s2y} Z `;  // short CCW base arc
+  }
+
+  return d;
+}
 
 function getSelectionFromPrimary(primaryIndex: number): CircleSelection {
   const primary = OUTER_NOTES[primaryIndex] ?? OUTER_NOTES[0]!;
@@ -857,11 +911,17 @@ export function createCircleOfFifthsUi(
     node.setAttribute("role", "button");
     node.setAttribute("aria-label", `Primary note ${note.label}`);
 
+    // Kiku flower replaces the annular sector wedge.
+    const flowerCenter = polarPoint((OUTER_INNER_RADIUS + OUTER_RADIUS) / 2, centerDeg);
+    const kikuD = describeKikuFlower(flowerCenter.x, flowerCenter.y, OUTER_FLOWER_R, OUTER_PETAL_COUNT);
+
     const path = createSvgEl("path", "cof-wedge-path");
-    path.setAttribute("d", describeAnnularSector(OUTER_INNER_RADIUS, OUTER_RADIUS, centerDeg, OUTER_WEDGE_DEG));
+    path.setAttribute("d", kikuD);
+    path.setAttribute("fill-rule", "evenodd");
     node.appendChild(path);
     const hintPath = createSvgEl("path", "cof-wedge-hint");
-    hintPath.setAttribute("d", describeAnnularSector(OUTER_INNER_RADIUS, OUTER_RADIUS, centerDeg, OUTER_WEDGE_DEG));
+    hintPath.setAttribute("d", kikuD);
+    hintPath.setAttribute("fill-rule", "evenodd");
     node.appendChild(hintPath);
     // Zone gradient: smooth light-to-dark tint from CCW edge to CW edge.
     const midRadius = (OUTER_INNER_RADIUS + OUTER_RADIUS) / 2;
@@ -887,7 +947,7 @@ export function createCircleOfFifthsUi(
     zoneGrad.appendChild(zoneStop1);
     defs.appendChild(zoneGrad);
     const zoneGradPath = createSvgEl("path", "cof-wedge-zone-grad");
-    zoneGradPath.setAttribute("d", describeAnnularSector(OUTER_INNER_RADIUS, OUTER_RADIUS, centerDeg, OUTER_WEDGE_DEG));
+    zoneGradPath.setAttribute("d", kikuD);
     zoneGradPath.setAttribute("fill", `url(#${zoneGradId})`);
     zoneGradPath.setAttribute("pointer-events", "none");
     node.appendChild(zoneGradPath);
@@ -1049,11 +1109,13 @@ export function createCircleOfFifthsUi(
     node.setAttribute("data-center-deg", String(centerDeg));
     node.setAttribute("data-span-deg", String(SECONDARY_WEDGE_DEG));
 
+    const secFlowerCenter = polarPoint((SECONDARY_INNER_RADIUS + SECONDARY_OUTER_RADIUS) / 2, centerDeg);
     const path = createSvgEl("path", "cof-secondary-path");
     path.setAttribute(
       "d",
-      describeAnnularSector(SECONDARY_INNER_RADIUS, SECONDARY_OUTER_RADIUS, centerDeg, SECONDARY_WEDGE_DEG)
+      describeKikuFlower(secFlowerCenter.x, secFlowerCenter.y, SECONDARY_FLOWER_R, SECONDARY_PETAL_COUNT)
     );
+    path.setAttribute("fill-rule", "evenodd");
     node.appendChild(path);
 
     const text = createSvgEl("text", "cof-secondary-label");
@@ -1143,8 +1205,10 @@ export function createCircleOfFifthsUi(
   dimNode.setAttribute("data-center-deg", "0");
   dimNode.setAttribute("data-span-deg", String(DIM_WEDGE_DEG));
 
+  const dimFlowerCenter = polarPoint((DIM_INNER_RADIUS + DIM_OUTER_RADIUS) / 2, 0);
   const dimPath = createSvgEl("path", "cof-dim-path");
-  dimPath.setAttribute("d", describeAnnularSector(DIM_INNER_RADIUS, DIM_OUTER_RADIUS, 0, DIM_WEDGE_DEG));
+  dimPath.setAttribute("d", describeKikuFlower(dimFlowerCenter.x, dimFlowerCenter.y, DIM_FLOWER_R, DIM_PETAL_COUNT));
+  dimPath.setAttribute("fill-rule", "evenodd");
   dimNode.appendChild(dimPath);
 
   const dimText = createSvgEl("text", "cof-dim-label");
