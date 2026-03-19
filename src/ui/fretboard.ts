@@ -15,6 +15,7 @@ import {
   type KeyModeType,
   type ScaleType,
 } from "../fretboard-logic.js";
+import { clamp } from "../utils.js";
 
 const SCALE_OPTIONS: Array<{ value: ScaleType; label: string }> = [
   { value: "major", label: "Major" },
@@ -239,10 +240,6 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
     zoomButton.classList.toggle("is-active", zoomArmed);
     zoomButton.setAttribute("aria-pressed", String(zoomArmed));
     zoomButton.textContent = zoomArmed ? "TARGET ON" : "TARGET";
-  };
-
-  const clamp = (value: number, min: number, max: number): number => {
-    return Math.min(max, Math.max(min, value));
   };
 
   const applyViewport = (): void => {
