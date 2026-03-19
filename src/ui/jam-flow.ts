@@ -213,26 +213,26 @@ function drawKiku(
   // Labels — drawn over the converging petal tips at flower centre.
   // Medium grey contrasts against all petal colors (mustard, rose, white).
   const textColor = "#888888";
-  const labelR = radius * 0.26; // reference radius for font sizing
+  // Note letters: 66% of flower diameter = 1.32 × radius, Black weight.
+  const mainSize = Math.max(12, Math.round(radius * 1.32));
+  const subSize  = Math.max(9,  Math.round(radius * 0.72));
 
   if (labelTop) {
     ctx.globalAlpha = opacity;
     ctx.fillStyle = textColor;
-    const fontSize = Math.max(10, Math.round(labelR * 1.3));
-    ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+    ctx.font = `900 ${mainSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const labelY = labelBot ? cy - labelR * 0.3 : cy;
+    const labelY = labelBot ? cy - radius * 0.32 : cy;
     ctx.fillText(labelTop, cx, labelY);
   }
   if (labelBot) {
     ctx.fillStyle = textColor;
     ctx.globalAlpha = opacity * 0.72;
-    const subSize = Math.max(8, Math.round(labelR * 0.85));
-    ctx.font = `bold ${subSize}px system-ui, sans-serif`;
+    ctx.font = `900 ${subSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(labelBot, cx, cy + labelR * 0.72);
+    ctx.fillText(labelBot, cx, cy + radius * 0.46);
   }
 
   ctx.restore();
@@ -242,19 +242,30 @@ function drawKiku(
 
 type Pos = { x: number; y: number; r: number };
 
-// Computes 12 circle-of-fifths positions within (availW x availH)
+// Computes 12 circle-of-fifths positions within (availW x availH).
+// Flower centres follow a regular-hexagon path (pointy-top, vertex at 12 o'clock)
+// so the arrangement reads as a closed wreath with slight artistic overlap.
+// Positions alternate between hex vertices (farther out) and face-centres
+// (closer in), creating a rhythmic zig-zag that references Japanese kamon design.
 function layoutCircle(availW: number, availH: number): Pos[] {
   const cx = availW / 2;
   const cy = availH / 2;
   const maxR = Math.min(availW, availH) * 0.5 * 0.82;
-  const flowerR = maxR * 0.28;
-  const circleR = maxR - flowerR;
+  // Smaller flowers give a controlled ~16% overlap between neighbours.
+  const flowerR = maxR * 0.23;
+  const baseR = maxR - flowerR;
 
   return CIRCLE_ORDER.map((_, i) => {
     const angle = (i / 12) * 2 * Math.PI - Math.PI / 2;
+    // Hexagonal radius at this angle (pointy-top, vertex at angle = -π/2).
+    // Rotate angle so the top vertex lands at localAngle = -π/6 → factor = 1.
+    const hexAngle = angle + Math.PI / 2;
+    const seg = Math.PI / 3; // 60° per hex face
+    const localAngle = ((hexAngle % seg) + seg) % seg - seg / 2; // −30° … +30°
+    const hexR = baseR * Math.cos(Math.PI / 6) / Math.cos(localAngle);
     return {
-      x: cx + Math.cos(angle) * circleR,
-      y: cy + Math.sin(angle) * circleR,
+      x: cx + Math.cos(angle) * hexR,
+      y: cy + Math.sin(angle) * hexR,
       r: flowerR,
     };
   });
@@ -516,7 +527,7 @@ function drawFretboard(
 
 type NoteBarHandle = {
   el: HTMLElement;
-  update(keySemitone: number | null): void;
+  update(keySemitone: number | null, relativeOffset?: number): void;
   destroy(): void;
 };
 
@@ -547,7 +558,7 @@ function buildNoteBar(
 
   hostEl.appendChild(el);
 
-  function update(keySemitone: number | null): void {
+  function update(keySemitone: number | null, relativeOffset = 0): void {
     if (keySemitone === null) {
       for (const btn of btns) {
         btn.className = "jf-note-btn jf-note-btn--default";
@@ -568,18 +579,23 @@ function buildNoteBar(
       if (!ch) {
         btn.className = "jf-note-btn jf-note-btn--nondiatonic";
         btn.style.cssText = "";
-      } else if (isLeadingTone(ch.degreeIndex)) {
-        const colors = noteBarColor(ch.degreeIndex);
-        btn.className = "jf-note-btn jf-note-btn--leading";
-        btn.style.backgroundColor = colors.bg;
-        btn.style.borderColor = colors.border ?? "transparent";
-        btn.style.color = colors.text;
       } else {
-        const colors = noteBarColor(ch.degreeIndex);
-        btn.className = "jf-note-btn jf-note-btn--diatonic";
-        btn.style.backgroundColor = colors.bg;
-        btn.style.borderColor = "transparent";
-        btn.style.color = colors.text;
+        // Remap degree by relative root offset so the note bar mirrors the
+        // flower colours shown in key-zoom (mustard = root, etc.)
+        const effDeg = ((ch.degreeIndex - relativeOffset + 7) % 7) as DegreeIndex;
+        if (isLeadingTone(effDeg)) {
+          const colors = noteBarColor(effDeg);
+          btn.className = "jf-note-btn jf-note-btn--leading";
+          btn.style.backgroundColor = colors.bg;
+          btn.style.borderColor = colors.border ?? "transparent";
+          btn.style.color = colors.text;
+        } else {
+          const colors = noteBarColor(effDeg);
+          btn.className = "jf-note-btn jf-note-btn--diatonic";
+          btn.style.backgroundColor = colors.bg;
+          btn.style.borderColor = "transparent";
+          btn.style.color = colors.text;
+        }
       }
     }
   }
@@ -768,6 +784,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
               modeAnim = { startT: tapNow, modeName: MODE_NAMES[deg]! };
             }
             lastTapDeg = null;
+            // Sync note bar colours to the new relative root.
+            noteBar.update(selectedKey, relativeRootDeg ?? 0);
           } else {
             // Single tap: play chord, track for potential double-tap
             lastTapDeg = deg;
@@ -780,6 +798,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       // Tap background → clear relative mode or go back to circle
       if (relativeRootDeg !== null) {
         relativeRootDeg = null;
+        noteBar.update(selectedKey, 0);
         return;
       }
       startTransition("key-zoom", "circle", false);
@@ -813,6 +832,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     if (from === "key-zoom" && to === "circle") {
       relativeRootDeg = null;
       lastTapDeg = null;
+      noteBar.update(null);
     }
     transitionActive = true;
     transitionFrom = from;
