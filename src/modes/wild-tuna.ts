@@ -159,10 +159,6 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
   return {
     onRecPressed(source: CompositeLooper) {
       const drumUi = getDrumUi();
-      // Stop any other actively-recording looper so only one records at a time.
-      for (const looper of getLoopers()) {
-        if (looper !== source) looper.requestStop();
-      }
       if (drumUi && !drumUi.isPlaying()) {
         // Transport is stopped: play 4-beat count-in then arm + start transport.
         drumUi.countIn(() => source.requestArm());

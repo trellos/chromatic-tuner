@@ -486,9 +486,9 @@ body.drum-fullscreen .mode-stage {
 }
 
 .wild-tuna-fretboard-looper {
+  bottom: 10px;
   left: 10px;
   position: absolute;
-  top: 10px;
   z-index: 2;
 }
 

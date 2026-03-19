@@ -210,9 +210,10 @@ function drawKiku(
   ctx.fillStyle = colorA;
   ctx.fill();
 
-  // Labels — drawn over the converging petal tips at flower centre.
-  // Medium grey contrasts against all petal colors (mustard, rose, white).
-  const textColor = "#888888";
+  // Labels — drawn over the center circle; pick dark/light text by luminance.
+  const [lr, lg, lb] = hexToRgb(colorA);
+  const lum = 0.299 * lr! / 255 + 0.587 * lg! / 255 + 0.114 * lb! / 255;
+  const textColor = lum > 0.5 ? "#1a1c24" : "#f0ece0";
   // Note letters: 66% of flower diameter = 1.32 × radius, Black weight.
   const mainSize = Math.max(12, Math.round(radius * 1.32));
   const subSize  = Math.max(9,  Math.round(radius * 0.72));
@@ -243,23 +244,25 @@ function drawKiku(
 type Pos = { x: number; y: number; r: number };
 
 // Computes 12 circle-of-fifths positions within (availW x availH).
-// Flower centres follow a regular-hexagon path (pointy-top, vertex at 12 o'clock)
-// so the arrangement reads as a closed wreath with slight artistic overlap.
-// Positions alternate between hex vertices (farther out) and face-centres
-// (closer in), creating a rhythmic zig-zag that references Japanese kamon design.
+// Flower centres follow a hexagonal path tilted by HEX_ROTATION so no vertex
+// points straight up — a "rakish" angle that reduces the top/bottom span while
+// keeping the characteristic hexagonal rhythm. The tilt also reduces the
+// alternation between vertex (far) and face-centre (near) positions, producing
+// a more even wreath with less overlap while retaining Japanese kamon character.
+const HEX_ROTATION = Math.PI / 9; // 20° rakish tilt
 function layoutCircle(availW: number, availH: number): Pos[] {
   const cx = availW / 2;
   const cy = availH / 2;
-  const maxR = Math.min(availW, availH) * 0.5 * 0.82;
-  // Smaller flowers give a controlled ~16% overlap between neighbours.
-  const flowerR = maxR * 0.23;
+  // Slightly larger maxR to compensate for the rotation bringing all positions
+  // closer to the inscribed-circle radius (net ~10% inward from the vertex).
+  const maxR = Math.min(availW, availH) * 0.5 * 0.86;
+  const flowerR = maxR * 0.21;
   const baseR = maxR - flowerR;
 
   return CIRCLE_ORDER.map((_, i) => {
     const angle = (i / 12) * 2 * Math.PI - Math.PI / 2;
-    // Hexagonal radius at this angle (pointy-top, vertex at angle = -π/2).
-    // Rotate angle so the top vertex lands at localAngle = -π/6 → factor = 1.
-    const hexAngle = angle + Math.PI / 2;
+    // Hexagonal radius at this angle, with the hex rotated by HEX_ROTATION.
+    const hexAngle = angle + Math.PI / 2 + HEX_ROTATION;
     const seg = Math.PI / 3; // 60° per hex face
     const localAngle = ((hexAngle % seg) + seg) % seg - seg / 2; // −30° … +30°
     const hexR = baseR * Math.cos(Math.PI / 6) / Math.cos(localAngle);
