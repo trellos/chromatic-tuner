@@ -480,7 +480,10 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
       } else {
         // Overwrite mode: keep existing slots; write starting at the seek target
         // (recordingSeekTarget survives count-in boundaries; fall back to playback position).
-        nextWriteMeasureIndex = recordingSeekTarget ?? playbackMeasureIndex;
+        // Clamp to 0 in case playbackMeasureIndex is still -1 from a previous
+        // transport stop — writing to slot -1 would silently lose the recording.
+        const fallback = Math.max(0, playbackMeasureIndex);
+        nextWriteMeasureIndex = recordingSeekTarget ?? fallback;
         recordingSeekTarget = null;
       }
       recordedMeasuresInPass = 0;

@@ -159,10 +159,6 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
   return {
     onRecPressed(source: CompositeLooper) {
       const drumUi = getDrumUi();
-      // Stop any other actively-recording looper so only one records at a time.
-      for (const looper of getLoopers()) {
-        if (looper !== source) looper.requestStop();
-      }
       if (drumUi && !drumUi.isPlaying()) {
         // Transport is stopped: play 4-beat count-in then arm + start transport.
         drumUi.countIn(() => source.requestArm());
@@ -592,6 +588,18 @@ export function createWildTunaMode(): ModeDefinition {
         },
         onFretDotTap: (midi) => {
           void playFretMidis([midi], 360, true);
+        },
+        isRecording: () => {
+          const cs = circleLooper?.getRecordState();
+          const fs = fretboardLooper?.getRecordState();
+          return cs === "armed" || cs === "recording" || cs === "stopping"
+              || fs === "armed" || fs === "recording" || fs === "stopping";
+        },
+        onModeChange: (mode) => {
+          // Show only the looper relevant to the current instrument view
+          const showCircle = mode !== "fretboard";
+          if (circleLooperHost) circleLooperHost.style.display = showCircle ? "" : "none";
+          if (fretboardLooperHost) fretboardLooperHost.style.display = showCircle ? "none" : "";
         },
       });
       jamFlowUi.enter();
