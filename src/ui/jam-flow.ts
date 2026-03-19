@@ -623,6 +623,11 @@ export type JamFlowOptions = {
   onNoteBarTap?: (semitone: number) => void;
   /** Tapped a fretboard dot */
   onFretDotTap?: (midi: number, stringIndex: number) => void;
+  /**
+   * Returns true if any looper is currently armed/recording.
+   * When true, tapping the background in key-zoom will not navigate back to circle.
+   */
+  isRecording?: () => boolean;
 };
 
 export type JamFlowUi = {
@@ -677,6 +682,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   // Dot pulse state (fretboard)
   type DotPulse = { stringIndex: number; fret: number; startT: number; durationMs: number };
   const dotPulses: DotPulse[] = [];
+
+  // Note bar trail state: rectangles that grow leftward from the note bar
+  type NoteTrail = { semitone: number; color: string; startT: number; durationMs: number };
+  const noteTrails: NoteTrail[] = [];
 
   // Relative-mode state: which degree index is currently the "root" in key-zoom
   let relativeRootDeg: number | null = null;
@@ -743,6 +752,23 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     fretboardLayout = computeFretboardLayout(w, h, 0);
   }
 
+  // ── Note trail helpers ─────────────────────────────────────────────────────
+
+  function getNoteTrailColor(semitone: number): string {
+    if (selectedKey === null) return COLOR_WHITE;
+    const chords = getDiatonicChords(selectedKey);
+    const ch = chords.find((c) => c.semitone === semitone);
+    if (!ch) return "rgba(180,185,210,0.5)"; // non-diatonic: muted
+    const effDeg = ((ch.degreeIndex - (relativeRootDeg ?? 0) + 7) % 7) as DegreeIndex;
+    return degreeColors(effDeg).colorA;
+  }
+
+  function addNoteTrail(semitone: number, durationMs: number) {
+    // Only emit trails when circle or key-zoom is visible
+    if (currentMode === "fretboard" && !transitionActive) return;
+    noteTrails.push({ semitone, color: getNoteTrailColor(semitone), startT: performance.now(), durationMs });
+  }
+
   // ── Tap detection ──────────────────────────────────────────────────────────
 
   function handleCanvasTap(evt: PointerEvent) {
@@ -804,7 +830,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         noteBar.update(selectedKey, 0);
         return;
       }
-      startTransition("key-zoom", "circle", false);
+      // Don't navigate back while a looper is armed or recording
+      if (!options.isRecording?.()) {
+        startTransition("key-zoom", "circle", false);
+      }
     } else if (currentMode === "fretboard" && fretboardLayout && selectedKey !== null) {
       // Tap a dot
       const dots = getFretboardDots(selectedKey);
@@ -894,6 +923,9 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     const rawT = Math.min(1, elapsed / transitionDuration);
     const easedT = easeInOut(rawT);
 
+    // Trails render first so flowers appear on top of them
+    drawTrails(now, w, h);
+
     if (!transitionActive) {
       drawStaticMode(currentMode, w, h);
     } else {
@@ -901,7 +933,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       if (rawT >= 1) finishTransition();
     }
 
-    // Pulses
+    // Pulse rings render on top of everything
     drawPulses(now);
 
     ctx.restore();
@@ -1021,8 +1053,21 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         petalCount = DEGREE_PETAL_COUNTS[effDeg]!;
       }
 
-      drawKiku(ctx, pos.x, pos.y, pos.r, petalCount, colorA, colorB,
-        chord.chordName, roman, opacity);
+      // No labels inside the flower — chord name is too small to read clearly.
+      drawKiku(ctx, pos.x, pos.y, pos.r, petalCount, colorA, colorB, undefined, undefined, opacity);
+
+      // Roman numeral at bottom-left of flower on the dark background.
+      if (opacity > 0) {
+        const romanSize = Math.max(9, Math.round(pos.r * 0.48));
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = "#f0ece0";
+        ctx.font = `900 ${romanSize}px system-ui, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(roman, pos.x - pos.r, pos.y + pos.r + 3);
+        ctx.restore();
+      }
     }
   }
 
@@ -1064,24 +1109,23 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       const colorA = lerpColor(COLOR_WHITE, chord.colorA, t);
       const colorB = chord.colorB ? lerpColor(COLOR_WHITE, chord.colorB, t) : undefined;
 
-      // Labels appear partway through
-      const showLabel = t > 0.3;
-      const showRoman = t > 0.5;
-      const labelOpacity = showLabel ? Math.min(1, (t - 0.3) / 0.3) : 0;
-
       const petalCount = t < 0.3 ? 14 : chord.petalCount;
+      const showRoman = t > 0.5;
 
-      ctx.save();
-      ctx.globalAlpha = labelOpacity;
-      drawKiku(ctx, x, y, r, petalCount, colorA, colorB,
-        showLabel ? chord.chordName : undefined,
-        showRoman ? chord.roman : undefined,
-        1);
-      ctx.restore();
+      drawKiku(ctx, x, y, r, petalCount, colorA, colorB, undefined, undefined, 1);
 
-      // Draw without labels at full opacity underneath
-      if (!showLabel) {
-        drawKiku(ctx, x, y, r, petalCount, colorA, colorB, undefined, undefined, 1);
+      // Roman numeral appears at bottom-left of the flower from t=0.5
+      if (showRoman) {
+        const romanAlpha = Math.min(1, (t - 0.5) / 0.3);
+        const romanSize = Math.max(9, Math.round(r * 0.48));
+        ctx.save();
+        ctx.globalAlpha = romanAlpha;
+        ctx.fillStyle = "#f0ece0";
+        ctx.font = `900 ${romanSize}px system-ui, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(chord.roman, x - r, y + r + 3);
+        ctx.restore();
       }
     }
 
@@ -1183,6 +1227,60 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
+  function drawTrails(now: number, w: number, h: number) {
+    // Each trail is a rectangle that emerges from the note bar (right edge of canvas)
+    // and grows leftward while the note plays, then slides off-screen to the left.
+    const noteH = h / 12;
+    const trailH = noteH * 0.46;
+    // Growth speed: fills the canvas in ~550 ms
+    const SPEED = w / 550; // px / ms
+    const alive: NoteTrail[] = [];
+
+    for (const trail of noteTrails) {
+      const elapsed = now - trail.startT;
+      // Maximum trail width is one canvas width; grows at SPEED px/ms
+      const maxW = Math.min(w, trail.durationMs * SPEED);
+      const exitDuration = maxW / SPEED; // ms to slide the full width off screen
+
+      if (elapsed >= trail.durationMs + exitDuration) continue;
+      alive.push(trail);
+
+      // Semitone 0 (C) is at the top of the note bar, 11 (B) at the bottom.
+      // Approximate button centre Y using (s + 0.5) / 12 of the canvas height,
+      // offset by 4 px top padding inside the note bar host.
+      const y = 4 + (trail.semitone + 0.5) * (h - 8) / 12;
+
+      let drawLeft: number, drawRight: number, alpha: number;
+      if (elapsed < trail.durationMs) {
+        // Growing phase: right edge anchored at w, left edge moves left
+        const currentW = Math.min(maxW, elapsed * SPEED);
+        drawRight = w;
+        drawLeft = w - currentW;
+        alpha = 0.62;
+      } else {
+        // Sliding phase: full-width rect slides left, fades out
+        const slide = (elapsed - trail.durationMs) * SPEED;
+        drawRight = w - slide;
+        drawLeft = w - maxW - slide;
+        if (drawRight <= 0) continue;
+        alpha = 0.62 * (1 - (elapsed - trail.durationMs) / exitDuration);
+      }
+
+      const visLeft  = Math.max(0, drawLeft);
+      const visRight = Math.min(w, drawRight);
+      if (visRight <= visLeft) continue;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = trail.color;
+      ctx.fillRect(visLeft, y - trailH / 2, visRight - visLeft, trailH);
+      ctx.restore();
+    }
+
+    noteTrails.length = 0;
+    noteTrails.push(...alive);
+  }
+
   function drawPulses(now: number) {
     const alive: Pulse[] = [];
     for (const p of pulses) {
@@ -1228,7 +1326,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     cachedW = 0; cachedH = 0; // force re-layout
   }
 
-  function pulseNote(midi: number, durationMs: number) {
+  function pulseFlower(midi: number, durationMs: number) {
+    // Add a pulse ring at the flower position for this midi note.
     const semitone = midi % 12;
     const { w, h } = resizeCanvas();
     rebuildLayouts(w, h);
@@ -1247,8 +1346,15 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
+  function pulseNote(midi: number, durationMs: number) {
+    pulseFlower(midi, durationMs);
+    addNoteTrail(midi % 12, durationMs);
+  }
+
   function pulseChord(midis: number[], durationMs: number) {
-    for (const midi of midis) pulseNote(midi, durationMs);
+    // Only pulse the root flower (first midi); trails emit for every note.
+    if (midis[0] !== undefined) pulseFlower(midis[0], durationMs);
+    for (const midi of midis) addNoteTrail(midi % 12, durationMs);
   }
 
   function pulseTargets(targets: Array<{ midi: number; stringIndex: number }>, durationMs: number) {

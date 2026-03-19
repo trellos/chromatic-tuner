@@ -589,6 +589,12 @@ export function createWildTunaMode(): ModeDefinition {
         onFretDotTap: (midi) => {
           void playFretMidis([midi], 360, true);
         },
+        isRecording: () => {
+          const cs = circleLooper?.getRecordState();
+          const fs = fretboardLooper?.getRecordState();
+          return cs === "armed" || cs === "recording" || cs === "stopping"
+              || fs === "armed" || fs === "recording" || fs === "stopping";
+        },
       });
       jamFlowUi.enter();
       await drumUi.enter();
