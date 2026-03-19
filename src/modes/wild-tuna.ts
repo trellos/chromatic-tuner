@@ -595,6 +595,12 @@ export function createWildTunaMode(): ModeDefinition {
           return cs === "armed" || cs === "recording" || cs === "stopping"
               || fs === "armed" || fs === "recording" || fs === "stopping";
         },
+        onModeChange: (mode) => {
+          // Show only the looper relevant to the current instrument view
+          const showCircle = mode !== "fretboard";
+          if (circleLooperHost) circleLooperHost.style.display = showCircle ? "" : "none";
+          if (fretboardLooperHost) fretboardLooperHost.style.display = showCircle ? "none" : "";
+        },
       });
       jamFlowUi.enter();
       await drumUi.enter();

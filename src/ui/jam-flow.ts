@@ -628,6 +628,12 @@ export type JamFlowOptions = {
    * When true, tapping the background in key-zoom will not navigate back to circle.
    */
   isRecording?: () => boolean;
+  /**
+   * Called whenever the visible mode changes (after a transition completes
+   * or immediately on the initial render). Use this to show/hide looper UIs
+   * that are relevant to the currently visible instrument.
+   */
+  onModeChange?: (mode: "circle" | "key-zoom" | "fretboard") => void;
 };
 
 export type JamFlowUi = {
@@ -796,16 +802,22 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         }
       }
     } else if (currentMode === "key-zoom" && selectedKey !== null) {
-      // Check if a flower was tapped
       const chords = getDiatonicChords(selectedKey);
+
+      // Check if the roman numeral label was tapped (bottom-left of each flower).
+      // The label is drawn at (pos.x - pos.r, pos.y + pos.r + 3) with font ~0.48*pos.r.
+      // Use a generous hit rect so it's easy to target without overlapping the flower.
       for (let deg = 0; deg < 7; deg++) {
         const pos = keyZoomPositions[deg]!;
-        const dx = mx - pos.x;
-        const dy = my - pos.y;
-        if (dx * dx + dy * dy <= pos.r * pos.r) {
+        const labelSize = Math.max(9, Math.round(pos.r * 0.48));
+        const labelX = pos.x - pos.r;
+        const labelY = pos.y + pos.r + 1;
+        const hitW = pos.r * 1.2;  // wide enough for "vii°"
+        const hitH = labelSize * 2.2;
+        if (mx >= labelX && mx <= labelX + hitW && my >= labelY && my <= labelY + hitH) {
           const tapNow = performance.now();
-          if (lastTapDeg === deg && tapNow - lastTapTime < 400) {
-            // Double-tap: toggle relative root
+          if (lastTapDeg === deg && tapNow - lastTapTime < 450) {
+            // Double-tap on roman numeral: toggle relative root
             if (relativeRootDeg === deg) {
               relativeRootDeg = null;
             } else {
@@ -813,14 +825,24 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
               modeAnim = { startT: tapNow, modeName: MODE_NAMES[deg]! };
             }
             lastTapDeg = null;
-            // Sync note bar colours to the new relative root.
             noteBar.update(selectedKey, relativeRootDeg ?? 0);
           } else {
-            // Single tap: play chord, track for potential double-tap
+            // Single tap on roman numeral: play chord + track for double-tap
             lastTapDeg = deg;
             lastTapTime = tapNow;
             options.onChordTap?.(chords[deg]!);
           }
+          return;
+        }
+      }
+
+      // Check if a flower body was tapped — single tap only (play chord).
+      for (let deg = 0; deg < 7; deg++) {
+        const pos = keyZoomPositions[deg]!;
+        const dx = mx - pos.x;
+        const dy = my - pos.y;
+        if (dx * dx + dy * dy <= pos.r * pos.r) {
+          options.onChordTap?.(chords[deg]!);
           return;
         }
       }
@@ -877,6 +899,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   function finishTransition() {
     currentMode = transitionTo;
     transitionActive = false;
+    options.onModeChange?.(currentMode);
   }
 
   // ── Pulses ─────────────────────────────────────────────────────────────────
@@ -1311,6 +1334,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     running = true;
     rafId = requestAnimationFrame(drawFrame);
     window.addEventListener("resize", onResize);
+    options.onModeChange?.(currentMode);
   }
 
   function exit() {
