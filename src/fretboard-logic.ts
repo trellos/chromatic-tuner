@@ -1,3 +1,5 @@
+import { clamp } from "./utils.js";
+
 export type NoteName =
   | "A"
   | "A#"
@@ -178,10 +180,6 @@ const OPEN_STRING_MIDI = [40, 45, 50, 55, 59, 64] as const;
 
 export const MAX_FRET = 12;
 const MAX_STRING_INDEX = OPEN_STRING_MIDI.length - 1;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 /**
  * Computes a stable 3-string / 4-fret viewport around a tapped note.

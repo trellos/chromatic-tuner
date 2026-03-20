@@ -12,12 +12,8 @@ export type SeigaihaBridge = {
   pulse(): void;
 };
 
-function createSeigaihaBridge(): SeigaihaBridge {
-  return {
-    setDetuneMagnitude: setSeigaihaDetuneMagnitude,
-    setModeRandomness: setSeigaihaModeRandomness,
-    pulse: pulseSeigaihaRandomness,
-  };
-}
-
-export const seigaihaBridge: SeigaihaBridge = createSeigaihaBridge();
+export const seigaihaBridge: SeigaihaBridge = {
+  setDetuneMagnitude: setSeigaihaDetuneMagnitude,
+  setModeRandomness: setSeigaihaModeRandomness,
+  pulse: pulseSeigaihaRandomness,
+};
