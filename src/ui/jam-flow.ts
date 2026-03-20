@@ -503,12 +503,14 @@ function drawFretboard(
     ctx.stroke();
   }
 
-  // Fret position markers
+  // Fret position markers — radius scales with fret spacing so they enlarge when zoomed
+  const fretSpacing = (fretYs[1]! - fretYs[0]!);
+  const inlayR = Math.max(3, fretSpacing * 0.11);
   const markerX = (stringXs[2]! + stringXs[3]!) / 2;
   for (const fret of FRET_MARKERS_SINGLE) {
     const fy = (fretYs[fret - 1]! + fretYs[fret]!) / 2;
     ctx.beginPath();
-    ctx.arc(markerX, fy, 3, 0, Math.PI * 2);
+    ctx.arc(markerX, fy, inlayR, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(180, 190, 220, 0.25)";
     ctx.fill();
   }
@@ -517,7 +519,7 @@ function drawFretboard(
     const fy = (fretYs[11]! + fretYs[12]!) / 2;
     for (const sx of [stringXs[1]!, stringXs[4]!]) {
       ctx.beginPath();
-      ctx.arc(sx, fy, 3, 0, Math.PI * 2);
+      ctx.arc(sx, fy, inlayR, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(180, 190, 220, 0.25)";
       ctx.fill();
     }
@@ -1359,7 +1361,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     h: number,
     speed: number,
     maxAlpha: number,
-    trailHeightFraction: number
+    trailHeightFraction: number,
+    fadeOnSlide: boolean
   ): void {
     const noteH = h / 12;
     const trailH = noteH * trailHeightFraction;
@@ -1386,7 +1389,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         drawRight = w - slide;
         drawLeft = w - maxW - slide;
         if (drawRight <= 0) continue;
-        alpha = maxAlpha * (1 - (elapsed - trail.durationMs) / exitDuration);
+        // fadeOnSlide: fast trail fades as it exits; slow trail stays opaque until gone
+        alpha = fadeOnSlide
+          ? maxAlpha * (1 - (elapsed - trail.durationMs) / exitDuration)
+          : maxAlpha;
       }
 
       const visLeft  = Math.max(0, drawLeft);
@@ -1415,10 +1421,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     const measureDurationMs = options.getMeasureDurationMs?.() ?? 2000;
     const SLOW_SPEED = w / (2 * measureDurationMs);
 
-    // Draw slow trail first (below fast trail)
-    drawOneTrailSet(slowTrails, now, w, h, SLOW_SPEED, 0.62, 0.54);
-    // Draw fast trail on top, more transparent
-    drawOneTrailSet(noteTrails, now, w, h, FAST_SPEED, 0.32, 0.46);
+    // Draw slow trail first (below fast trail) — no fade during slide
+    drawOneTrailSet(slowTrails, now, w, h, SLOW_SPEED, 0.62, 0.54, false);
+    // Draw fast trail on top, more transparent — fades as it exits
+    drawOneTrailSet(noteTrails, now, w, h, FAST_SPEED, 0.32, 0.46, true);
   }
 
   function drawPulses(now: number) {

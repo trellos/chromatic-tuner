@@ -762,14 +762,19 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
     padding: 8px 10px;
   }
 
+  /* Row 1: pattern controls (step toggle, beat, kit, share) — default order 0 */
+  /* Row 2: transport controls (tempo + play) side by side */
   .wild-tuna-pane--drum .drum-tempo {
-    flex-basis: 100%;
+    flex-basis: auto;
+    flex-grow: 1;
     justify-content: center;
-    order: 1;
+    order: 2;
   }
 
   .wild-tuna-pane--drum .drum-play {
-    order: 4;
+    flex-grow: 1;
+    min-width: 60px;
+    order: 2;
   }
 }
 
