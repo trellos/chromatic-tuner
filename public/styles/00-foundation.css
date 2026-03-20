@@ -577,6 +577,7 @@ body.wild-tuna-fullscreen .wild-tuna-composite.wt-jam-expanded {
 
 .jf-note-btn--leading {
   /* bg/border/color set inline by JS */
+  border-width: 5px;
 }
 
 .jf-note-btn--nondiatonic {
