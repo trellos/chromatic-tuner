@@ -451,6 +451,7 @@ body.drum-fullscreen .drum-ui {
     flex-wrap: wrap;
     gap: 8px;
     justify-content: center;
+    min-width: 0;
     overflow: visible;
     padding: 10px 12px;
   }
@@ -459,9 +460,11 @@ body.drum-fullscreen .drum-ui {
     flex: 0 1 auto;
   }
 
+  /* Tempo sits on its own first row; controls fill the second row. */
   .drum-tempo {
+    flex-basis: 100%;
     gap: 8px;
-    min-width: 144px;
+    justify-content: center;
     order: 1;
     padding: 6px 8px;
   }

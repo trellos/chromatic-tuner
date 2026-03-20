@@ -22,19 +22,20 @@ export function createAudioContextService(): AudioContextService {
     const AudioCtx = getAudioCtor();
     if (!AudioCtx) throw new Error("AudioContext is not available in this browser.");
 
-    if (!isIOS) {
-      return new AudioCtx({ latencyHint: "interactive" });
-    }
-
+    // Route audio through the media channel (not the ringer) on mobile browsers.
     // On iOS, Web Audio defaults to the "ambient" session category which is
-    // silenced by the hardware ringer switch. Setting type to "playback" routes
-    // audio through the media channel so it plays even when the ringer is off.
-    // Supported in iOS 16.4+ (Safari 16.4+); silently ignored on older versions.
+    // silenced by the hardware ringer switch. On Android Chrome the default is
+    // already media, but setting this explicitly keeps behaviour consistent.
+    // Supported in iOS 16.4+ / Chrome for Android; silently ignored elsewhere.
     try {
       (navigator as any).audioSession.type = "playback";
     } catch {
-      // Not supported on this iOS version; audio will still work but may be
-      // silenced by the ringer switch.
+      // Not supported on this browser; audio will still work but may be
+      // affected by the ringer switch on some iOS versions.
+    }
+
+    if (!isIOS) {
+      return new AudioCtx({ latencyHint: "interactive" });
     }
 
     // iOS Safari initialises the AudioContext sample rate based on the hardware
