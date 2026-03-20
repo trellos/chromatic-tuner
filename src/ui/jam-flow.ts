@@ -617,7 +617,8 @@ const DISPLAY_TO_SEMITONE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 function buildNoteBar(
   hostEl: HTMLElement,
-  onTap: (semitone: number) => void
+  onPressStart: (semitone: number) => void,
+  onPressEnd: (semitone: number) => void,
 ): NoteBarHandle {
   const el = document.createElement("div");
   el.className = "jf-note-bar";
@@ -631,7 +632,21 @@ function buildNoteBar(
     btn.className = "jf-note-btn jf-note-btn--default";
     btn.textContent = CHROMATIC_NOTES_DISPLAY[i]!;
     btn.dataset.semitone = String(semitone);
-    btn.addEventListener("click", () => onTap(semitone));
+    // Sound starts on pointer-down (instrument, not UI button): note rings while held.
+    let activePointerId: number | null = null;
+    btn.addEventListener("pointerdown", (evt) => {
+      if (activePointerId !== null) return;
+      activePointerId = evt.pointerId;
+      onPressStart(semitone);
+    });
+    const endPress = (evt: PointerEvent): void => {
+      if (activePointerId === null || evt.pointerId !== activePointerId) return;
+      activePointerId = null;
+      onPressEnd(semitone);
+    };
+    btn.addEventListener("pointerup", endPress);
+    btn.addEventListener("pointercancel", endPress);
+    btn.addEventListener("pointerleave", endPress);
     btns.push(btn);
     el.appendChild(btn);
   }
@@ -706,12 +721,18 @@ export type JamFlowOptions = {
   onKeyPressEnd?: () => void;
   /** Double-tapped the center area in circle mode → cycle instrument. */
   onInnerDoubleTap?: () => void;
-  /** Tapped a chord flower in key-zoom mode → play the chord */
+  /** Pressed down on a chord flower in key-zoom → start sustain for that chord. */
   onChordTap?: (chord: DiatonicChord) => void;
-  /** Tapped a note bar button */
-  onNoteBarTap?: (semitone: number) => void;
-  /** Tapped a fretboard dot */
+  /** Released from a key-zoom chord flower → stop sustain. */
+  onChordPressEnd?: () => void;
+  /** Pressed down on a note bar button → start sustain. */
+  onNoteBarPressStart?: (semitone: number) => void;
+  /** Released a note bar button → stop sustain. */
+  onNoteBarPressEnd?: (semitone: number) => void;
+  /** Pressed down on a fretboard dot → start sustain. */
   onFretDotTap?: (midi: number, stringIndex: number) => void;
+  /** Released from a fretboard dot → stop sustain. */
+  onFretDotPressEnd?: () => void;
   /**
    * Returns true if any looper is currently armed/recording.
    * When true, tapping the background in key-zoom will not navigate back to circle.
@@ -782,8 +803,13 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   // Currently held circle flower (for sustain + minor label display)
   let heldCircleKey: { semitone: number; isMinor: boolean } | null = null;
+  // Held key-zoom chord flower or roman-numeral label
+  let heldKeyZoomChord: DiatonicChord | null = null;
+  // Held fretboard dot
+  let heldFretDot: { midi: number; stringIndex: number } | null = null;
 
-  // Live sustain trail: grows from right edge while a circle flower is held
+  // Live sustain trail: grows from right edge of the note strip while any note is held.
+  // Set on pointerdown for circle flowers, key-zoom chords, note bar, and fret dots.
   let liveSustainTrail: { semitone: number; color: string; startT: number } | null = null;
 
   // Double-tap tracking for circle flowers
@@ -822,16 +848,29 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   type ModeAnim = { startT: number; modeName: string };
   let modeAnim: ModeAnim | null = null;
 
-  // Note bar
-  const noteBar = buildNoteBar(noteBarHost, (semitone) => {
-    options.onNoteBarTap?.(semitone);
-    if (transitionActive) return;
-    if (currentMode === "key-zoom") {
-      startTransition("key-zoom", "fretboard", true);
-    } else if (currentMode === "fretboard") {
-      startTransition("fretboard", "key-zoom", false);
-    }
-  });
+  // Note bar — sound starts on pointerdown, ends on pointerup/cancel/leave.
+  const noteBar = buildNoteBar(
+    noteBarHost,
+    (semitone) => {
+      // Grow a live trail while the note is held.
+      liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
+      options.onNoteBarPressStart?.(semitone);
+      if (transitionActive) return;
+      if (currentMode === "key-zoom") {
+        startTransition("key-zoom", "fretboard", true);
+      } else if (currentMode === "fretboard") {
+        startTransition("fretboard", "key-zoom", false);
+      }
+    },
+    (semitone) => {
+      // Freeze trail width and let it slide off.
+      if (liveSustainTrail !== null && liveSustainTrail.semitone === semitone) {
+        slowTrails.push({ ...liveSustainTrail, durationMs: performance.now() - liveSustainTrail.startT });
+        liveSustainTrail = null;
+      }
+      options.onNoteBarPressEnd?.(semitone);
+    },
+  );
 
   function getDimensions() {
     // Measure the canvas wrapper directly — it is already sized to exclude the
@@ -940,8 +979,14 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
           // Update held state for visual minor-label feedback
           heldCircleKey = { semitone, isMinor };
 
-          // Start live sustain trail anchored at right edge
+          // Start live sustain trail anchored at right edge.
           liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
+
+          // Pulse ring on the flower.
+          const chForPulse = selectedKey !== null
+            ? getDiatonicChords(selectedKey).find((c) => c.semitone === semitone)
+            : null;
+          addPulseAtCanvas(pos.x, pos.y, pos.r, chForPulse?.colorA ?? COLOR_WHITE, 400);
 
           // Start sustain
           options.onKeyPressStart?.(semitone, isMinor);
@@ -1001,22 +1046,30 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             lastTapDeg = null;
             noteBar.update(selectedKey, relativeRootDeg ?? 0);
           } else {
-            // Single tap on roman numeral: play chord + track for double-tap
+            // Single tap on roman numeral: start chord sustain + track for double-tap.
             lastTapDeg = deg;
             lastTapTime = tapNow;
-            options.onChordTap?.(chords[deg]!);
+            const chord = chords[deg]!;
+            heldKeyZoomChord = chord;
+            liveSustainTrail = { semitone: chord.semitone, color: chord.colorA, startT: tapNow };
+            addPulseAtCanvas(pos.x, pos.y, pos.r, chord.colorA, 400);
+            options.onChordTap?.(chord);
           }
           return;
         }
       }
 
-      // Check if a flower body was tapped — single tap only (play chord).
+      // Check if a flower body was tapped — start chord sustain.
       for (let deg = 0; deg < 7; deg++) {
         const pos = keyZoomPositions[deg]!;
         const dx = mx - pos.x;
         const dy = my - pos.y;
         if (dx * dx + dy * dy <= pos.r * pos.r) {
-          options.onChordTap?.(chords[deg]!);
+          const chord = chords[deg]!;
+          heldKeyZoomChord = chord;
+          liveSustainTrail = { semitone: chord.semitone, color: chord.colorA, startT: performance.now() };
+          addPulseAtCanvas(pos.x, pos.y, pos.r, chord.colorA, 400);
+          options.onChordTap?.(chord);
           return;
         }
       }
@@ -1059,6 +1112,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             // Zoom to octave range centered on this note (only when not already zoomed)
             fretboardZoom = computeFretboardZoomForNote(dot.stringIndex, dot.fret);
           } else {
+            heldFretDot = { midi: dot.midi, stringIndex: dot.stringIndex };
+            liveSustainTrail = { semitone: dot.midi % 12, color: getNoteTrailColor(dot.midi % 12), startT: performance.now() };
             options.onFretDotTap?.(dot.midi, dot.stringIndex);
             addDotPulse(dot.stringIndex, dot.fret);
           }
@@ -1074,15 +1129,22 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   }
 
   function handleCanvasPointerUp(_evt: PointerEvent) {
-    if (currentMode === "circle" && heldCircleKey !== null) {
-      // Convert the live sustain trail into a fixed slow trail entry
-      if (liveSustainTrail !== null) {
-        const durationMs = performance.now() - liveSustainTrail.startT;
-        slowTrails.push({ ...liveSustainTrail, durationMs });
-        liveSustainTrail = null;
-      }
+    // Finalize the live sustain trail for whichever mode was held.
+    if (liveSustainTrail !== null) {
+      slowTrails.push({ ...liveSustainTrail, durationMs: performance.now() - liveSustainTrail.startT });
+      liveSustainTrail = null;
+    }
+    if (heldCircleKey !== null) {
       heldCircleKey = null;
       options.onKeyPressEnd?.();
+    }
+    if (heldKeyZoomChord !== null) {
+      heldKeyZoomChord = null;
+      options.onChordPressEnd?.();
+    }
+    if (heldFretDot !== null) {
+      heldFretDot = null;
+      options.onFretDotPressEnd?.();
     }
   }
 

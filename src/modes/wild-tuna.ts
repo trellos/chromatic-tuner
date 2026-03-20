@@ -394,6 +394,58 @@ export function createWildTunaMode(): ModeDefinition {
     return fretSample;
   };
 
+  // Fretboard sustain — looped playback while a dot is held.
+  let fretSustainVoice: { sources: AudioBufferSourceNode[]; gains: GainNode[] } | null = null;
+
+  const stopFretSustain = (): void => {
+    const voice = fretSustainVoice;
+    if (!voice) return;
+    fretSustainVoice = null;
+    const ctx = audioContext;
+    const now = ctx?.currentTime ?? 0;
+    const releaseSec = 0.09;
+    voice.gains.forEach((gain) => {
+      const current = Math.max(0.0001, gain.gain.value);
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(current, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSec);
+    });
+    voice.sources.forEach((source) => {
+      try { source.stop(now + releaseSec + 0.02); } catch { /* already stopped */ }
+    });
+  };
+
+  const startFretSustain = async (targets: Array<{ midi: number; stringIndex: number }>): Promise<void> => {
+    stopFretSustain();
+    const ctx = await ensureAudioContext();
+    if (!ctx) return;
+    const sample = await ensureFretSample(ctx);
+    if (!sample) return;
+    // Simple fixed-fraction loop region (no zero-crossing search needed for short hold).
+    const loopStart = sample.duration * 0.30;
+    const loopEnd = sample.duration * 0.82;
+    const at = ctx.currentTime + 0.008;
+    const sources: AudioBufferSourceNode[] = [];
+    const gains: GainNode[] = [];
+    for (const { midi } of targets) {
+      const source = ctx.createBufferSource();
+      source.buffer = sample;
+      source.playbackRate.value = Math.pow(2, (midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
+      source.loop = true;
+      source.loopStart = loopStart;
+      source.loopEnd = loopEnd;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(FRETBOARD_SAMPLE_GAIN, at + 0.02);
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(at);
+      sources.push(source);
+      gains.push(gain);
+    }
+    fretSustainVoice = { sources, gains };
+  };
+
   const playFretTargets = async (targets: Array<{ midi: number; stringIndex: number }>, durationMs: number, shouldRecord: boolean): Promise<void> => {
     if (!targets.length) return;
     const midis = targets.map((t) => t.midi);
@@ -596,12 +648,12 @@ export function createWildTunaMode(): ModeDefinition {
         onKeyPressStart: (semitone, isMinor) => {
           // Start sustain when the user presses down on a circle flower.
           const midis = isMinor ? minorChordMidis(semitone) : majorChordMidis(semitone);
-          circleLooper?.recordPulse(midis, 640);
+          circleLooper?.recordHoldStart("circle-key", midis);
           noteTracker.notesStarted(midis.length, 640);
-          jamFlowUi?.pulseChord(midis, 640);
           void guitarPlayer.startSustainChord(midis);
         },
         onKeyPressEnd: () => {
+          circleLooper?.recordHoldEnd("circle-key");
           guitarPlayer.stopSustain();
         },
         onInnerDoubleTap: () => {
@@ -609,14 +661,35 @@ export function createWildTunaMode(): ModeDefinition {
           jamFlowUi?.setInstrumentLabel(name);
         },
         onChordTap: (chord) => {
-          // Tap a diatonic chord flower in key-zoom mode → play that chord
-          void playCircleMidis(diatonicChordMidis(chord), 640, true);
+          // Pressed down on a key-zoom chord flower → start sustain.
+          const midis = diatonicChordMidis(chord);
+          circleLooper?.recordHoldStart("key-zoom-chord", midis);
+          noteTracker.notesStarted(midis.length, 640);
+          void guitarPlayer.startSustainChord(midis);
         },
-        onNoteBarTap: (semitone) => {
-          void playCircleMidis([48 + semitone], 380, true);
+        onChordPressEnd: () => {
+          circleLooper?.recordHoldEnd("key-zoom-chord");
+          guitarPlayer.stopSustain();
+        },
+        onNoteBarPressStart: (semitone) => {
+          const midi = 48 + semitone;
+          circleLooper?.recordHoldStart("note-bar", [midi]);
+          noteTracker.notesStarted(1, 640);
+          void guitarPlayer.startSustainMidi(midi);
+        },
+        onNoteBarPressEnd: (_semitone) => {
+          circleLooper?.recordHoldEnd("note-bar");
+          guitarPlayer.stopSustain();
         },
         onFretDotTap: (midi, stringIndex) => {
-          void playFretTargets([{ midi, stringIndex }], 360, true);
+          // Pressed down on a fretboard dot → start sustain.
+          fretboardLooper?.recordHoldStart("fret-dot", [midi]);
+          noteTracker.notesStarted(1, 360);
+          void startFretSustain([{ midi, stringIndex }]);
+        },
+        onFretDotPressEnd: () => {
+          fretboardLooper?.recordHoldEnd("fret-dot");
+          stopFretSustain();
         },
         isRecording: () => {
           const cs = circleLooper?.getRecordState();
@@ -681,6 +754,7 @@ export function createWildTunaMode(): ModeDefinition {
       seigaihaBridge.setModeRandomness(null);
       guitarPlayer.stopSustain();
       guitarPlayer.stopAll();
+      stopFretSustain();
       drumUi?.exit();
       drumUi?.destroy();
       drumUi = null;
