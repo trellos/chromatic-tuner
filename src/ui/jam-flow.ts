@@ -1055,8 +1055,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             tapNow - lastFretDotTap.atMs < 400;
           lastFretDotTap = { stringIndex: dot.stringIndex, fret: dot.fret, atMs: tapNow };
 
-          if (isDoubleTap) {
-            // Zoom to octave range centered on this note
+          if (isDoubleTap && fretboardZoom === null) {
+            // Zoom to octave range centered on this note (only when not already zoomed)
             fretboardZoom = computeFretboardZoomForNote(dot.stringIndex, dot.fret);
           } else {
             options.onFretDotTap?.(dot.midi, dot.stringIndex);
