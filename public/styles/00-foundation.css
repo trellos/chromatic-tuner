@@ -445,8 +445,8 @@ body.drum-fullscreen .mode-stage {
   display: none;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr);
-  /* Timeline (auto) sits above the drum machine, then jam-flow canvas pane. */
-  grid-template-rows: auto 1.1fr 1fr;
+  /* Timeline (auto) + drum (auto, sizes to content) + jam-flow canvas (fills remaining). */
+  grid-template-rows: auto auto 1fr;
   height: 100%;
   margin: 0 auto;
   max-width: min(700px, 100%);
@@ -812,6 +812,27 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
   min-width: 0;
 }
 
+/* Step columns: remove the 18px minimum so they shrink to fit on narrow screens. */
+.wild-tuna-pane--drum .drum-steps {
+  grid-template-columns: repeat(var(--drum-step-count, 16), minmax(0, 1fr));
+}
+
+@media (max-width: 480px) {
+  /* Tighten drum-grids padding and row chrome so 16 steps have enough room. */
+  .wild-tuna-pane--drum .drum-grids {
+    padding: 10px 10px;
+  }
+
+  .wild-tuna-pane--drum .drum-row {
+    gap: 6px;
+    grid-template-columns: 42px 1fr;
+  }
+
+  .wild-tuna-pane--drum .drum-steps {
+    gap: 4px;
+  }
+}
+
 .wild-tuna-pane--drum .drum-tempo {
   flex-shrink: 0;
 }
@@ -819,7 +840,7 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
 @media (max-width: 900px) {
   .wild-tuna-composite {
     gap: 8px;
-    grid-template-rows: auto 1.1fr 1fr;
+    grid-template-rows: auto auto 1fr;
   }
 }
 
