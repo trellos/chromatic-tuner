@@ -26,8 +26,20 @@ const MAJOR_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
 // Chord qualities for each scale degree
 const DEGREE_QUALITIES = ["major", "minor", "minor", "major", "major", "minor", "diminished"];
 
-// Roman numeral labels
+// Roman numeral labels (major scale — used for the I chord and direct major-mode display)
 const DEGREE_ROMAN = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+
+// Upper- and lower-case numerals (without quality suffix) for relative-mode labels
+const DEGREE_ROMAN_UPPER = ["I", "II", "III", "IV", "V", "VI", "VII"];
+const DEGREE_ROMAN_LOWER = ["i", "ii", "iii", "iv", "v", "vi", "vii"];
+
+// Roman numeral for a chord at `effDeg` position whose actual quality is `quality`.
+// Used when a relative root is active so the numeral reflects the mode's chord qualities.
+function relativeRoman(effDeg: number, quality: string): string {
+  if (quality === "major") return DEGREE_ROMAN_UPPER[effDeg]!;
+  if (quality === "diminished") return DEGREE_ROMAN_LOWER[effDeg]! + "°";
+  return DEGREE_ROMAN_LOWER[effDeg]!; // minor
+}
 
 // Petal counts per degree tier
 const DEGREE_PETAL_COUNTS = [18, 14, 14, 16, 16, 14, 10];
@@ -1273,7 +1285,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         const ec = degreeColors(effDeg);
         colorA     = ec.colorA;
         colorB     = ec.colorB;
-        roman      = DEGREE_ROMAN[effDeg]!;
+        // Roman numeral reflects the chord's actual quality at this modal position
+        roman      = relativeRoman(effDeg, chord.quality);
         petalCount = DEGREE_PETAL_COUNTS[effDeg]!;
       }
 
