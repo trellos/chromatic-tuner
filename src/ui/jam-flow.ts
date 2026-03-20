@@ -854,6 +854,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     (semitone) => {
       // Grow a live trail while the note is held.
       liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
+      addFastTrail(semitone);
       options.onNoteBarPressStart?.(semitone);
       if (transitionActive) return;
       if (currentMode === "key-zoom") {
@@ -866,11 +867,9 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       // Freeze trail width and let it slide off.
       if (liveSustainTrail !== null && liveSustainTrail.semitone === semitone) {
         const holdDuration = performance.now() - liveSustainTrail.startT;
-        const { color, startT: pressStartT } = liveSustainTrail;
+        const { color } = liveSustainTrail;
         // Slow trail: startT = now so elapsed=0 → right edge stays at w (no pop).
         slowTrails.push({ semitone, color, startT: performance.now(), durationMs: holdDuration });
-        // Fast trail: startT = press-start so elapsed=durationMs → already full-width, slides off.
-        noteTrails.push({ semitone, color, startT: pressStartT, durationMs: holdDuration });
         liveSustainTrail = null;
       }
       options.onNoteBarPressEnd?.(semitone);
@@ -938,6 +937,20 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     slowTrails.push({ semitone, color, startT, durationMs });
   }
 
+  // Fast trail only — emitted at press-start so it grows as the note rings.
+  const FAST_TRAIL_DEFAULT_MS = 640;
+  function addFastTrail(semitone: number): void {
+    const color = getNoteTrailColor(semitone);
+    noteTrails.push({ semitone, color, startT: performance.now(), durationMs: FAST_TRAIL_DEFAULT_MS });
+  }
+
+  // Returns [root, third, fifth] semitones (mod 12) for a chord quality.
+  function getTriadSemitones(root: number, quality: string): [number, number, number] {
+    const third = quality === "major" ? 4 : 3; // minor and diminished both use minor third
+    const fifth  = quality === "diminished" ? 6 : 7;
+    return [root, (root + third) % 12, (root + fifth) % 12];
+  }
+
   // ── Tap detection ──────────────────────────────────────────────────────────
 
   function handleCanvasPointerDown(evt: PointerEvent) {
@@ -986,6 +999,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
           // Start live sustain trail anchored at right edge.
           liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
+
+          // Emit fast trails for all 3 triad notes at press-start.
+          const circleQuality = isMinor ? "minor" : "major";
+          for (const s of getTriadSemitones(semitone, circleQuality)) addFastTrail(s);
 
           // Pulse ring on the flower.
           const chForPulse = selectedKey !== null
@@ -1057,6 +1074,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             const chord = chords[deg]!;
             heldKeyZoomChord = chord;
             liveSustainTrail = { semitone: chord.semitone, color: chord.colorA, startT: tapNow };
+            for (const s of getTriadSemitones(chord.semitone, chord.quality)) addFastTrail(s);
             addPulseAtCanvas(pos.x, pos.y, pos.r, chord.colorA, 400);
             options.onChordTap?.(chord);
           }
@@ -1073,6 +1091,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
           const chord = chords[deg]!;
           heldKeyZoomChord = chord;
           liveSustainTrail = { semitone: chord.semitone, color: chord.colorA, startT: performance.now() };
+          for (const s of getTriadSemitones(chord.semitone, chord.quality)) addFastTrail(s);
           addPulseAtCanvas(pos.x, pos.y, pos.r, chord.colorA, 400);
           options.onChordTap?.(chord);
           return;
@@ -1119,6 +1138,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
           } else {
             heldFretDot = { midi: dot.midi, stringIndex: dot.stringIndex };
             liveSustainTrail = { semitone: dot.midi % 12, color: getNoteTrailColor(dot.midi % 12), startT: performance.now() };
+            addFastTrail(dot.midi % 12);
             options.onFretDotTap?.(dot.midi, dot.stringIndex);
             addDotPulse(dot.stringIndex, dot.fret);
           }
@@ -1137,11 +1157,9 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     // Finalize the live sustain trail for whichever mode was held.
     if (liveSustainTrail !== null) {
       const holdDuration = performance.now() - liveSustainTrail.startT;
-      const { semitone, color, startT: pressStartT } = liveSustainTrail;
+      const { semitone, color } = liveSustainTrail;
       // Slow trail: startT = now so elapsed=0 → right edge stays at w (no pop).
       slowTrails.push({ semitone, color, startT: performance.now(), durationMs: holdDuration });
-      // Fast trail: startT = press-start so elapsed=durationMs → already full-width, slides off.
-      noteTrails.push({ semitone, color, startT: pressStartT, durationMs: holdDuration });
       liveSustainTrail = null;
     }
     if (heldCircleKey !== null) {
