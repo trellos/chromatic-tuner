@@ -865,7 +865,12 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     (semitone) => {
       // Freeze trail width and let it slide off.
       if (liveSustainTrail !== null && liveSustainTrail.semitone === semitone) {
-        slowTrails.push({ ...liveSustainTrail, durationMs: performance.now() - liveSustainTrail.startT });
+        const holdDuration = performance.now() - liveSustainTrail.startT;
+        const { color, startT: pressStartT } = liveSustainTrail;
+        // Slow trail: startT = now so elapsed=0 → right edge stays at w (no pop).
+        slowTrails.push({ semitone, color, startT: performance.now(), durationMs: holdDuration });
+        // Fast trail: startT = press-start so elapsed=durationMs → already full-width, slides off.
+        noteTrails.push({ semitone, color, startT: pressStartT, durationMs: holdDuration });
         liveSustainTrail = null;
       }
       options.onNoteBarPressEnd?.(semitone);
@@ -1131,7 +1136,12 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   function handleCanvasPointerUp(_evt: PointerEvent) {
     // Finalize the live sustain trail for whichever mode was held.
     if (liveSustainTrail !== null) {
-      slowTrails.push({ ...liveSustainTrail, durationMs: performance.now() - liveSustainTrail.startT });
+      const holdDuration = performance.now() - liveSustainTrail.startT;
+      const { semitone, color, startT: pressStartT } = liveSustainTrail;
+      // Slow trail: startT = now so elapsed=0 → right edge stays at w (no pop).
+      slowTrails.push({ semitone, color, startT: performance.now(), durationMs: holdDuration });
+      // Fast trail: startT = press-start so elapsed=durationMs → already full-width, slides off.
+      noteTrails.push({ semitone, color, startT: pressStartT, durationMs: holdDuration });
       liveSustainTrail = null;
     }
     if (heldCircleKey !== null) {
