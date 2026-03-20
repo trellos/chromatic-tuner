@@ -393,6 +393,69 @@ function computeFretboardLayout(availW: number, availH: number, noteBarW: number
   return { x, y, w, h, stringXs, fretYs, nutY, dotRadius };
 }
 
+// Computes the octave zoom viewport for a double-tapped note.
+// The note's fret is placed 1 fret from the left of the view; 4 more frets follow.
+// Strings: if stringIndex <= 3, show strings [s, s+1, s+2]; if B (4) or high e (5),
+// treat as the high note and show 2 lower strings instead.
+function computeFretboardZoomForNote(
+  stringIndex: number,
+  fret: number
+): { fretStart: number; fretCount: number; stringStart: number; stringCount: number } {
+  const fretStart = Math.max(0, fret - 1);
+  const fretCount = 6; // 1 before + note + 4 after
+  let stringStart: number;
+  if (stringIndex >= 4) {
+    // B or high e: zoom to lower strings so the tapped string is on the right
+    stringStart = stringIndex - 2;
+  } else {
+    stringStart = stringIndex;
+  }
+  stringStart = Math.max(0, Math.min(3, stringStart)); // keep in bounds (0..3 for 3-string view)
+  return { fretStart, fretCount, stringStart, stringCount: 3 };
+}
+
+// Computes a fretboard layout where the zoom range fills the full display area.
+function computeFretboardLayoutZoomed(
+  availW: number,
+  availH: number,
+  noteBarW: number,
+  zoom: { fretStart: number; fretCount: number; stringStart: number; stringCount: number }
+): FretboardLayout {
+  const pad = 8;
+  const topPad = 28;
+
+  const GOLDEN = 1.618;
+  const fullW = availW - noteBarW - pad * 2;
+  const h = availH - topPad - pad;
+  const maxW = Math.floor(h / GOLDEN);
+  const w = Math.round(Math.min(fullW, maxW));
+  const xOff = Math.round((fullW - w) / 2);
+  const x = pad + xOff;
+  const y = topPad;
+
+  // Map zoomed string range to full width
+  const stringGaps = zoom.stringCount - 1 || 1;
+  const zoomStringSpacing = w / stringGaps;
+
+  // Map zoomed fret range to full height
+  const zoomFretSpacing = h / zoom.fretCount;
+
+  // Compute all 6 string X positions extrapolated from zoom
+  const stringXs = Array.from({ length: 6 }, (_, i) =>
+    x + (i - zoom.stringStart) * zoomStringSpacing
+  );
+
+  // Compute all fret Y positions extrapolated from zoom
+  const fretYs = Array.from({ length: FRET_COUNT + 1 }, (_, i) =>
+    y + (i - zoom.fretStart) * zoomFretSpacing
+  );
+
+  const nutY = fretYs[0]!;
+  const dotRadius = Math.min(zoomStringSpacing * 0.38, 18);
+
+  return { x, y, w, h, stringXs, fretYs, nutY, dotRadius };
+}
+
 function drawFretboard(
   ctx: CanvasRenderingContext2D,
   layout: FretboardLayout,
@@ -634,6 +697,11 @@ export type JamFlowOptions = {
    * that are relevant to the currently visible instrument.
    */
   onModeChange?: (mode: "circle" | "key-zoom" | "fretboard") => void;
+  /**
+   * Returns the duration of one measure in milliseconds (used to set the speed
+   * of the recent-history note trail, which scrolls across in 2 measures).
+   */
+  getMeasureDurationMs?: () => number;
 };
 
 export type JamFlowUi = {
@@ -692,6 +760,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   // Note bar trail state: rectangles that grow leftward from the note bar
   type NoteTrail = { semitone: number; color: string; startT: number; durationMs: number };
   const noteTrails: NoteTrail[] = [];
+  // Slow "recent history" trails: same concept but move across screen in 2 measures
+  const slowTrails: NoteTrail[] = [];
 
   // Relative-mode state: which degree index is currently the "root" in key-zoom
   let relativeRootDeg: number | null = null;
@@ -699,6 +769,11 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   // Double-tap tracking for key-zoom chord flowers
   let lastTapDeg: number | null = null;
   let lastTapTime = 0;
+
+  // Fretboard double-tap zoom state
+  type FretboardZoom = { fretStart: number; fretCount: number; stringStart: number; stringCount: number };
+  let fretboardZoom: FretboardZoom | null = null;
+  let lastFretDotTap = { stringIndex: -1, fret: -1, atMs: 0 };
 
   // Mode-name tessellated animation (triggered by double-tap)
   type ModeAnim = { startT: number; modeName: string };
@@ -770,9 +845,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   }
 
   function addNoteTrail(semitone: number, durationMs: number) {
-    // Only emit trails when circle or key-zoom is visible
-    if (currentMode === "fretboard" && !transitionActive) return;
-    noteTrails.push({ semitone, color: getNoteTrailColor(semitone), startT: performance.now(), durationMs });
+    const color = getNoteTrailColor(semitone);
+    const startT = performance.now();
+    noteTrails.push({ semitone, color, startT, durationMs });
+    slowTrails.push({ semitone, color, startT, durationMs });
   }
 
   // ── Tap detection ──────────────────────────────────────────────────────────
@@ -856,22 +932,45 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       if (!options.isRecording?.()) {
         startTransition("key-zoom", "circle", false);
       }
-    } else if (currentMode === "fretboard" && fretboardLayout && selectedKey !== null) {
+    } else if (currentMode === "fretboard" && selectedKey !== null) {
+      // Use zoom layout if active, otherwise base layout
+      const activeLayout = fretboardZoom
+        ? computeFretboardLayoutZoomed(w, h, 0, fretboardZoom)
+        : fretboardLayout;
+      if (!activeLayout) return;
       // Tap a dot
       const dots = getFretboardDots(selectedKey);
+      let hitDot = false;
       for (const dot of dots) {
-        const sx = fretboardLayout.stringXs[dot.stringIndex]!;
+        const sx = activeLayout.stringXs[dot.stringIndex]!;
         const fy = dot.fret === 0
-          ? fretboardLayout.nutY - fretboardLayout.dotRadius * 1.1
-          : (fretboardLayout.fretYs[dot.fret - 1]! + fretboardLayout.fretYs[dot.fret]!) / 2;
-        const r = fretboardLayout.dotRadius * (dot.fret === 0 ? 0.7 : 1);
+          ? activeLayout.nutY - activeLayout.dotRadius * 1.1
+          : (activeLayout.fretYs[dot.fret - 1]! + activeLayout.fretYs[dot.fret]!) / 2;
+        const r = activeLayout.dotRadius * (dot.fret === 0 ? 0.7 : 1);
         const dx = mx - sx;
         const dy = my - fy;
         if (dx * dx + dy * dy <= r * r * 1.4) {
-          options.onFretDotTap?.(dot.midi, dot.stringIndex);
-          addDotPulse(dot.stringIndex, dot.fret);
+          const tapNow = performance.now();
+          const isDoubleTap =
+            lastFretDotTap.stringIndex === dot.stringIndex &&
+            lastFretDotTap.fret === dot.fret &&
+            tapNow - lastFretDotTap.atMs < 400;
+          lastFretDotTap = { stringIndex: dot.stringIndex, fret: dot.fret, atMs: tapNow };
+
+          if (isDoubleTap) {
+            // Zoom to octave range centered on this note
+            fretboardZoom = computeFretboardZoomForNote(dot.stringIndex, dot.fret);
+          } else {
+            options.onFretDotTap?.(dot.midi, dot.stringIndex);
+            addDotPulse(dot.stringIndex, dot.fret);
+          }
+          hitDot = true;
           return;
         }
+      }
+      // Tapping background clears zoom
+      if (!hitDot && fretboardZoom) {
+        fretboardZoom = null;
       }
     }
   }
@@ -1021,7 +1120,10 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       }
     } else if (mode === "fretboard") {
       if (fretboardLayout) {
-        drawFretboard(ctx, fretboardLayout, selectedKey, 1, true, relativeRootDeg ?? 0);
+        const activeLayout = fretboardZoom
+          ? computeFretboardLayoutZoomed(w, h, 0, fretboardZoom)
+          : fretboardLayout;
+        drawFretboard(ctx, activeLayout, selectedKey, 1, true, relativeRootDeg ?? 0);
       }
     }
   }
@@ -1178,7 +1280,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     const relOff = relativeRootDeg ?? 0;
     drawFretboard(ctx, fretboardLayout, selectedKey, fretOpacity, t > 0.5, relOff);
 
-    // Kiku flowers fade out
+    // Kiku flowers fade out (no labels — key zoom never shows notes inside flowers)
     const flowerOpacity = 1 - t;
     if (flowerOpacity > 0) {
       const drawOrder: DegreeIndex[] = [6, 1, 2, 5, 3, 4, 0];
@@ -1186,7 +1288,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         const chord = chords[deg]!;
         const pos = keyZoomPositions[deg]!;
         drawKiku(ctx, pos.x, pos.y, pos.r, chord.petalCount,
-          chord.colorA, chord.colorB, chord.chordName, chord.roman, flowerOpacity);
+          chord.colorA, chord.colorB, undefined, undefined, flowerOpacity);
       }
     }
 
@@ -1250,43 +1352,41 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
-  function drawTrails(now: number, w: number, h: number) {
-    // Each trail is a rectangle that emerges from the note bar (right edge of canvas)
-    // and grows leftward while the note plays, then slides off-screen to the left.
+  function drawOneTrailSet(
+    trails: NoteTrail[],
+    now: number,
+    w: number,
+    h: number,
+    speed: number,
+    maxAlpha: number,
+    trailHeightFraction: number
+  ): void {
     const noteH = h / 12;
-    const trailH = noteH * 0.46;
-    // Growth speed: fills the canvas in ~550 ms
-    const SPEED = w / 550; // px / ms
+    const trailH = noteH * trailHeightFraction;
     const alive: NoteTrail[] = [];
 
-    for (const trail of noteTrails) {
+    for (const trail of trails) {
       const elapsed = now - trail.startT;
-      // Maximum trail width is one canvas width; grows at SPEED px/ms
-      const maxW = Math.min(w, trail.durationMs * SPEED);
-      const exitDuration = maxW / SPEED; // ms to slide the full width off screen
+      const maxW = Math.min(w, trail.durationMs * speed);
+      const exitDuration = maxW / speed;
 
       if (elapsed >= trail.durationMs + exitDuration) continue;
       alive.push(trail);
 
-      // Semitone 0 (C) is at the top of the note bar, 11 (B) at the bottom.
-      // Approximate button centre Y using (s + 0.5) / 12 of the canvas height,
-      // offset by 4 px top padding inside the note bar host.
       const y = 4 + (trail.semitone + 0.5) * (h - 8) / 12;
 
       let drawLeft: number, drawRight: number, alpha: number;
       if (elapsed < trail.durationMs) {
-        // Growing phase: right edge anchored at w, left edge moves left
-        const currentW = Math.min(maxW, elapsed * SPEED);
+        const currentW = Math.min(maxW, elapsed * speed);
         drawRight = w;
         drawLeft = w - currentW;
-        alpha = 0.62;
+        alpha = maxAlpha;
       } else {
-        // Sliding phase: full-width rect slides left, fades out
-        const slide = (elapsed - trail.durationMs) * SPEED;
+        const slide = (elapsed - trail.durationMs) * speed;
         drawRight = w - slide;
         drawLeft = w - maxW - slide;
         if (drawRight <= 0) continue;
-        alpha = 0.62 * (1 - (elapsed - trail.durationMs) / exitDuration);
+        alpha = maxAlpha * (1 - (elapsed - trail.durationMs) / exitDuration);
       }
 
       const visLeft  = Math.max(0, drawLeft);
@@ -1300,8 +1400,25 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
       ctx.restore();
     }
 
-    noteTrails.length = 0;
-    noteTrails.push(...alive);
+    trails.length = 0;
+    trails.push(...alive);
+  }
+
+  function drawTrails(now: number, w: number, h: number) {
+    // Each trail is a rectangle that emerges from the note bar (right edge of canvas)
+    // and grows leftward while the note plays, then slides off-screen to the left.
+
+    // Fast trail: fills canvas in ~550 ms, semi-transparent
+    const FAST_SPEED = w / 550;
+
+    // Slow "recent history" trail: fills canvas in 2 measures, more opaque
+    const measureDurationMs = options.getMeasureDurationMs?.() ?? 2000;
+    const SLOW_SPEED = w / (2 * measureDurationMs);
+
+    // Draw slow trail first (below fast trail)
+    drawOneTrailSet(slowTrails, now, w, h, SLOW_SPEED, 0.62, 0.54);
+    // Draw fast trail on top, more transparent
+    drawOneTrailSet(noteTrails, now, w, h, FAST_SPEED, 0.32, 0.46);
   }
 
   function drawPulses(now: number) {
@@ -1382,21 +1499,28 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   }
 
   function pulseTargets(targets: Array<{ midi: number; stringIndex: number }>, durationMs: number) {
+    // Add note trails for all targets
+    for (const t of targets) {
+      addNoteTrail(t.midi % 12, durationMs);
+    }
+
+    if (!fretboardLayout) return;
+    const activeLayout = fretboardZoom
+      ? computeFretboardLayoutZoomed(cachedW, cachedH, 0, fretboardZoom)
+      : fretboardLayout;
+
     for (const t of targets) {
       const semitone = t.midi % 12;
-      if (fretboardLayout) {
-        // Find matching dot position
-        const sx = fretboardLayout.stringXs[t.stringIndex];
-        if (sx !== undefined && selectedKey !== null) {
-          const dots = getFretboardDots(selectedKey);
-          const match = dots.find((d) => d.stringIndex === t.stringIndex && d.semitone === semitone);
-          if (match) {
-            const fy = match.fret === 0
-              ? fretboardLayout.nutY - fretboardLayout.dotRadius * 1.1
-              : (fretboardLayout.fretYs[match.fret - 1]! + fretboardLayout.fretYs[match.fret]!) / 2;
-            const r = fretboardLayout.dotRadius;
-            addPulseAtCanvas(sx, fy, r, COLOR_WHITE, durationMs);
-          }
+      const sx = activeLayout.stringXs[t.stringIndex];
+      if (sx !== undefined && selectedKey !== null) {
+        const dots = getFretboardDots(selectedKey);
+        const match = dots.find((d) => d.stringIndex === t.stringIndex && d.semitone === semitone);
+        if (match) {
+          const fy = match.fret === 0
+            ? activeLayout.nutY - activeLayout.dotRadius * 1.1
+            : (activeLayout.fretYs[match.fret - 1]! + activeLayout.fretYs[match.fret]!) / 2;
+          const r = activeLayout.dotRadius;
+          addPulseAtCanvas(sx, fy, r, COLOR_WHITE, durationMs);
         }
       }
     }

@@ -221,9 +221,11 @@
 
 .drum-label {
   color: rgba(15, 23, 42, 0.7);
+  cursor: pointer;
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  user-select: none;
 }
 
 .drum-step-toggle {
@@ -268,6 +270,16 @@
 
 /* Keep "on" state always visible regardless of beat accent */
 .step.is-on {
+  background: linear-gradient(135deg, var(--tuna-purple), var(--tuna-aqua));
+  border-color: rgba(0, 245, 212, 0.6);
+  box-shadow: 0 6px 12px rgba(0, 245, 212, 0.25);
+}
+
+/* Override beat accent on activated steps so is-on is always visible */
+.drum-mock[data-steps="16"] .step.is-on:nth-child(n+5):nth-child(-n+8),
+.drum-mock[data-steps="16"] .step.is-on:nth-child(n+13):nth-child(-n+16),
+.drum-mock[data-steps="8"] .step.is-on:nth-child(n+3):nth-child(-n+4),
+.drum-mock[data-steps="8"] .step.is-on:nth-child(n+7):nth-child(-n+8) {
   background: linear-gradient(135deg, var(--tuna-purple), var(--tuna-aqua));
   border-color: rgba(0, 245, 212, 0.6);
   box-shadow: 0 6px 12px rgba(0, 245, 212, 0.25);

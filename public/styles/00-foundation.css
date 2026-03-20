@@ -753,6 +753,26 @@ body.wild-tuna-fullscreen .wt-fullscreen-close:focus-visible {
   width: 100%;
 }
 
+@media (max-width: 600px) {
+  .wild-tuna-pane--drum .drum-ui {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    padding: 8px 10px;
+  }
+
+  .wild-tuna-pane--drum .drum-tempo {
+    flex-basis: 100%;
+    justify-content: center;
+    order: 1;
+  }
+
+  .wild-tuna-pane--drum .drum-play {
+    order: 4;
+  }
+}
+
 .wild-tuna-pane--drum .drum-play {
   flex-shrink: 0;
   min-height: 34px;
