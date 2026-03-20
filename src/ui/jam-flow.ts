@@ -771,8 +771,11 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   // Currently held circle flower (for sustain + minor label display)
   let heldCircleKey: { semitone: number; isMinor: boolean } | null = null;
 
+  // Live sustain trail: grows from right edge while a circle flower is held
+  let liveSustainTrail: { semitone: number; color: string; startT: number } | null = null;
+
   // Double-tap tracking for circle flowers
-  let lastCircleTapInfo: { semitone: number; isMinor: boolean; atMs: number } | null = null;
+  let lastCircleTapInfo: { semitone: number; atMs: number } | null = null;
 
   // Double-tap tracking for center area in circle mode (instrument change)
   let lastCenterTapTime = 0;
@@ -914,23 +917,26 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         const distSq = dx * dx + dy * dy;
         if (distSq <= pos.r * pos.r) {
           const semitone = CIRCLE_ORDER[i]!;
-          // Inner 1/3 radius → minor chord
-          const isMinor = distSq <= (pos.r / 3) * (pos.r / 3);
+          // Inner 45% of radius → minor chord; outer zone → major chord
+          const isMinor = distSq <= (pos.r * 0.45) * (pos.r * 0.45);
 
           // Update held state for visual minor-label feedback
           heldCircleKey = { semitone, isMinor };
+
+          // Start live sustain trail anchored at right edge
+          liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
 
           // Start sustain
           options.onKeyPressStart?.(semitone, isMinor);
 
           // Double-tap detection → enter key zoom
+          // (same semitone within 450 ms; inner/outer zone does not need to match)
           const tapNow = performance.now();
           const isDoubleTap =
             lastCircleTapInfo !== null &&
             lastCircleTapInfo.semitone === semitone &&
-            lastCircleTapInfo.isMinor === isMinor &&
             tapNow - lastCircleTapInfo.atMs < 450;
-          lastCircleTapInfo = { semitone, isMinor, atMs: tapNow };
+          lastCircleTapInfo = { semitone, atMs: tapNow };
 
           if (isDoubleTap) {
             if (isMinor) {
@@ -1052,6 +1058,12 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   function handleCanvasPointerUp(_evt: PointerEvent) {
     if (currentMode === "circle" && heldCircleKey !== null) {
+      // Convert the live sustain trail into a fixed slow trail entry
+      if (liveSustainTrail !== null) {
+        const durationMs = performance.now() - liveSustainTrail.startT;
+        slowTrails.push({ ...liveSustainTrail, durationMs });
+        liveSustainTrail = null;
+      }
       heldCircleKey = null;
       options.onKeyPressEnd?.();
     }
@@ -1546,6 +1558,23 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
     // Draw slow trail first (below fast trail) — no fade, full alpha
     drawSlowTrailSet(slowTrails, now, w, h, SLOW_SPEED, 0.62, 0.54);
+
+    // Render live sustain trail: grows leftward from right edge while key is held
+    if (liveSustainTrail !== null) {
+      const elapsed = now - liveSustainTrail.startT;
+      const barW = Math.min(w, elapsed * SLOW_SPEED);
+      if (barW > 0) {
+        const noteH = h / 12;
+        const trailH = noteH * 0.54;
+        const y = 4 + (liveSustainTrail.semitone + 0.5) * (h - 8) / 12;
+        ctx.save();
+        ctx.globalAlpha = 0.62;
+        ctx.fillStyle = liveSustainTrail.color;
+        ctx.fillRect(w - barW, y - trailH / 2, barW, trailH);
+        ctx.restore();
+      }
+    }
+
     // Draw fast trail on top, more transparent — fades as it exits
     drawFastTrailSet(noteTrails, now, w, h, FAST_SPEED, 0.32, 0.46);
   }
