@@ -394,8 +394,9 @@ export function createWildTunaMode(): ModeDefinition {
     return fretSample;
   };
 
-  const playFretMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
-    if (!midis.length) return;
+  const playFretTargets = async (targets: Array<{ midi: number; stringIndex: number }>, durationMs: number, shouldRecord: boolean): Promise<void> => {
+    if (!targets.length) return;
+    const midis = targets.map((t) => t.midi);
     if (shouldRecord) fretboardLooper?.recordPulse(midis, durationMs);
     noteTracker.notesStarted(midis.length, durationMs);
     const ctx = await ensureAudioContext();
@@ -415,7 +416,11 @@ export function createWildTunaMode(): ModeDefinition {
         source.stop(startAt + durationMs / 1000);
       }
     });
-    jamFlowUi?.pulseTargets(midis.map((midi) => ({ midi, stringIndex: 0 })), durationMs);
+    jamFlowUi?.pulseTargets(targets, durationMs);
+  };
+
+  const playFretMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
+    return playFretTargets(midis.map((midi) => ({ midi, stringIndex: 0 })), durationMs, shouldRecord);
   };
 
   const playCircleMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
@@ -575,6 +580,7 @@ export function createWildTunaMode(): ModeDefinition {
       guitarPlayer.setInstrument("guitar-acoustic");
 
       jamFlowUi = createJamFlowUi(jamFlowHost, {
+        getMeasureDurationMs: () => (60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000,
         onKeySelect: (semitone) => {
           // Playing a key flower plays its major chord
           void playCircleMidis(majorChordMidis(semitone), 640, true);
@@ -586,8 +592,8 @@ export function createWildTunaMode(): ModeDefinition {
         onNoteBarTap: (semitone) => {
           void playCircleMidis([48 + semitone], 380, true);
         },
-        onFretDotTap: (midi) => {
-          void playFretMidis([midi], 360, true);
+        onFretDotTap: (midi, stringIndex) => {
+          void playFretTargets([{ midi, stringIndex }], 360, true);
         },
         isRecording: () => {
           const cs = circleLooper?.getRecordState();

@@ -1234,7 +1234,19 @@ export function createDrumMachineUi(
       "click",
       (event) => {
         const target = event.target as HTMLElement | null;
-        if (!target?.classList.contains("step")) return;
+        if (!target) return;
+        // Tapping a drum label previews that voice's sample.
+        if (target.classList.contains("drum-label")) {
+          const row = target.closest<HTMLElement>(".drum-row");
+          const voice = row?.dataset.voice as VoiceId | undefined;
+          if (voice) {
+            void ensureAudio().then(() => {
+              if (audioContext) playVoice(voice, audioContext.currentTime);
+            });
+          }
+          return;
+        }
+        if (!target.classList.contains("step")) return;
         target.classList.toggle("is-on");
       },
       { signal }
