@@ -494,13 +494,27 @@ body.drum-fullscreen .mode-stage {
 
 /* ── Jam Flow ────────────────────────────────────────────────────────────── */
 .jf-wrapper {
-  background: #1a1c24;
+  background: transparent;
   bottom: 0;
   display: flex;
   left: 0;
   position: absolute;
   right: 0;
   top: 0;
+}
+
+/* Drum pane transition when entering key-zoom / fretboard mode */
+.wild-tuna-pane--drum {
+  transition: opacity 0.4s ease;
+}
+
+.wild-tuna-composite.wt-jam-expanded .wild-tuna-pane--drum {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.wild-tuna-fullscreen .wild-tuna-composite.wt-jam-expanded {
+  grid-template-rows: auto 0px 1fr;
 }
 
 .jf-canvas-wrapper {

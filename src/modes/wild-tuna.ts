@@ -444,6 +444,12 @@ export function createWildTunaMode(): ModeDefinition {
     return [root, root + 4, root + 7];
   }
 
+  // Build minor chord MIDI numbers (root + m3 + P5) from a semitone (0–11).
+  function minorChordMidis(semitone: number): number[] {
+    const root = 48 + semitone;
+    return [root, root + 3, root + 7];
+  }
+
   // Build chord MIDI numbers from a DiatonicChord (respects major/minor/diminished quality).
   function diatonicChordMidis(chord: DiatonicChord): number[] {
     const root = 48 + chord.semitone;
@@ -577,13 +583,30 @@ export function createWildTunaMode(): ModeDefinition {
         }
       });
 
-      guitarPlayer.setInstrument("guitar-acoustic");
+      const initialInstrumentName = guitarPlayer.setInstrument("guitar-acoustic");
+
+      const compositeEl = modeEl.querySelector<HTMLElement>("[data-wild-tuna-composite]");
 
       jamFlowUi = createJamFlowUi(jamFlowHost, {
         getMeasureDurationMs: () => (60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000,
-        onKeySelect: (semitone) => {
-          // Playing a key flower plays its major chord
-          void playCircleMidis(majorChordMidis(semitone), 640, true);
+        onKeySelect: (_semitone) => {
+          // Double-tap entered key zoom — sustain already started via onKeyPressStart.
+          // No additional playback needed here.
+        },
+        onKeyPressStart: (semitone, isMinor) => {
+          // Start sustain when the user presses down on a circle flower.
+          const midis = isMinor ? minorChordMidis(semitone) : majorChordMidis(semitone);
+          circleLooper?.recordPulse(midis, 640);
+          noteTracker.notesStarted(midis.length, 640);
+          jamFlowUi?.pulseChord(midis, 640);
+          void guitarPlayer.startSustainChord(midis);
+        },
+        onKeyPressEnd: () => {
+          guitarPlayer.stopSustain();
+        },
+        onInnerDoubleTap: () => {
+          const name = guitarPlayer.cycleInstrument();
+          jamFlowUi?.setInstrumentLabel(name);
         },
         onChordTap: (chord) => {
           // Tap a diatonic chord flower in key-zoom mode → play that chord
@@ -602,12 +625,18 @@ export function createWildTunaMode(): ModeDefinition {
               || fs === "armed" || fs === "recording" || fs === "stopping";
         },
         onModeChange: (mode) => {
+          // Fade drum machine out when in key-zoom or fretboard to give more space.
+          const inCircle = mode === "circle";
+          compositeEl?.classList.toggle("wt-jam-expanded", !inCircle);
+
           // Show only the looper relevant to the current instrument view
           const showCircle = mode !== "fretboard";
           if (circleLooperHost) circleLooperHost.style.display = showCircle ? "" : "none";
           if (fretboardLooperHost) fretboardLooperHost.style.display = showCircle ? "none" : "";
         },
       });
+      // Set initial instrument label so it reflects the player state
+      jamFlowUi.setInstrumentLabel(initialInstrumentName);
       jamFlowUi.enter();
       await drumUi.enter();
 
