@@ -120,6 +120,12 @@
 - **Resize handling**: Each fretboard viewport observes its parent container; the layout automatically sizes fretboards to fill available space.
 - **Cleanup**: On mode exit, disconnect resize observers, tear down UI instances, and close audio context.
 
+## Mobile audio routing
+- Audio output on mobile **must use the media channel**, not the ringer/notification channel.
+- This is enforced by setting `navigator.audioSession.type = "playback"` (in a try/catch) before creating the `AudioContext` — see `src/app/audio-context-service.ts`.
+- Apply this unconditionally for all browsers, not just iOS; Android Chrome also supports the `audioSession` API.
+- Do **not** move this call inside an iOS-only branch — this bug has recurred and the fix must remain platform-agnostic.
+
 ## Testing expectations
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
