@@ -26,8 +26,20 @@ const MAJOR_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
 // Chord qualities for each scale degree
 const DEGREE_QUALITIES = ["major", "minor", "minor", "major", "major", "minor", "diminished"];
 
-// Roman numeral labels
+// Roman numeral labels (major scale — used for the I chord and direct major-mode display)
 const DEGREE_ROMAN = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+
+// Upper- and lower-case numerals (without quality suffix) for relative-mode labels
+const DEGREE_ROMAN_UPPER = ["I", "II", "III", "IV", "V", "VI", "VII"];
+const DEGREE_ROMAN_LOWER = ["i", "ii", "iii", "iv", "v", "vi", "vii"];
+
+// Roman numeral for a chord at `effDeg` position whose actual quality is `quality`.
+// Used when a relative root is active so the numeral reflects the mode's chord qualities.
+function relativeRoman(effDeg: number, quality: string): string {
+  if (quality === "major") return DEGREE_ROMAN_UPPER[effDeg]!;
+  if (quality === "diminished") return DEGREE_ROMAN_LOWER[effDeg]! + "°";
+  return DEGREE_ROMAN_LOWER[effDeg]!; // minor
+}
 
 // Petal counts per degree tier
 const DEGREE_PETAL_COUNTS = [18, 14, 14, 16, 16, 14, 10];
@@ -605,7 +617,8 @@ const DISPLAY_TO_SEMITONE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 function buildNoteBar(
   hostEl: HTMLElement,
-  onTap: (semitone: number) => void
+  onPressStart: (semitone: number) => void,
+  onPressEnd: (semitone: number) => void,
 ): NoteBarHandle {
   const el = document.createElement("div");
   el.className = "jf-note-bar";
@@ -619,7 +632,21 @@ function buildNoteBar(
     btn.className = "jf-note-btn jf-note-btn--default";
     btn.textContent = CHROMATIC_NOTES_DISPLAY[i]!;
     btn.dataset.semitone = String(semitone);
-    btn.addEventListener("click", () => onTap(semitone));
+    // Sound starts on pointer-down (instrument, not UI button): note rings while held.
+    let activePointerId: number | null = null;
+    btn.addEventListener("pointerdown", (evt) => {
+      if (activePointerId !== null) return;
+      activePointerId = evt.pointerId;
+      onPressStart(semitone);
+    });
+    const endPress = (evt: PointerEvent): void => {
+      if (activePointerId === null || evt.pointerId !== activePointerId) return;
+      activePointerId = null;
+      onPressEnd(semitone);
+    };
+    btn.addEventListener("pointerup", endPress);
+    btn.addEventListener("pointercancel", endPress);
+    btn.addEventListener("pointerleave", endPress);
     btns.push(btn);
     el.appendChild(btn);
   }
@@ -680,19 +707,43 @@ function buildNoteBar(
 type JamFlowMode = "circle" | "key-zoom" | "fretboard";
 
 export type JamFlowOptions = {
-  /** Tapped a circle flower → select this key and play */
+  /**
+   * Double-tapped a circle flower → entered key zoom with this key.
+   * (Single tap plays the chord but does not enter key zoom.)
+   */
   onKeySelect?: (semitone: number) => void;
-  /** Tapped a chord flower in key-zoom mode → play the chord */
+  /**
+   * User pressed down on a circle flower → start sustain for the chord.
+   * isMinor=true when the inner third of the flower was pressed.
+   */
+  onKeyPressStart?: (semitone: number, isMinor: boolean) => void;
+  /** User released from a circle flower → stop sustain. */
+  onKeyPressEnd?: () => void;
+  /** Double-tapped the center area in circle mode → cycle instrument. */
+  onInnerDoubleTap?: () => void;
+  /** Pressed down on a chord flower in key-zoom → start sustain for that chord. */
   onChordTap?: (chord: DiatonicChord) => void;
-  /** Tapped a note bar button */
-  onNoteBarTap?: (semitone: number) => void;
-  /** Tapped a fretboard dot */
+  /** Released from a key-zoom chord flower → stop sustain. */
+  onChordPressEnd?: () => void;
+  /** Pressed down on a note bar button → start sustain. */
+  onNoteBarPressStart?: (semitone: number) => void;
+  /** Released a note bar button → stop sustain. */
+  onNoteBarPressEnd?: (semitone: number) => void;
+  /** Pressed down on a fretboard dot → start sustain. */
   onFretDotTap?: (midi: number, stringIndex: number) => void;
+  /** Released from a fretboard dot → stop sustain. */
+  onFretDotPressEnd?: () => void;
   /**
    * Returns true if any looper is currently armed/recording.
    * When true, tapping the background in key-zoom will not navigate back to circle.
    */
   isRecording?: () => boolean;
+  /**
+   * Called at the START of a mode transition (before the animation begins).
+   * Use this to synchronise external DOM changes (e.g. drum fade) with the
+   * canvas animation so they begin simultaneously.
+   */
+  onTransitionStart?: (from: JamFlowMode, to: JamFlowMode) => void;
   /**
    * Called whenever the visible mode changes (after a transition completes
    * or immediately on the initial render). Use this to show/hide looper UIs
@@ -714,6 +765,8 @@ export type JamFlowUi = {
   pulseChord(midis: number[], durationMs: number): void;
   /** Visual pulse on fretboard dots */
   pulseTargets(targets: Array<{ midi: number; stringIndex: number }>, durationMs: number): void;
+  /** Update the instrument label shown in the centre of the circle. */
+  setInstrumentLabel(label: string): void;
   destroy(): void;
 };
 
@@ -751,18 +804,34 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   let transitionTo: JamFlowMode = "key-zoom";
   let transitionForward = true; // true = forward, false = reverse
 
+  // Instrument label displayed in center of circle mode
+  let instrumentLabel = "ACOUSTIC GUITAR";
+
+  // Currently held circle flower (for sustain + minor label display)
+  let heldCircleKey: { semitone: number; isMinor: boolean } | null = null;
+  // Held key-zoom chord flower or roman-numeral label
+  let heldKeyZoomChord: DiatonicChord | null = null;
+  // Held fretboard dot
+  let heldFretDot: { midi: number; stringIndex: number } | null = null;
+
+  // Live sustain trail: grows from right edge of the note strip while any note is held.
+  // Set on pointerdown for circle flowers, key-zoom chords, note bar, and fret dots.
+  let liveSustainTrail: { semitone: number; color: string; startT: number } | null = null;
+
+  // Double-tap tracking for circle flowers
+  let lastCircleTapInfo: { semitone: number; atMs: number } | null = null;
+
+  // Double-tap tracking for center area in circle mode (instrument change)
+  let lastCenterTapTime = 0;
+
   // Pulse state: a list of active pulse rings
   type Pulse = { x: number; y: number; r: number; startT: number; durationMs: number; color: string };
   const pulses: Pulse[] = [];
 
-  // Dot pulse state (fretboard)
-  type DotPulse = { stringIndex: number; fret: number; startT: number; durationMs: number };
-  const dotPulses: DotPulse[] = [];
-
   // Note bar trail state: rectangles that grow leftward from the note bar
   type NoteTrail = { semitone: number; color: string; startT: number; durationMs: number };
   const noteTrails: NoteTrail[] = [];
-  // Slow "recent history" trails: same concept but move across screen in 2 measures
+  // Slow "recent history" trails: slide immediately at constant speed (no growth phase)
   const slowTrails: NoteTrail[] = [];
 
   // Relative-mode state: which degree index is currently the "root" in key-zoom
@@ -781,16 +850,33 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   type ModeAnim = { startT: number; modeName: string };
   let modeAnim: ModeAnim | null = null;
 
-  // Note bar
-  const noteBar = buildNoteBar(noteBarHost, (semitone) => {
-    options.onNoteBarTap?.(semitone);
-    if (transitionActive) return;
-    if (currentMode === "key-zoom") {
-      startTransition("key-zoom", "fretboard", true);
-    } else if (currentMode === "fretboard") {
-      startTransition("fretboard", "key-zoom", false);
-    }
-  });
+  // Note bar — sound starts on pointerdown, ends on pointerup/cancel/leave.
+  const noteBar = buildNoteBar(
+    noteBarHost,
+    (semitone) => {
+      // Grow a live trail while the note is held.
+      liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
+      addFastTrail(semitone);
+      options.onNoteBarPressStart?.(semitone);
+      if (transitionActive) return;
+      if (currentMode === "key-zoom") {
+        startTransition("key-zoom", "fretboard", true);
+      } else if (currentMode === "fretboard") {
+        startTransition("fretboard", "key-zoom", false);
+      }
+    },
+    (semitone) => {
+      // Freeze trail width and let it slide off.
+      if (liveSustainTrail !== null && liveSustainTrail.semitone === semitone) {
+        const holdDuration = performance.now() - liveSustainTrail.startT;
+        const { color } = liveSustainTrail;
+        // Slow trail: startT = now so elapsed=0 → right edge stays at w (no pop).
+        slowTrails.push({ semitone, color, startT: performance.now(), durationMs: holdDuration });
+        liveSustainTrail = null;
+      }
+      options.onNoteBarPressEnd?.(semitone);
+    },
+  );
 
   function getDimensions() {
     // Measure the canvas wrapper directly — it is already sized to exclude the
@@ -853,32 +939,111 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     slowTrails.push({ semitone, color, startT, durationMs });
   }
 
+  // Fast trail only — emitted at press-start so it grows as the note rings.
+  const FAST_TRAIL_DEFAULT_MS = 640;
+  function addFastTrail(semitone: number): void {
+    const color = getNoteTrailColor(semitone);
+    noteTrails.push({ semitone, color, startT: performance.now(), durationMs: FAST_TRAIL_DEFAULT_MS });
+  }
+
+  // Returns [root, third, fifth] semitones (mod 12) for a chord quality.
+  function getTriadSemitones(root: number, quality: string): [number, number, number] {
+    const third = quality === "major" ? 4 : 3; // minor and diminished both use minor third
+    const fifth  = quality === "diminished" ? 6 : 7;
+    return [root, (root + third) % 12, (root + fifth) % 12];
+  }
+
   // ── Tap detection ──────────────────────────────────────────────────────────
 
-  function handleCanvasTap(evt: PointerEvent) {
+  function handleCanvasPointerDown(evt: PointerEvent) {
     if (transitionActive) return;
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
     const mx = (evt.clientX - rect.left);
     const my = (evt.clientY - rect.top);
     const { w, h } = resizeCanvas();
     rebuildLayouts(w, h);
 
     if (currentMode === "circle") {
-      // Find which flower was tapped
+      // Check for center double-tap (instrument change).
+      // Center zone radius ≈ 15% of the smaller dimension.
+      const centerR = Math.min(w, h) * 0.15;
+      const dcx = mx - w / 2;
+      const dcy = my - h / 2;
+      if (dcx * dcx + dcy * dcy <= centerR * centerR) {
+        const tapNow = performance.now();
+        if (tapNow - lastCenterTapTime < 450) {
+          options.onInnerDoubleTap?.();
+          lastCenterTapTime = 0;
+        } else {
+          lastCenterTapTime = tapNow;
+        }
+        return;
+      }
+
+      // Find which flower was pressed
       for (let i = 0; i < 12; i++) {
         const pos = circlePositions[i]!;
         const dx = mx - pos.x;
         const dy = my - pos.y;
-        if (dx * dx + dy * dy <= pos.r * pos.r) {
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= pos.r * pos.r) {
           const semitone = CIRCLE_ORDER[i]!;
-          selectedKey = semitone;
-          noteBar.update(semitone);
-          options.onKeySelect?.(semitone);
-          startTransition("circle", "key-zoom", true);
+          // Inner half of flower (canvas-center-facing side) → minor chord.
+          // The dividing line is perpendicular to the radial direction and passes
+          // through the flower center. Dot product of tap displacement with the
+          // outward radial vector < 0 means the tap is on the inward-facing side.
+          const outX = pos.x - w / 2;
+          const outY = pos.y - h / 2;
+          const isMinor = (dx * outX + dy * outY) < 0;
+
+          // Update held state for visual minor-label feedback
+          heldCircleKey = { semitone, isMinor };
+
+          // Start live sustain trail anchored at right edge.
+          liveSustainTrail = { semitone, color: getNoteTrailColor(semitone), startT: performance.now() };
+
+          // Emit fast trails for all 3 triad notes at press-start.
+          const circleQuality = isMinor ? "minor" : "major";
+          for (const s of getTriadSemitones(semitone, circleQuality)) addFastTrail(s);
+
+          // Pulse ring on the flower.
+          const chForPulse = selectedKey !== null
+            ? getDiatonicChords(selectedKey).find((c) => c.semitone === semitone)
+            : null;
+          addPulseAtCanvas(pos.x, pos.y, pos.r, chForPulse?.colorA ?? COLOR_WHITE, 400);
+
+          // Start sustain
+          options.onKeyPressStart?.(semitone, isMinor);
+
+          // Double-tap detection → enter key zoom
+          // (same semitone within 450 ms; inner/outer zone does not need to match)
+          const tapNow = performance.now();
+          const isDoubleTap =
+            lastCircleTapInfo !== null &&
+            lastCircleTapInfo.semitone === semitone &&
+            tapNow - lastCircleTapInfo.atMs < 450;
+          lastCircleTapInfo = { semitone, atMs: tapNow };
+
+          if (isDoubleTap) {
+            if (isMinor) {
+              // Minor double-tap: enter key zoom showing the relative major,
+              // but mark the minor chord (vi of the relative major) as root.
+              const majorSemitone = (semitone + 3) % 12;
+              selectedKey = majorSemitone;
+              relativeRootDeg = 5; // vi is degree index 5
+              noteBar.update(majorSemitone, 5);
+            } else {
+              selectedKey = semitone;
+              relativeRootDeg = null;
+              noteBar.update(semitone);
+            }
+            options.onKeySelect?.(semitone);
+            startTransition("circle", "key-zoom", true);
+          }
           return;
         }
       }
+      return;
     } else if (currentMode === "key-zoom" && selectedKey !== null) {
       const chords = getDiatonicChords(selectedKey);
 
@@ -905,22 +1070,32 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             lastTapDeg = null;
             noteBar.update(selectedKey, relativeRootDeg ?? 0);
           } else {
-            // Single tap on roman numeral: play chord + track for double-tap
+            // Single tap on roman numeral: start chord sustain + track for double-tap.
             lastTapDeg = deg;
             lastTapTime = tapNow;
-            options.onChordTap?.(chords[deg]!);
+            const chord = chords[deg]!;
+            heldKeyZoomChord = chord;
+            liveSustainTrail = { semitone: chord.semitone, color: chord.colorA, startT: tapNow };
+            for (const s of getTriadSemitones(chord.semitone, chord.quality)) addFastTrail(s);
+            addPulseAtCanvas(pos.x, pos.y, pos.r, chord.colorA, 400);
+            options.onChordTap?.(chord);
           }
           return;
         }
       }
 
-      // Check if a flower body was tapped — single tap only (play chord).
+      // Check if a flower body was tapped — start chord sustain.
       for (let deg = 0; deg < 7; deg++) {
         const pos = keyZoomPositions[deg]!;
         const dx = mx - pos.x;
         const dy = my - pos.y;
         if (dx * dx + dy * dy <= pos.r * pos.r) {
-          options.onChordTap?.(chords[deg]!);
+          const chord = chords[deg]!;
+          heldKeyZoomChord = chord;
+          liveSustainTrail = { semitone: chord.semitone, color: chord.colorA, startT: performance.now() };
+          for (const s of getTriadSemitones(chord.semitone, chord.quality)) addFastTrail(s);
+          addPulseAtCanvas(pos.x, pos.y, pos.r, chord.colorA, 400);
+          options.onChordTap?.(chord);
           return;
         }
       }
@@ -959,12 +1134,17 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             tapNow - lastFretDotTap.atMs < 400;
           lastFretDotTap = { stringIndex: dot.stringIndex, fret: dot.fret, atMs: tapNow };
 
-          if (isDoubleTap) {
-            // Zoom to octave range centered on this note
+          if (isDoubleTap && fretboardZoom === null) {
+            // Zoom to octave range centered on this note (only when not already zoomed)
             fretboardZoom = computeFretboardZoomForNote(dot.stringIndex, dot.fret);
           } else {
+            heldFretDot = { midi: dot.midi, stringIndex: dot.stringIndex };
+            const dotColor = getNoteTrailColor(dot.midi % 12);
+            liveSustainTrail = { semitone: dot.midi % 12, color: dotColor, startT: performance.now() };
+            addFastTrail(dot.midi % 12);
             options.onFretDotTap?.(dot.midi, dot.stringIndex);
-            addDotPulse(dot.stringIndex, dot.fret);
+            // Expanding pulse ring on the tapped dot
+            addPulseAtCanvas(sx, fy, r, dotColor, 500);
           }
           hitDot = true;
           return;
@@ -977,7 +1157,32 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
-  canvas.addEventListener("pointerdown", handleCanvasTap);
+  function handleCanvasPointerUp(_evt: PointerEvent) {
+    // Finalize the live sustain trail for whichever mode was held.
+    if (liveSustainTrail !== null) {
+      const holdDuration = performance.now() - liveSustainTrail.startT;
+      const { semitone, color } = liveSustainTrail;
+      // Slow trail: startT = now so elapsed=0 → right edge stays at w (no pop).
+      slowTrails.push({ semitone, color, startT: performance.now(), durationMs: holdDuration });
+      liveSustainTrail = null;
+    }
+    if (heldCircleKey !== null) {
+      heldCircleKey = null;
+      options.onKeyPressEnd?.();
+    }
+    if (heldKeyZoomChord !== null) {
+      heldKeyZoomChord = null;
+      options.onChordPressEnd?.();
+    }
+    if (heldFretDot !== null) {
+      heldFretDot = null;
+      options.onFretDotPressEnd?.();
+    }
+  }
+
+  canvas.addEventListener("pointerdown", handleCanvasPointerDown);
+  canvas.addEventListener("pointerup", handleCanvasPointerUp);
+  canvas.addEventListener("pointercancel", handleCanvasPointerUp);
 
   // ── Transitions ────────────────────────────────────────────────────────────
 
@@ -995,6 +1200,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     transitionForward = forward;
     transitionStart = performance.now();
     transitionDuration = 500;
+    options.onTransitionStart?.(from, to);
   }
 
   function finishTransition() {
@@ -1007,10 +1213,6 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   function addPulseAtCanvas(x: number, y: number, r: number, color: string, durationMs: number) {
     pulses.push({ x, y, r, startT: performance.now(), durationMs, color });
-  }
-
-  function addDotPulse(stringIndex: number, fret: number) {
-    dotPulses.push({ stringIndex, fret, startT: performance.now(), durationMs: 500 });
   }
 
   function semitoneToCirclePos(semitone: number): Pos | null {
@@ -1134,7 +1336,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     const cx = w / 2;
     const cy = h / 2;
 
-    // Center text
+    // Center instrument label (rotated text)
     ctx.save();
     ctx.globalAlpha = opacity * 0.18;
     ctx.fillStyle = COLOR_WHITE;
@@ -1142,16 +1344,19 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     ctx.font = `${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    // Rotated text
     ctx.translate(cx, cy);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("ACOUSTIC GUITAR", 0, 0);
+    ctx.fillText(instrumentLabel, 0, 0);
     ctx.restore();
 
     for (let i = 0; i < 12; i++) {
       const pos = circlePositions[i]!;
       const semitone = CIRCLE_ORDER[i]!;
-      const label = NOTE_NAMES_FLAT[semitone]!;
+      // Show minor label (e.g. "Cm") while that flower is held in the inner third
+      const isHeldMinor = heldCircleKey?.semitone === semitone && heldCircleKey.isMinor;
+      const label = isHeldMinor
+        ? (NOTE_NAMES_FLAT[semitone]! + "m")
+        : NOTE_NAMES_FLAT[semitone]!;
       drawKiku(ctx, pos.x, pos.y, pos.r, 14, COLOR_WHITE, undefined, label, undefined, opacity);
     }
   }
@@ -1176,7 +1381,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         const ec = degreeColors(effDeg);
         colorA     = ec.colorA;
         colorB     = ec.colorB;
-        roman      = DEGREE_ROMAN[effDeg]!;
+        // Roman numeral reflects the chord's actual quality at this modal position
+        roman      = relativeRoman(effDeg, chord.quality);
         petalCount = DEGREE_PETAL_COUNTS[effDeg]!;
       }
 
@@ -1354,15 +1560,15 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
-  function drawOneTrailSet(
+  // Fast trails: grow from right edge over the note's duration, then slide off.
+  function drawFastTrailSet(
     trails: NoteTrail[],
     now: number,
     w: number,
     h: number,
     speed: number,
     maxAlpha: number,
-    trailHeightFraction: number,
-    fadeOnSlide: boolean
+    trailHeightFraction: number
   ): void {
     const noteH = h / 12;
     const trailH = noteH * trailHeightFraction;
@@ -1371,8 +1577,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     for (const trail of trails) {
       const elapsed = now - trail.startT;
       const maxW = Math.min(w, trail.durationMs * speed);
-      const exitDuration = maxW / speed;
-
+      // Keep alive until right edge exits left side (elapsed >= durationMs + w/speed)
+      const exitDuration = w / speed;
       if (elapsed >= trail.durationMs + exitDuration) continue;
       alive.push(trail);
 
@@ -1389,10 +1595,8 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         drawRight = w - slide;
         drawLeft = w - maxW - slide;
         if (drawRight <= 0) continue;
-        // fadeOnSlide: fast trail fades as it exits; slow trail stays opaque until gone
-        alpha = fadeOnSlide
-          ? maxAlpha * (1 - (elapsed - trail.durationMs) / exitDuration)
-          : maxAlpha;
+        // Fade as it exits
+        alpha = maxAlpha * Math.max(0, 1 - (elapsed - trail.durationMs) / exitDuration);
       }
 
       const visLeft  = Math.max(0, drawLeft);
@@ -1410,21 +1614,78 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     trails.push(...alive);
   }
 
-  function drawTrails(now: number, w: number, h: number) {
-    // Each trail is a rectangle that emerges from the note bar (right edge of canvas)
-    // and grows leftward while the note plays, then slides off-screen to the left.
+  // Slow "recent history" trails: start at right edge and slide left at constant speed.
+  // No growth phase — the bar moves at speed from the moment the note plays.
+  // Total visible time = w / speed = 2 * measureDurationMs exactly.
+  function drawSlowTrailSet(
+    trails: NoteTrail[],
+    now: number,
+    w: number,
+    h: number,
+    speed: number,
+    maxAlpha: number,
+    trailHeightFraction: number
+  ): void {
+    const noteH = h / 12;
+    const trailH = noteH * trailHeightFraction;
+    const alive: NoteTrail[] = [];
 
-    // Fast trail: fills canvas in ~550 ms, semi-transparent
+    for (const trail of trails) {
+      const elapsed = now - trail.startT;
+      // Bar width is proportional to note duration
+      const barW = Math.min(w, trail.durationMs * speed);
+      const slide = elapsed * speed;
+      const drawRight = w - slide;
+
+      if (drawRight <= 0) continue; // right edge has exited
+      alive.push(trail);
+
+      const drawLeft = drawRight - barW;
+      const visLeft  = Math.max(0, drawLeft);
+      const visRight = Math.min(w, drawRight);
+      if (visRight <= visLeft) continue;
+
+      const y = 4 + (trail.semitone + 0.5) * (h - 8) / 12;
+      ctx.save();
+      ctx.globalAlpha = maxAlpha;
+      ctx.fillStyle = trail.color;
+      ctx.fillRect(visLeft, y - trailH / 2, visRight - visLeft, trailH);
+      ctx.restore();
+    }
+
+    trails.length = 0;
+    trails.push(...alive);
+  }
+
+  function drawTrails(now: number, w: number, h: number) {
+    // Fast trail: grows from right edge over the note duration, then slides off.
     const FAST_SPEED = w / 550;
 
-    // Slow "recent history" trail: fills canvas in 2 measures, more opaque
+    // Slow "recent history" trail: traverses full canvas in exactly 2 measures.
     const measureDurationMs = options.getMeasureDurationMs?.() ?? 2000;
     const SLOW_SPEED = w / (2 * measureDurationMs);
 
-    // Draw slow trail first (below fast trail) — no fade during slide
-    drawOneTrailSet(slowTrails, now, w, h, SLOW_SPEED, 0.62, 0.54, false);
+    // Draw slow trail first (below fast trail) — no fade, full alpha
+    drawSlowTrailSet(slowTrails, now, w, h, SLOW_SPEED, 0.62, 0.54);
+
+    // Render live sustain trail: grows leftward from right edge while key is held
+    if (liveSustainTrail !== null) {
+      const elapsed = now - liveSustainTrail.startT;
+      const barW = Math.min(w, elapsed * SLOW_SPEED);
+      if (barW > 0) {
+        const noteH = h / 12;
+        const trailH = noteH * 0.54;
+        const y = 4 + (liveSustainTrail.semitone + 0.5) * (h - 8) / 12;
+        ctx.save();
+        ctx.globalAlpha = 0.62;
+        ctx.fillStyle = liveSustainTrail.color;
+        ctx.fillRect(w - barW, y - trailH / 2, barW, trailH);
+        ctx.restore();
+      }
+    }
+
     // Draw fast trail on top, more transparent — fades as it exits
-    drawOneTrailSet(noteTrails, now, w, h, FAST_SPEED, 0.32, 0.46, true);
+    drawFastTrailSet(noteTrails, now, w, h, FAST_SPEED, 0.32, 0.46);
   }
 
   function drawPulses(now: number) {
@@ -1532,12 +1793,18 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     }
   }
 
+  function setInstrumentLabel(label: string): void {
+    instrumentLabel = label;
+  }
+
   function destroy() {
     exit();
-    canvas.removeEventListener("pointerdown", handleCanvasTap);
+    canvas.removeEventListener("pointerdown", handleCanvasPointerDown);
+    canvas.removeEventListener("pointerup", handleCanvasPointerUp);
+    canvas.removeEventListener("pointercancel", handleCanvasPointerUp);
     noteBar.destroy();
     wrapper.remove();
   }
 
-  return { enter, exit, pulseNote, pulseChord, pulseTargets, destroy };
+  return { enter, exit, pulseNote, pulseChord, pulseTargets, setInstrumentLabel, destroy };
 }

@@ -86,6 +86,15 @@
 - Inner detail rotation should always follow shortest angular path when primary changes.
 - Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
 
+## Instrument philosophy (Wild Tuna + Circle of Fifths)
+- Every interactive note surface (circle flowers, key-zoom chord flowers, note bar buttons, fretboard dots) is a **musical instrument**, not a UI button.
+- Notes **ring out while the finger/pointer is held down** and stop when it is released.
+- Sustained playback uses looped sample regions so the note plays indefinitely during the hold.
+- The looper records the **actual held duration** via `recordHoldStart` / `recordHoldEnd` — never a fixed fallback duration.
+- Visual trails grow while the note is held and reflect the actual duration; a longer hold produces a longer trail.
+- Do **not** regress to one-shot `playMidi`/`playChord` calls or `recordPulse` with a fixed duration for live user presses. Those are for looper-playback events only.
+- Trigger audio on `pointerdown`, not `click` or `mouseup` — mobile click fires after `pointerup` and would introduce audible latency.
+
 ## Wild Tuna mode notes
 - Entry point: `src/modes/wild-tuna.ts`.
 - Three-pane layout: Drum Machine (top) | timeline row | Circle of Fifths + Fretboard (bottom).
