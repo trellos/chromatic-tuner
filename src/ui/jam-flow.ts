@@ -739,6 +739,12 @@ export type JamFlowOptions = {
    */
   isRecording?: () => boolean;
   /**
+   * Called at the START of a mode transition (before the animation begins).
+   * Use this to synchronise external DOM changes (e.g. drum fade) with the
+   * canvas animation so they begin simultaneously.
+   */
+  onTransitionStart?: (from: JamFlowMode, to: JamFlowMode) => void;
+  /**
    * Called whenever the visible mode changes (after a transition completes
    * or immediately on the initial render). Use this to show/hide looper UIs
    * that are relevant to the currently visible instrument.
@@ -821,10 +827,6 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
   // Pulse state: a list of active pulse rings
   type Pulse = { x: number; y: number; r: number; startT: number; durationMs: number; color: string };
   const pulses: Pulse[] = [];
-
-  // Dot pulse state (fretboard)
-  type DotPulse = { stringIndex: number; fret: number; startT: number; durationMs: number };
-  const dotPulses: DotPulse[] = [];
 
   // Note bar trail state: rectangles that grow leftward from the note bar
   type NoteTrail = { semitone: number; color: string; startT: number; durationMs: number };
@@ -1137,10 +1139,12 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
             fretboardZoom = computeFretboardZoomForNote(dot.stringIndex, dot.fret);
           } else {
             heldFretDot = { midi: dot.midi, stringIndex: dot.stringIndex };
-            liveSustainTrail = { semitone: dot.midi % 12, color: getNoteTrailColor(dot.midi % 12), startT: performance.now() };
+            const dotColor = getNoteTrailColor(dot.midi % 12);
+            liveSustainTrail = { semitone: dot.midi % 12, color: dotColor, startT: performance.now() };
             addFastTrail(dot.midi % 12);
             options.onFretDotTap?.(dot.midi, dot.stringIndex);
-            addDotPulse(dot.stringIndex, dot.fret);
+            // Expanding pulse ring on the tapped dot
+            addPulseAtCanvas(sx, fy, r, dotColor, 500);
           }
           hitDot = true;
           return;
@@ -1196,6 +1200,7 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
     transitionForward = forward;
     transitionStart = performance.now();
     transitionDuration = 500;
+    options.onTransitionStart?.(from, to);
   }
 
   function finishTransition() {
@@ -1208,10 +1213,6 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
 
   function addPulseAtCanvas(x: number, y: number, r: number, color: string, durationMs: number) {
     pulses.push({ x, y, r, startT: performance.now(), durationMs, color });
-  }
-
-  function addDotPulse(stringIndex: number, fret: number) {
-    dotPulses.push({ stringIndex, fret, startT: performance.now(), durationMs: 500 });
   }
 
   function semitoneToCirclePos(semitone: number): Pos | null {

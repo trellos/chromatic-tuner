@@ -697,10 +697,23 @@ export function createWildTunaMode(): ModeDefinition {
           return cs === "armed" || cs === "recording" || cs === "stopping"
               || fs === "armed" || fs === "recording" || fs === "stopping";
         },
+        onTransitionStart: (from, to) => {
+          if (from === "circle") {
+            // Leaving circle: start drum fade-out immediately so it syncs with canvas animation.
+            compositeEl?.classList.add("wt-drum-hidden");
+          } else if (to === "circle") {
+            // Returning to circle: expand drum height NOW (while drum is still invisible)
+            // so the canvas gets correct dimensions before the first animation frame.
+            compositeEl?.classList.remove("wt-jam-expanded");
+          }
+        },
         onModeChange: (mode) => {
-          // Fade drum machine out when in key-zoom or fretboard to give more space.
           const inCircle = mode === "circle";
-          compositeEl?.classList.toggle("wt-jam-expanded", !inCircle);
+          // Height collapse: only applied once we've fully settled in key-zoom/fretboard,
+          // after the drum opacity is already 0, so the resize isn't visible.
+          if (!inCircle) compositeEl?.classList.add("wt-jam-expanded");
+          // Fade drum back in when returning to circle (height was already restored in onTransitionStart).
+          if (inCircle) compositeEl?.classList.remove("wt-drum-hidden");
 
           // Show only the looper relevant to the current instrument view
           const showCircle = mode !== "fretboard";

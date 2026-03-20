@@ -503,16 +503,21 @@ body.drum-fullscreen .mode-stage {
   top: 0;
 }
 
-/* Drum pane transition when entering key-zoom / fretboard mode */
+/* Drum pane opacity transitions in sync with the 500ms canvas animation */
 .wild-tuna-pane--drum {
-  transition: opacity 0.4s ease;
+  transition: opacity 0.5s ease;
 }
 
-.wild-tuna-composite.wt-jam-expanded .wild-tuna-pane--drum {
+/* wt-drum-hidden: fades the drum pane out. Applied at transition START so the
+   fade begins simultaneously with the canvas flower animation. */
+.wild-tuna-composite.wt-drum-hidden .wild-tuna-pane--drum {
   opacity: 0;
   pointer-events: none;
 }
 
+/* wt-jam-expanded: collapses the drum row height AFTER the opacity is already 0
+   (applied in onModeChange, 500ms after transition start). In fullscreen this
+   reclaims the vertical space for the canvas without a visible jump. */
 body.wild-tuna-fullscreen .wild-tuna-composite.wt-jam-expanded {
   grid-template-rows: auto 0px 1fr;
 }
