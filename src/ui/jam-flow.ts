@@ -929,8 +929,13 @@ export function createJamFlowUi(hostEl: HTMLElement, options: JamFlowOptions = {
         const distSq = dx * dx + dy * dy;
         if (distSq <= pos.r * pos.r) {
           const semitone = CIRCLE_ORDER[i]!;
-          // Inner 45% of radius → minor chord; outer zone → major chord
-          const isMinor = distSq <= (pos.r * 0.45) * (pos.r * 0.45);
+          // Inner half of flower (canvas-center-facing side) → minor chord.
+          // The dividing line is perpendicular to the radial direction and passes
+          // through the flower center. Dot product of tap displacement with the
+          // outward radial vector < 0 means the tap is on the inward-facing side.
+          const outX = pos.x - w / 2;
+          const outY = pos.y - h / 2;
+          const isMinor = (dx * outX + dy * outY) < 0;
 
           // Update held state for visual minor-label feedback
           heldCircleKey = { semitone, isMinor };
