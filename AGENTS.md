@@ -45,7 +45,8 @@
 - Tapping a candidate row updates a separate one-line hint listing related modal interpretations (the row itself should not expand).
 
 ## Circle of Fifths notes
-- Shared UI implementation: `src/ui/circle-of-fifths.ts`.
+- Shared Circle shell/orchestration: `src/ui/circle-of-fifths.ts`.
+- Circle note-bar DOM + trail lifecycle: `src/ui/circle-note-bar.ts`.
 - Dedicated mode adapter: `src/modes/circle-of-fifths.ts`.
 - Outer ring has 12 primary wedges in circle-of-fifths order.
 - Detail layer has 2 inner rings:
