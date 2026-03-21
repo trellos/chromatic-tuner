@@ -49,7 +49,9 @@ export type WildTunaTrackApi = {
 };
 
 type TrackApiInternal = WildTunaTrackApi & {
-  _emit: (event: Omit<TrackNoteEvent, "startedAt"> & { startedAt?: number }) => void;
+  _emitPulse: (event: Omit<TrackNoteEvent, "startedAt"> & { startedAt?: number; origin?: "live" | "playback" }) => string | null;
+  _startHold: (event: Omit<TrackNoteEvent, "durationMs" | "startedAt"> & { startedAt?: number; origin?: "live" | "playback" }) => string | null;
+  _stopHold: (noteId: string, endAt?: number) => void;
   _reset: () => void;
 };
 
@@ -62,8 +64,20 @@ function buildTrackApi(): TrackApiInternal {
   const hub = createNoteEventHub<TrackNoteSource>();
 
   return {
-    _emit(event) {
-      hub.emitPulse({ ...event, origin: "playback" });
+    _emitPulse(event) {
+      return hub.emitPulse({
+        ...event,
+        origin: event.origin ?? "playback",
+      });
+    },
+    _startHold(event) {
+      return hub.startHold({
+        ...event,
+        origin: event.origin ?? "live",
+      });
+    },
+    _stopHold(noteId, endAt) {
+      hub.stopHold(noteId, endAt);
     },
     _reset() {
       hub.reset();
@@ -294,21 +308,18 @@ function noteCountToRandomness(count: number): number {
   return Math.min(0.8, 1 - Math.pow(0.72, count));
 }
 
-function createNoteCountTracker(onChange: (randomness: number) => void) {
-  let count = 0;
-  return {
-    notesStarted(noteCount: number, durationMs: number) {
-      count += noteCount;
-      onChange(noteCountToRandomness(count));
-      window.setTimeout(() => {
-        count = Math.max(0, count - noteCount);
-        onChange(noteCountToRandomness(count));
-      }, Math.max(0, durationMs));
-    },
-    reset() {
-      count = 0;
-      onChange(0);
-    },
+function syncTrackRandomness(trackApi: WildTunaTrackApi): () => void {
+  const update = () => {
+    const activeNoteCount = trackApi.getActiveNotes().reduce((sum, event) => sum + event.midis.length, 0);
+    seigaihaBridge.setModeRandomness(noteCountToRandomness(activeNoteCount));
+  };
+
+  const stopOn = trackApi.onNoteOn(update);
+  const stopOff = trackApi.onNoteOff(update);
+  update();
+  return () => {
+    stopOn();
+    stopOff();
   };
 }
 
@@ -360,7 +371,8 @@ export function createWildTunaMode(): ModeDefinition {
   const guitarPlayer = createCircleGuitarPlayer();
   let audioContext: AudioContext | null = null;
   let fretSample: AudioBuffer | null = null;
-  const noteTracker = createNoteCountTracker((r) => seigaihaBridge.setModeRandomness(r));
+  const liveTrackHoldIds = new Map<string, string>();
+  let stopTrackRandomnessSync: (() => void) | null = null;
 
   let sessionTransport = createSessionTransport();
 
@@ -431,7 +443,6 @@ export function createWildTunaMode(): ModeDefinition {
     if (!targets.length) return;
     const midis = targets.map((t) => t.midi);
     if (shouldRecord) fretboardLooper?.recordPulse(midis, durationMs);
-    noteTracker.notesStarted(midis.length, durationMs);
     const ctx = await ensureAudioContext();
     if (!ctx) return;
     const sample = await ensureFretSample(ctx);
@@ -459,7 +470,6 @@ export function createWildTunaMode(): ModeDefinition {
   const playCircleMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
     if (!midis.length) return;
     if (shouldRecord) circleLooper?.recordPulse(midis, durationMs);
-    noteTracker.notesStarted(midis.length, durationMs);
     if (midis.length === 1) {
       const midi = midis[0];
       if (midi === undefined) return;
@@ -491,13 +501,35 @@ export function createWildTunaMode(): ModeDefinition {
     return [root, root + 4, root + 7]; // major
   }
 
+  const replaceLiveHold = (holdKey: string, source: TrackNoteSource, midis: number[]): void => {
+    const previousId = liveTrackHoldIds.get(holdKey);
+    if (previousId) {
+      _trackApi._stopHold(previousId);
+    }
+    const noteId = _trackApi._startHold({ source, midis, origin: "live" });
+    if (noteId) {
+      liveTrackHoldIds.set(holdKey, noteId);
+    } else {
+      liveTrackHoldIds.delete(holdKey);
+    }
+  };
+
+  const stopLiveHold = (holdKey: string): void => {
+    const noteId = liveTrackHoldIds.get(holdKey);
+    if (!noteId) return;
+    liveTrackHoldIds.delete(holdKey);
+    _trackApi._stopHold(noteId);
+  };
+
   return {
     id: "wild-tuna",
     title: "Wild Tuna",
     preserveState: false,
     canFullscreen: true,
     onEnter: async () => {
-      noteTracker.reset();
+      stopTrackRandomnessSync?.();
+      _trackApi._reset();
+      stopTrackRandomnessSync = syncTrackRandomness(_trackApi);
       sessionTransport = createSessionTransport();
       modeAbort?.abort();
       modeAbort = new AbortController();
@@ -522,8 +554,6 @@ export function createWildTunaMode(): ModeDefinition {
         () => drumUi?.getStepsPerBar() ?? 16
       );
 
-      _trackApi._reset();
-
       const onRecordingProgress = (looper: () => CompositeLooper | null) => (
         measureIndex: number,
         events: Array<{ midis: number[]; startStep: number; endStep: number }>
@@ -537,7 +567,7 @@ export function createWildTunaMode(): ModeDefinition {
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
         getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
         onPlaybackEvent: (event) => {
-          _trackApi._emit({ source: "circle", ...event, startedAt: performance.now() });
+          _trackApi._emitPulse({ source: "circle", ...event, startedAt: performance.now(), origin: "playback" });
           void playCircleMidis(event.midis, event.durationMs, false);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(circleLooper!),
@@ -549,7 +579,7 @@ export function createWildTunaMode(): ModeDefinition {
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
         getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
         onPlaybackEvent: (event) => {
-          _trackApi._emit({ source: "fretboard", ...event, startedAt: performance.now() });
+          _trackApi._emitPulse({ source: "fretboard", ...event, startedAt: performance.now(), origin: "playback" });
           void playFretMidis(event.midis, event.durationMs, false);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(fretboardLooper!),
@@ -630,11 +660,12 @@ export function createWildTunaMode(): ModeDefinition {
           // Start sustain when the user presses down on a circle flower.
           const midis = isMinor ? minorChordMidis(semitone) : majorChordMidis(semitone);
           circleLooper?.recordHoldStart("circle-key", midis);
-          noteTracker.notesStarted(midis.length, 640);
+          replaceLiveHold("circle-key", "circle", midis);
           void guitarPlayer.startSustainChord(midis);
         },
         onKeyPressEnd: () => {
           circleLooper?.recordHoldEnd("circle-key");
+          stopLiveHold("circle-key");
           guitarPlayer.stopSustain();
         },
         onInnerDoubleTap: () => {
@@ -645,31 +676,34 @@ export function createWildTunaMode(): ModeDefinition {
           // Pressed down on a key-zoom chord flower → start sustain.
           const midis = diatonicChordMidis(chord);
           circleLooper?.recordHoldStart("key-zoom-chord", midis);
-          noteTracker.notesStarted(midis.length, 640);
+          replaceLiveHold("key-zoom-chord", "circle", midis);
           void guitarPlayer.startSustainChord(midis);
         },
         onChordPressEnd: () => {
           circleLooper?.recordHoldEnd("key-zoom-chord");
+          stopLiveHold("key-zoom-chord");
           guitarPlayer.stopSustain();
         },
         onNoteBarPressStart: (semitone) => {
           const midi = 48 + semitone;
           circleLooper?.recordHoldStart("note-bar", [midi]);
-          noteTracker.notesStarted(1, 640);
+          replaceLiveHold("note-bar", "circle", [midi]);
           void guitarPlayer.startSustainMidi(midi);
         },
         onNoteBarPressEnd: (_semitone) => {
           circleLooper?.recordHoldEnd("note-bar");
+          stopLiveHold("note-bar");
           guitarPlayer.stopSustain();
         },
         onFretDotTap: (midi, stringIndex) => {
           // Pressed down on a fretboard dot → start sustain.
           fretboardLooper?.recordHoldStart("fret-dot", [midi]);
-          noteTracker.notesStarted(1, 360);
+          replaceLiveHold("fret-dot", "fretboard", [midi]);
           void startFretSustain([{ midi, stringIndex }]);
         },
         onFretDotPressEnd: () => {
           fretboardLooper?.recordHoldEnd("fret-dot");
+          stopLiveHold("fret-dot");
           stopFretSustain();
         },
         isRecording: () => {
@@ -744,6 +778,9 @@ export function createWildTunaMode(): ModeDefinition {
     onExit: () => {
       modeAbort?.abort();
       modeAbort = null;
+      liveTrackHoldIds.clear();
+      stopTrackRandomnessSync?.();
+      stopTrackRandomnessSync = null;
       _trackApi._reset();
       seigaihaBridge.setModeRandomness(null);
       guitarPlayer.stopSustain();

@@ -49,8 +49,6 @@ export type AudioSessionHoldInput<InstrumentId extends string = string, Source e
   origin?: NoteEventOrigin;
 };
 
-type HoldSnapshot<InstrumentId extends string, Source extends string> = AudioSessionNoteEvent<InstrumentId, Source>;
-
 type NoteTimeoutId = ReturnType<typeof globalThis.setTimeout>;
 
 type AudioSessionOptions = {
@@ -78,10 +76,9 @@ export function createAudioSession<InstrumentId extends string = string, Source 
       ...(options.clearTimeoutFn === undefined ? {} : { clearTimeoutFn: options.clearTimeoutFn }),
     });
   const instruments = new Map<InstrumentId, AudioSessionInstrument<InstrumentId>>();
-  const holdHandlers = new Map<string, HoldSnapshot<InstrumentId, Source>>();
+  const holdIdsByInstrument = new Map<InstrumentId, Set<string>>();
   const noteOnHandlers = new Set<(event: AudioSessionNoteEvent<InstrumentId, Source>) => void>();
   const noteOffHandlers = new Set<(event: AudioSessionNoteEvent<InstrumentId, Source>) => void>();
-  let nextHoldId = 0;
 
   noteEvents.onNoteOn((event) => {
     noteOnHandlers.forEach((handler) => handler(event as AudioSessionNoteEvent<InstrumentId, Source>));
@@ -98,11 +95,22 @@ export function createAudioSession<InstrumentId extends string = string, Source 
     return instrument;
   };
 
-  const emitHoldOff = (noteId: string): void => {
-    const snapshot = holdHandlers.get(noteId);
-    if (!snapshot) return;
-    holdHandlers.delete(noteId);
-    noteOffHandlers.forEach((handler) => handler(snapshot));
+  const addHoldId = (instrumentId: InstrumentId, noteId: string): void => {
+    const existing = holdIdsByInstrument.get(instrumentId);
+    if (existing) {
+      existing.add(noteId);
+      return;
+    }
+    holdIdsByInstrument.set(instrumentId, new Set([noteId]));
+  };
+
+  const removeHoldId = (instrumentId: InstrumentId, noteId: string): void => {
+    const holdIds = holdIdsByInstrument.get(instrumentId);
+    if (!holdIds) return;
+    holdIds.delete(noteId);
+    if (holdIds.size === 0) {
+      holdIdsByInstrument.delete(instrumentId);
+    }
   };
 
   return {
@@ -125,51 +133,45 @@ export function createAudioSession<InstrumentId extends string = string, Source 
     startHold(event) {
       const instrument = getInstrument(event.instrumentId);
       void instrument.startHold(event.midis);
-      const midis = event.midis.map((value) => Math.round(value)).filter((value) => Number.isFinite(value));
-      if (!midis.length) return null;
-      const startedAt = event.startedAt ?? now();
-      const noteId = `hold-${nextHoldId++}`;
-      const snapshot: HoldSnapshot<InstrumentId, Source> = {
-        noteId,
+      const noteId = noteEvents.startHold({
         source: createSessionSource(event.instrumentId, event.source),
-        midis,
-        durationMs: 0,
-        startedAt,
-        endAt: startedAt,
+        midis: event.midis,
+        ...(event.startedAt === undefined ? {} : { startedAt: event.startedAt }),
         origin: event.origin ?? "live",
-      };
-      holdHandlers.set(noteId, snapshot);
-      noteOnHandlers.forEach((handler) => handler(snapshot));
+      });
+      if (!noteId) return null;
+      addHoldId(event.instrumentId, noteId);
       return noteId;
     },
     stopHold(noteId) {
-      const snapshot = holdHandlers.get(noteId);
+      const snapshot = noteEvents.getActiveNotes().find((event) => event.noteId === noteId);
       if (!snapshot) return;
       const [instrumentId] = snapshot.source.split(":", 1) as [InstrumentId];
       void instruments.get(instrumentId)?.stopHold();
-      emitHoldOff(noteId);
+      removeHoldId(instrumentId, noteId);
+      noteEvents.stopHold(noteId);
     },
     releaseInstrument(instrumentId) {
       void instruments.get(instrumentId)?.stopHold();
-      for (const [noteId, snapshot] of holdHandlers.entries()) {
-        if (snapshot.source.startsWith(`${instrumentId}:`)) {
-          emitHoldOff(noteId);
-        }
+      for (const noteId of [...(holdIdsByInstrument.get(instrumentId) ?? [])]) {
+        noteEvents.stopHold(noteId);
+        removeHoldId(instrumentId, noteId);
       }
     },
     releaseAll() {
       instruments.forEach((instrument) => {
         void instrument.stopHold();
       });
-      for (const noteId of [...holdHandlers.keys()]) {
-        emitHoldOff(noteId);
+      for (const [instrumentId, holdIds] of holdIdsByInstrument.entries()) {
+        for (const noteId of [...holdIds]) {
+          noteEvents.stopHold(noteId);
+          removeHoldId(instrumentId, noteId);
+        }
       }
     },
     stopAll() {
       noteEvents.reset();
-      for (const noteId of [...holdHandlers.keys()]) {
-        emitHoldOff(noteId);
-      }
+      holdIdsByInstrument.clear();
       instruments.forEach((instrument) => {
         void instrument.stopAll?.();
         void instrument.stopHold();
@@ -184,10 +186,7 @@ export function createAudioSession<InstrumentId extends string = string, Source 
       return () => noteOffHandlers.delete(handler);
     },
     getActiveNotes() {
-      return [
-        ...noteEvents.getActiveNotes(),
-        ...holdHandlers.values(),
-      ].sort((a, b) => a.startedAt - b.startedAt) as AudioSessionNoteEvent<InstrumentId, Source>[];
+      return noteEvents.getActiveNotes() as AudioSessionNoteEvent<InstrumentId, Source>[];
     },
   };
 }
