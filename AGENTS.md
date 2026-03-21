@@ -88,6 +88,7 @@
 - Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
 
 ## Instrument philosophy (Wild Tuna + Circle of Fifths)
+- Shared note-event infrastructure should preserve stacked pulses as separate note lifecycles; do not collapse repeated attacks of the same pitch/chord into one active slot.
 - Every interactive note surface (circle flowers, key-zoom chord flowers, note bar buttons, fretboard dots) is a **musical instrument**, not a UI button.
 - Notes **ring out while the finger/pointer is held down** and stop when it is released.
 - Sustained playback uses looped sample regions so the note plays indefinitely during the hold.
@@ -97,6 +98,7 @@
 - Trigger audio on `pointerdown`, not `click` or `mouseup` — mobile click fires after `pointerup` and would introduce audible latency.
 
 ## Wild Tuna mode notes
+- Shared normalized note-event hub: `src/app/note-events.ts`.
 - Entry point: `src/modes/wild-tuna.ts`.
 - Three-pane layout: Drum Machine (top) | timeline row | Circle of Fifths + Fretboard (bottom).
 - Two `CompositeLooper` instances (`src/ui/ui-composite-looper.ts`) record MIDI from the Circle and Fretboard.

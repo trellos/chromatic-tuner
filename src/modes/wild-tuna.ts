@@ -22,82 +22,63 @@ import {
   decodeDrumTrackPayload,
   type WildTunaTrackPayload,
 } from "../app/share-payloads.js";
+import {
+  createNoteEventHub,
+  type NoteEventSnapshot,
+} from "../app/note-events.js";
 
 // Fixed number of measures shown in the timeline and cycled during playback.
 const GLOBAL_MEASURE_COUNT = 4;
 
 // ── Playing Track API ──────────────────────────────────────────────────────
-// A unified, aggregated stream of note events from all active loopers.
-// Consumers subscribe via `getWildTunaTrackApi()` and listen for note-on/off
-// events or poll `getActiveNotes()` for the currently-sounding notes.
+// Wild Tuna exposes a single aggregated note stream across both loopers.
+// The shared note-event hub preserves stacking semantics, so repeated pulses of
+// the same chord remain distinct active notes instead of overwriting each other.
 
-export type TrackNoteEvent = {
-  /** Which looper fired the event */
-  source: "circle" | "fretboard";
-  midis: number[];
-  durationMs: number;
-  /** performance.now() timestamp when the note started */
-  startedAt: number;
-};
-
+export type TrackNoteSource = "circle" | "fretboard";
+export type TrackNoteEvent = Omit<NoteEventSnapshot<TrackNoteSource>, "noteId" | "endAt" | "origin">;
 export type ActiveTrackNote = TrackNoteEvent & {
-  /** performance.now() timestamp when the note will end */
+  noteId: string;
   endAt: number;
 };
 
 export type WildTunaTrackApi = {
-  /** Register a handler called when a note starts. Returns an unsubscribe function. */
   onNoteOn: (handler: (event: TrackNoteEvent) => void) => () => void;
-  /** Register a handler called when a note ends. Returns an unsubscribe function. */
   onNoteOff: (handler: (event: TrackNoteEvent) => void) => () => void;
-  /** Returns a snapshot of all notes that are currently sounding. */
   getActiveNotes: () => ActiveTrackNote[];
 };
 
 type TrackApiInternal = WildTunaTrackApi & {
-  _emit: (event: TrackNoteEvent) => void;
+  _emit: (event: Omit<TrackNoteEvent, "startedAt"> & { startedAt?: number }) => void;
   _reset: () => void;
 };
 
+function toTrackNoteEvent(event: NoteEventSnapshot<TrackNoteSource>): TrackNoteEvent {
+  const { noteId: _noteId, endAt: _endAt, origin: _origin, ...rest } = event;
+  return rest;
+}
+
 function buildTrackApi(): TrackApiInternal {
-  const noteOnHandlers = new Set<(e: TrackNoteEvent) => void>();
-  const noteOffHandlers = new Set<(e: TrackNoteEvent) => void>();
-  // Key: `${source}:${midis.join(",")}` — tracks one active slot per source+chord combo.
-  const activeNotes = new Map<string, ActiveTrackNote>();
-  const endTimeouts = new Map<string, number>();
+  const hub = createNoteEventHub<TrackNoteSource>();
 
   return {
     _emit(event) {
-      const key = `${event.source}:${event.midis.join(",")}`;
-      const prev = endTimeouts.get(key);
-      if (prev !== undefined) {
-        window.clearTimeout(prev);
-        endTimeouts.delete(key);
-      }
-      noteOnHandlers.forEach((h) => h(event));
-      activeNotes.set(key, { ...event, endAt: event.startedAt + event.durationMs });
-      const tid = window.setTimeout(() => {
-        endTimeouts.delete(key);
-        activeNotes.delete(key);
-        noteOffHandlers.forEach((h) => h(event));
-      }, event.durationMs);
-      endTimeouts.set(key, tid);
+      hub.emitPulse({ ...event, origin: "playback" });
     },
     _reset() {
-      endTimeouts.forEach((tid) => window.clearTimeout(tid));
-      endTimeouts.clear();
-      activeNotes.clear();
+      hub.reset();
     },
     onNoteOn(handler) {
-      noteOnHandlers.add(handler);
-      return () => { noteOnHandlers.delete(handler); };
+      return hub.onNoteOn((event) => handler(toTrackNoteEvent(event)));
     },
     onNoteOff(handler) {
-      noteOffHandlers.add(handler);
-      return () => { noteOffHandlers.delete(handler); };
+      return hub.onNoteOff((event) => handler(toTrackNoteEvent(event)));
     },
     getActiveNotes() {
-      return [...activeNotes.values()];
+      return hub.getActiveNotes().map((event) => {
+        const { origin: _origin, ...rest } = event;
+        return rest;
+      });
     },
   };
 }
