@@ -9,7 +9,8 @@ This file describes how `src/ui` modules should be designed and maintained as th
 Current entries:
 - `seigaihaBackground.ts`: app background pattern generation + install/update API.
 - `drum-machine.ts`: reusable drum machine UI object (lifecycle + transport).
-- `circle-of-fifths.ts`: reusable Circle of Fifths SVG UI (tap zones, note bar, sustain, trails).
+- `circle-of-fifths.ts`: reusable Circle of Fifths shell (tap zones, geometry, detail orchestration).
+- `circle-note-bar.ts`: reusable Circle note-bar surface (rows, pointer lifecycle, sustain trails).
 - `fretboard.ts`: reusable fretboard UI object.
 - `ui-composite-looper.ts`: reusable quantized MIDI loop recorder widget (REC/CLR, 4-measure slots).
 
@@ -100,6 +101,7 @@ When editing this system:
 
 Primary implementation:
 - `src/ui/circle-of-fifths.ts`
+- `src/ui/circle-note-bar.ts` (note-bar rows, trails, and pointerdown note lifecycle)
 
 Integration points:
 - `src/modes/tuner.ts` (Strobe/Circle toggle + pitch-driven primary updates)
