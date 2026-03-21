@@ -140,6 +140,32 @@
 - Apply this unconditionally for all browsers, not just iOS; Android Chrome also supports the `audioSession` API.
 - Do **not** move this call inside an iOS-only branch — this bug has recurred and the fix must remain platform-agnostic.
 
+## Module layer boundaries
+
+### UI elements (`src/ui/*.ts`)
+- Own their rendering and internal state; expose a narrow lifecycle API (`create`, `enter`, `exit`, `destroy`).
+- Do NOT create `new AudioContext()` — use `src/app/audio-context-service.ts`.
+- Do NOT import from `src/modes/` — zero dependency on mode-level code.
+- Do NOT contain mode-specific business logic (transport coordination, URL encoding, looper state).
+
+### Mode adapters (`src/modes/*.ts`)
+- Are thin lifecycle wrappers: wire up UI elements, attach event callbacks, clean up on exit.
+- Do NOT contain rendering logic — delegate to `src/ui/` objects.
+- Do NOT call audio player methods directly (e.g. `guitarPlayer.playMidi()`, `ctx.createBufferSource()`).
+  Use `src/app/audio-session.ts` or a dedicated audio controller (e.g. `src/app/circle-audio-controller.ts`).
+- Do NOT store state that belongs inside a UI element.
+
+### Canvas-rendering modules (`src/ui/jam-flow.ts`)
+- When multiple visual modes share a single `<canvas>` with animated transitions between them, they belong in one file.
+  Reason: the shared RAF loop, layout caches, and transition interpolation (Circle ↔ KeyZoom ↔ Fretboard) require coordinated state that cannot be safely split across modules.
+- Do NOT split a canvas module just to reduce line count. The correct signal is the public API surface, not lines-of-code.
+- Keep the public API narrow even if internal implementation is long.
+
+### Coordinators (`src/modes/wild-tuna.ts`)
+- Allowed responsibilities: looper sync, transport wiring, URL share payload, mode lifecycle.
+- Do NOT add audio callback wiring (e.g. `playCircleMidis`, `playFretMidis` closures) — that belongs in the audio session or the element itself.
+- Do NOT add inline rendering (canvas calls, DOM manipulation beyond initial mount).
+
 ## Testing expectations
 - Keep assertions deterministic (text, selected state, counts, visibility).
 - Cover interaction flow in Playwright with at least desktop and mobile projects.
