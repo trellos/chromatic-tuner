@@ -107,7 +107,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
   - Mode exit must clear/neutralize fretboard-owned randomness (`null`) so other modes can drive background state.
 
 ### Circle of Fifths (`src/modes/circle-of-fifths.ts`)
-- Dedicated mode is a thin adapter over shared Circle UI (`src/ui/circle-of-fifths.ts`).
+- Dedicated mode is a thin adapter over shared Circle UI (`src/ui/circle-of-fifths.ts`) plus the shared playback controller (`src/app/circle-audio-controller.ts`).
 - Taps trigger guitar-sample playback + seigaiha pulse; keep theory/render logic in shared UI helpers.
 - Keep this mode focused on lifecycle wiring (`onEnter`/`onExit`) and cleanup only.
 - Interaction contract:
@@ -147,6 +147,7 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - **Seigaiha:** `noteTracker` converts active note count to a randomness value fed to `seigaihaBridge`; decays when notes stop sounding.
 - **Track API:** `getWildTunaTrackApi()` returns a `WildTunaTrackApi` with `onNoteOn`/`onNoteOff`/`getActiveNotes` aggregating playback events from both loopers. The singleton is recreated on each `onEnter` via `_reset()`.
 - Shared note-event aggregation lives in `src/app/note-events.ts`; preserve stacked note/chord pulses as separate active notes so rapid re-attacks stay visible to subscribers.
+- Shared real-time routing lives in `src/app/audio-session.ts`; keep it narrow (instrument registration, active note lifecycle, subscriber fanout) and do not move geometry or looper timing into it.
 - **CSS:** Layout in `public/styles/00-foundation.css` (`.wild-tuna-composite` grid). Timeline block + step styles: `.wt-timeline-block`, `.wt-timeline-step` in the same file. Looper widget styles: `public/styles/60-circle-of-fifths.css`.
 
 ## Guardrails

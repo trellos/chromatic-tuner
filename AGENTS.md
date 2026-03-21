@@ -45,6 +45,7 @@
 - Tapping a candidate row updates a separate one-line hint listing related modal interpretations (the row itself should not expand).
 
 ## Circle of Fifths notes
+- Shared Circle playback adapter: `src/app/circle-audio-controller.ts` (maps direct surface interactions onto the shared audio session + player without reintroducing click-latency logic in the mode file).
 - Shared Circle shell/orchestration: `src/ui/circle-of-fifths.ts`.
 - Circle note-bar DOM + trail lifecycle: `src/ui/circle-note-bar.ts`.
 - Dedicated mode adapter: `src/modes/circle-of-fifths.ts`.
@@ -88,6 +89,7 @@
 - Chord MIDI generation must keep the chord root as the first/lowest note and normalize octave consistently.
 
 ## Instrument philosophy (Wild Tuna + Circle of Fifths)
+- Shared low-latency instrument router: `src/app/audio-session.ts` (register instruments, fan out note lifecycle, keep pointerdown audio dispatch ahead of subscriber work).
 - Shared note-event infrastructure should preserve stacked pulses as separate note lifecycles; do not collapse repeated attacks of the same pitch/chord into one active slot.
 - Every interactive note surface (circle flowers, key-zoom chord flowers, note bar buttons, fretboard dots) is a **musical instrument**, not a UI button.
 - Notes **ring out while the finger/pointer is held down** and stop when it is released.
