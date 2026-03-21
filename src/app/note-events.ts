@@ -18,8 +18,17 @@ export type NoteEventInput<Source extends string = string> = {
   origin?: NoteEventOrigin;
 };
 
+export type NoteEventHoldInput<Source extends string = string> = {
+  source: Source;
+  midis: number[];
+  startedAt?: number;
+  origin?: NoteEventOrigin;
+};
+
 export type NoteEventHub<Source extends string = string> = {
   emitPulse: (event: NoteEventInput<Source>) => string | null;
+  startHold: (event: NoteEventHoldInput<Source>) => string | null;
+  stopHold: (noteId: string, endAt?: number) => void;
   onNoteOn: (handler: (event: NoteEventSnapshot<Source>) => void) => () => void;
   onNoteOff: (handler: (event: NoteEventSnapshot<Source>) => void) => () => void;
   getActiveNotes: () => NoteEventSnapshot<Source>[];
@@ -52,7 +61,7 @@ export function createNoteEventHub<Source extends string = string>(
   const endTimeoutIds = new Map<string, NoteTimeoutId>();
   let nextNoteId = 0;
 
-  const finalizeNote = (noteId: string): void => {
+  const finalizeNote = (noteId: string, endAt = now()): void => {
     const snapshot = activeNotes.get(noteId);
     if (!snapshot) return;
     const timeoutId = endTimeoutIds.get(noteId);
@@ -61,7 +70,11 @@ export function createNoteEventHub<Source extends string = string>(
       endTimeoutIds.delete(noteId);
     }
     activeNotes.delete(noteId);
-    noteOffHandlers.forEach((handler) => handler(snapshot));
+    noteOffHandlers.forEach((handler) => handler({
+      ...snapshot,
+      durationMs: Math.max(0, endAt - snapshot.startedAt),
+      endAt,
+    }));
   };
 
   return {
@@ -85,6 +98,27 @@ export function createNoteEventHub<Source extends string = string>(
       const timeoutId = setTimeoutFn(() => finalizeNote(noteId), durationMs);
       endTimeoutIds.set(noteId, timeoutId);
       return noteId;
+    },
+    startHold(event) {
+      const midis = sanitizeMidis(event.midis);
+      if (!midis.length) return null;
+      const startedAt = event.startedAt ?? now();
+      const noteId = `hold-${nextNoteId++}`;
+      const snapshot: NoteEventSnapshot<Source> = {
+        noteId,
+        source: event.source,
+        midis,
+        durationMs: 0,
+        startedAt,
+        endAt: startedAt,
+        origin: event.origin ?? "live",
+      };
+      activeNotes.set(noteId, snapshot);
+      noteOnHandlers.forEach((handler) => handler(snapshot));
+      return noteId;
+    },
+    stopHold(noteId, endAt = now()) {
+      finalizeNote(noteId, endAt);
     },
     onNoteOn(handler) {
       noteOnHandlers.add(handler);

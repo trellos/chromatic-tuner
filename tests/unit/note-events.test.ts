@@ -58,4 +58,39 @@ describe("note-events", () => {
       vi.useRealTimers();
     }
   });
+
+  it("tracks held notes independently from stacked pulses", () => {
+    vi.useFakeTimers();
+    try {
+      let nowMs = 1000;
+      const noteOff: Array<{ noteId: string; durationMs: number }> = [];
+      const hub = createNoteEventHub<"circle">({
+        now: () => nowMs,
+        setTimeoutFn: (handler, delayMs) => setTimeout(handler, delayMs),
+        clearTimeoutFn: (id) => clearTimeout(id),
+      });
+      hub.onNoteOff((event) => noteOff.push({ noteId: event.noteId, durationMs: event.durationMs }));
+
+      const holdId = hub.startHold({ source: "circle", midis: [60], origin: "live" });
+      nowMs += 40;
+      vi.advanceTimersByTime(40);
+      const pulseId = hub.emitPulse({ source: "circle", midis: [60], durationMs: 120, origin: "playback" });
+
+      expect(hub.getActiveNotes().map((event) => event.noteId)).toEqual([holdId, pulseId]);
+
+      nowMs += 120;
+      vi.advanceTimersByTime(120);
+      expect(hub.getActiveNotes().map((event) => event.noteId)).toEqual([holdId]);
+
+      nowMs += 80;
+      hub.stopHold(holdId!, nowMs);
+      expect(noteOff).toEqual([
+        { noteId: pulseId!, durationMs: 120 },
+        { noteId: holdId!, durationMs: 240 },
+      ]);
+      expect(hub.getActiveNotes()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
