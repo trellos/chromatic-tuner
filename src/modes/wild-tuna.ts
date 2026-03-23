@@ -1,17 +1,13 @@
 import { createCircleGuitarPlayer } from "../audio/circle-guitar-player.js";
+import { createAudioDispatch } from "../audio/audio-dispatch.js";
+import { createFretboardPlayer, type FretboardPlayer } from "../audio/fretboard-player.js";
 import { createDrumMachineUi, type DrumMachineUi } from "../ui/drum-machine.js";
 import { createJamFlowUi, type JamFlowUi, type DiatonicChord } from "../ui/jam-flow.js";
 import {
   FRETBOARD_DEFAULT_STATE,
   type FretboardState,
 } from "../fretboard-logic.js";
-import {
-  FRETBOARD_SAMPLE_BASE_MIDI,
-  FRETBOARD_SAMPLE_GAIN,
-  fetchFretboardSample,
-} from "../audio/fretboard-sample.js";
 import { createUiCompositeLooper, type CompositeLooper } from "../ui/ui-composite-looper.js";
-import { getOrCreateAudioContext } from "../utils.js";
 import type { ModeDefinition } from "./types.js";
 import { seigaihaBridge } from "../app/seigaiha-bridge.js";
 import { setCarouselHidden } from "../app/carousel-bridge.js";
@@ -334,7 +330,7 @@ function syncTrackRandomness(trackApi: WildTunaTrackApi): () => void {
 //   │       ↓                                                        │
 //   │  CircleLooper + FretboardLooper (CompositeLooper instances)    │
 //   │       ↓  (onPlaybackEvent)                                     │
-//   │  playCircleMidis / playFretTargets  →  audio + visual pulse   │
+//   │  playCircleMidis / FretboardPlayer  →  audio + visual pulse   │
 //   └─────────────────────────────────────────────────────────────────┘
 //
 // Transport lifecycle:
@@ -368,104 +364,13 @@ export function createWildTunaMode(): ModeDefinition {
   let circleLooper: CompositeLooper | null = null;
   let fretboardLooper: CompositeLooper | null = null;
   let fretboardState: FretboardState = { ...FRETBOARD_DEFAULT_STATE };
-  const guitarPlayer = createCircleGuitarPlayer();
-  let audioContext: AudioContext | null = null;
-  let fretSample: AudioBuffer | null = null;
+  const audioDispatch = createAudioDispatch();
+  const guitarPlayer = createCircleGuitarPlayer({ getContext: audioDispatch.getContext });
+  const fretboardPlayer: FretboardPlayer = createFretboardPlayer(audioDispatch);
   const liveTrackHoldIds = new Map<string, string>();
   let stopTrackRandomnessSync: (() => void) | null = null;
 
   let sessionTransport = createSessionTransport();
-
-  const ensureAudioContext = async (): Promise<AudioContext | null> => {
-    audioContext = await getOrCreateAudioContext(audioContext);
-    return audioContext;
-  };
-
-  const ensureFretSample = async (ctx: AudioContext): Promise<AudioBuffer | null> => {
-    if (fretSample) return fretSample;
-    fretSample = await fetchFretboardSample(ctx);
-    return fretSample;
-  };
-
-  // Fretboard sustain — looped playback while a dot is held.
-  let fretSustainVoice: { sources: AudioBufferSourceNode[]; gains: GainNode[] } | null = null;
-
-  const stopFretSustain = (): void => {
-    const voice = fretSustainVoice;
-    if (!voice) return;
-    fretSustainVoice = null;
-    const ctx = audioContext;
-    const now = ctx?.currentTime ?? 0;
-    const releaseSec = 0.09;
-    voice.gains.forEach((gain) => {
-      const current = Math.max(0.0001, gain.gain.value);
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setValueAtTime(current, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + releaseSec);
-    });
-    voice.sources.forEach((source) => {
-      try { source.stop(now + releaseSec + 0.02); } catch { /* already stopped */ }
-    });
-  };
-
-  const startFretSustain = async (targets: Array<{ midi: number; stringIndex: number }>): Promise<void> => {
-    stopFretSustain();
-    const ctx = await ensureAudioContext();
-    if (!ctx) return;
-    const sample = await ensureFretSample(ctx);
-    if (!sample) return;
-    // Simple fixed-fraction loop region (no zero-crossing search needed for short hold).
-    const loopStart = sample.duration * 0.30;
-    const loopEnd = sample.duration * 0.82;
-    const at = ctx.currentTime + 0.008;
-    const sources: AudioBufferSourceNode[] = [];
-    const gains: GainNode[] = [];
-    for (const { midi } of targets) {
-      const source = ctx.createBufferSource();
-      source.buffer = sample;
-      source.playbackRate.value = Math.pow(2, (midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
-      source.loop = true;
-      source.loopStart = loopStart;
-      source.loopEnd = loopEnd;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(FRETBOARD_SAMPLE_GAIN, at + 0.02);
-      source.connect(gain);
-      gain.connect(ctx.destination);
-      source.start(at);
-      sources.push(source);
-      gains.push(gain);
-    }
-    fretSustainVoice = { sources, gains };
-  };
-
-  const playFretTargets = async (targets: Array<{ midi: number; stringIndex: number }>, durationMs: number, shouldRecord: boolean): Promise<void> => {
-    if (!targets.length) return;
-    const midis = targets.map((t) => t.midi);
-    if (shouldRecord) fretboardLooper?.recordPulse(midis, durationMs);
-    const ctx = await ensureAudioContext();
-    if (!ctx) return;
-    const sample = await ensureFretSample(ctx);
-    const startAt = ctx.currentTime + 0.01;
-    midis.forEach((midi) => {
-      if (sample) {
-        const source = ctx.createBufferSource();
-        source.buffer = sample;
-        source.playbackRate.value = Math.pow(2, (midi - FRETBOARD_SAMPLE_BASE_MIDI) / 12);
-        const gain = ctx.createGain();
-        gain.gain.value = FRETBOARD_SAMPLE_GAIN;
-        source.connect(gain);
-        gain.connect(ctx.destination);
-        source.start(startAt);
-        source.stop(startAt + durationMs / 1000);
-      }
-    });
-    jamFlowUi?.pulseTargets(targets, durationMs);
-  };
-
-  const playFretMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
-    return playFretTargets(midis.map((midi) => ({ midi, stringIndex: 0 })), durationMs, shouldRecord);
-  };
 
   const playCircleMidis = async (midis: number[], durationMs: number, shouldRecord: boolean): Promise<void> => {
     if (!midis.length) return;
@@ -580,7 +485,9 @@ export function createWildTunaMode(): ModeDefinition {
         getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
         onPlaybackEvent: (event) => {
           _trackApi._emitPulse({ source: "fretboard", ...event, startedAt: performance.now(), origin: "playback" });
-          void playFretMidis(event.midis, event.durationMs, false);
+          const targets = event.midis.map((midi) => ({ midi, stringIndex: 0 }));
+          void fretboardPlayer.playTargets(targets, event.durationMs);
+          jamFlowUi?.pulseTargets(targets, event.durationMs);
         },
         onRecButtonPressed: () => coordinator.onRecPressed(fretboardLooper!),
         onRecordingProgress: onRecordingProgress(() => fretboardLooper),
@@ -589,6 +496,7 @@ export function createWildTunaMode(): ModeDefinition {
 
       // Drum machine generates its own DOM; wild-tuna just appends drumUi.rootEl.
       drumUi = createDrumMachineUi({
+        getAudioContext: audioDispatch.getContext,
         onTransportStart: () => {
           sessionTransport.notifyStart();
         },
@@ -699,12 +607,12 @@ export function createWildTunaMode(): ModeDefinition {
           // Pressed down on a fretboard dot → start sustain.
           fretboardLooper?.recordHoldStart("fret-dot", [midi]);
           replaceLiveHold("fret-dot", "fretboard", [midi]);
-          void startFretSustain([{ midi, stringIndex }]);
+          void fretboardPlayer.startSustain([{ midi, stringIndex }]);
         },
         onFretDotPressEnd: () => {
           fretboardLooper?.recordHoldEnd("fret-dot");
           stopLiveHold("fret-dot");
-          stopFretSustain();
+          fretboardPlayer.stopSustain();
         },
         isRecording: () => {
           const cs = circleLooper?.getRecordState();
@@ -785,7 +693,7 @@ export function createWildTunaMode(): ModeDefinition {
       seigaihaBridge.setModeRandomness(null);
       guitarPlayer.stopSustain();
       guitarPlayer.stopAll();
-      stopFretSustain();
+      fretboardPlayer.stopSustain();
       drumUi?.exit();
       drumUi?.destroy();
       drumUi = null;

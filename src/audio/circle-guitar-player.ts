@@ -90,7 +90,10 @@ export type CircleGuitarPlayer = {
   destroy: () => Promise<void>;
 };
 
-export function createCircleGuitarPlayer(): CircleGuitarPlayer {
+export function createCircleGuitarPlayer(options?: {
+  /** If provided, the player uses this shared context instead of creating its own. */
+  getContext?: () => Promise<AudioContext | null>;
+}): CircleGuitarPlayer {
   let audioContext: AudioContext | null = null;
   const sampleBytesByUrl = new Map<string, ArrayBuffer>();
   const sampleBytesPromiseByUrl = new Map<string, Promise<ArrayBuffer | null>>();
@@ -103,6 +106,14 @@ export function createCircleGuitarPlayer(): CircleGuitarPlayer {
   let sustainStopRequested = false;
 
   const ensureAudioContext = async (): Promise<AudioContext | null> => {
+    if (options?.getContext) {
+      const shared = await options.getContext();
+      if (shared && shared.state !== "closed") {
+        audioContext = shared;
+        await shared.resume();
+        return shared;
+      }
+    }
     if (audioContext && audioContext.state !== "closed") {
       await audioContext.resume();
       return audioContext;

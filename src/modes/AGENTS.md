@@ -155,6 +155,12 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Keep cross-mode coupling out of mode files.
 - Keep lifecycle cleanup complete: timers, observers, event listeners, and audio nodes must be released on `onExit`.
 - Prefer small helper functions over nested control flow.
+- Mode files must NOT contain rendering logic. All drawing belongs in `src/ui/` objects.
+- Mode files must NOT call audio player methods directly. Route audio through `src/app/audio-session.ts`
+  or a dedicated audio controller (`src/app/circle-audio-controller.ts`).
+- `src/modes/wild-tuna.ts` is a coordinator. Its only legitimate responsibilities are:
+  looper synchronization, transport wiring, URL share payload encode/decode, and mode lifecycle.
+  If you find yourself adding audio dispatch or rendering code here, move it to the appropriate `src/ui/` or `src/app/` module.
 
 ## Pruning Rules (No Bush)
 

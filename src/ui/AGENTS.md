@@ -25,6 +25,19 @@ Modules should:
 - `public/style.css` should carry supporting CSS primitives for these modules.
 - UI modules should be deterministic and testable when possible.
 
+## Module Boundaries (do not cross)
+
+- Do NOT create `new AudioContext()` inside any `src/ui/` module. Always use `src/app/audio-context-service.ts`.
+- Do NOT import from `src/modes/`. UI modules are upstream of modes, never downstream.
+- Do NOT embed transport coordination logic (beat scheduling, looper arming, BPM math) — expose callbacks for callers to implement.
+
+## `jam-flow.ts` note
+
+`src/ui/jam-flow.ts` is a multi-view canvas rendering module. All three views (Circle, Key Zoom, Fretboard)
+share one `<canvas>` and one RAF loop, and the animated transitions between views interpolate positions
+across all three simultaneously. This is intentionally one file. Its size (>1,500 lines) is a consequence
+of legitimate complexity, not a refactoring target. Judge it by its public API (currently 6 methods), not by line count.
+
 ## Current Module Notes: Seigaiha Background
 
 Primary implementation:
