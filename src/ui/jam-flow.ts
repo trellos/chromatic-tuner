@@ -297,14 +297,20 @@ function layoutKeyZoom(availW: number, availH: number): Pos[] {
   const ox = availW * margin;
   const oy = availH * margin;
 
-  // Heights of 3 tiers
-  const tier1H = usableH * 0.40;
-  const tier2H = usableH * 0.35;
-  const tier3H = usableH * 0.25;
+  // In portrait mode, cap the layout height so rows stay compact rather than
+  // spreading across the full canvas height.
+  const isPortrait = availH > availW;
+  const layoutH = isPortrait ? Math.min(usableH, usableW * 1.35) : usableH;
+  const layoutOY = oy + (usableH - layoutH) * 0.5;
 
-  const tier1Y = oy + tier1H * 0.5;
-  const tier2Y = oy + tier1H + tier2H * 0.5;
-  const tier3Y = oy + tier1H + tier2H + tier3H * 0.5;
+  // Heights of 3 tiers
+  const tier1H = layoutH * 0.40;
+  const tier2H = layoutH * 0.35;
+  const tier3H = layoutH * 0.25;
+
+  const tier1Y = layoutOY + tier1H * 0.5;
+  const tier2Y = layoutOY + tier1H + tier2H * 0.5;
+  const tier3Y = layoutOY + tier1H + tier2H + tier3H * 0.5;
 
   // Radii
   const rI = Math.min(usableW * 0.32, tier1H * 0.88) * 0.5;
