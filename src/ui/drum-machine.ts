@@ -50,6 +50,12 @@ export type DrumMachineUiOptions = {
   onShareOverride?: () => void;
   /** Called after the step count changes (8 or 16). */
   onStepsPerBarChange?: (n: 8 | 16) => void;
+  /**
+   * If provided, the drum machine uses this shared AudioContext instead of
+   * creating its own. Pass this when Wild Tuna needs the drum clock to share
+   * a context with the guitar and fretboard players for accurate scheduling.
+   */
+  getAudioContext?: () => Promise<AudioContext | null>;
 };
 
 export type DrumMachineUi = {
@@ -896,7 +902,12 @@ export function createDrumMachineUi(
   };
 
   const ensureAudio = async () => {
-    if (audioContext) {
+    if (options.getAudioContext) {
+      const shared = await options.getAudioContext();
+      if (!shared) return;
+      audioContext = shared;
+      await audioContext.resume();
+    } else if (audioContext) {
       await audioContext.resume();
     } else {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
