@@ -678,13 +678,10 @@ body.wild-tuna-fullscreen .wild-tuna-composite.wt-jam-expanded {
 }
 
 .wt-timeline-blocks {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  flex: 1;
-  min-height: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  align-content: center;
+  width: 100%;
   padding: 0 4px;
 }
 
