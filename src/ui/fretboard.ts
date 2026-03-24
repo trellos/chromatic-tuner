@@ -256,15 +256,15 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
 
     const fullStringSpan = Math.max(1, fullViewport.stringCount - 1);
     const windowStringSpan = Math.max(1, zoomViewport.stringCount - 1);
-    const paddedStringSpan = Math.min(fullStringSpan, windowStringSpan + 1);
+    const paddedStringSpan = Math.min(fullStringSpan, windowStringSpan + 0.6);
     const maxStringStart = Math.max(0, fullStringSpan - paddedStringSpan);
-    const stringStartWithPadding = clamp(zoomViewport.stringStart - 0.5, 0, maxStringStart);
+    const stringStartWithPadding = clamp(zoomViewport.stringStart - 0.3, 0, maxStringStart);
 
     const fullFretSpan = Math.max(1, fullViewport.fretCount);
     const windowFretSpan = Math.max(1, zoomViewport.fretCount);
-    const paddedFretSpan = Math.min(fullFretSpan, windowFretSpan + 1);
+    const paddedFretSpan = Math.min(fullFretSpan, windowFretSpan + 0.6);
     const maxFretStart = Math.max(0, fullFretSpan - paddedFretSpan);
-    const fretStartWithPadding = clamp(zoomViewport.fretStart - 0.5, 0, maxFretStart);
+    const fretStartWithPadding = clamp(zoomViewport.fretStart - 0.3, 0, maxFretStart);
 
     const zoomScaleX = fullStringSpan / paddedStringSpan;
     const zoomScaleY = fullFretSpan / paddedFretSpan;
@@ -286,9 +286,13 @@ export function createFretboardUi(rootEl: HTMLElement, options: FretboardUiOptio
 
   const zoomToPosition = (position: { stringIndex: number; fret: number }): void => {
     zoomViewport = getFretboardZoomViewport(position.stringIndex, position.fret, {
-      fretCount: 4,
+      fretCount: 5,
       stringCount: 3,
     });
+    // Show one fret before the tapped fret for context
+    if (zoomViewport && zoomViewport.fretStart > 0) {
+      zoomViewport.fretStart = Math.max(0, zoomViewport.fretStart - 1);
+    }
     applyViewport();
   };
 

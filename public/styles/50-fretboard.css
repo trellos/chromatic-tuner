@@ -191,9 +191,9 @@ body.wild-tuna-fullscreen .wild-tuna-pane--fretboard .fretboard-layout.fretboard
 }
 
 .fretboard-board.is-zoomed .fretboard-dot {
-  font-size: clamp(12px, 1.55vw, 14px);
+  font-size: clamp(14px, 2vw, 18px);
   transform: translate(-50%, -50%) scale(var(--fretboard-dot-shape-scale-x, 1), 1);
-  width: clamp(22px, 2.8vw, 28px);
+  width: clamp(32px, 4vw, 44px);
 }
 
 .fretboard-board.is-zoomed .fretboard-open-indicator {
