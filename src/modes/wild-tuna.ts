@@ -24,7 +24,8 @@ import {
 } from "../app/note-events.js";
 
 // Fixed number of measures shown in the timeline and cycled during playback.
-const GLOBAL_MEASURE_COUNT = 4;
+// Now starts at 4 but can be changed dynamically (4, 8, 12, or 16 measures).
+let GLOBAL_MEASURE_COUNT = 4;
 
 // ── Playing Track API ──────────────────────────────────────────────────────
 // Wild Tuna exposes a single aggregated note stream across both loopers.
@@ -144,7 +145,7 @@ type LiveRecordingState = {
   events: Array<{ midis: number[]; startStep: number; endStep: number }>;
 } | null;
 
-function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi: () => ReturnType<typeof createDrumMachineUi> | null, getTimelineSteps: () => number) {
+function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi: () => ReturnType<typeof createDrumMachineUi> | null, getTimelineSteps: () => number, getMeasureCount: () => number) {
   let liveRecording: LiveRecordingState = null;
 
   return {
@@ -171,16 +172,17 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
       for (const looper of getLoopers()) looper.seekToMeasure(measureIndex);
     },
     getMaxMeasureCount() {
-      return GLOBAL_MEASURE_COUNT;
+      return getMeasureCount();
     },
     // Returns how many loopers have recorded content in each measure slot.
     // Values are 0 (empty), 1, or 2 — used for timeline fill coloring.
     // The measure currently being recorded shows 0 (in-progress, not yet committed).
     getFillCounts(): number[] {
-      const counts = Array<number>(GLOBAL_MEASURE_COUNT).fill(0);
+      const measureCount = getMeasureCount();
+      const counts = Array<number>(measureCount).fill(0);
       for (const looper of getLoopers()) {
         const slots = looper.getMeasureSlots();
-        for (let i = 0; i < Math.min(slots.length, GLOBAL_MEASURE_COUNT); i++) {
+        for (let i = 0; i < Math.min(slots.length, measureCount); i++) {
           // If this looper is actively recording this measure, treat it as empty
           // (the old data is being overwritten; new data isn't committed yet).
           if (liveRecording?.looper === looper && liveRecording.measureIndex === i) continue;
@@ -195,12 +197,13 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
     // The measure currently being recorded shows live in-progress events.
     getStepDensities(): number[][] {
       const steps = getTimelineSteps();
-      const densities: number[][] = Array.from({ length: GLOBAL_MEASURE_COUNT }, () =>
+      const measureCount = getMeasureCount();
+      const densities: number[][] = Array.from({ length: measureCount }, () =>
         Array<number>(steps).fill(0)
       );
       for (const looper of getLoopers()) {
         const slots = looper.getMeasureSlots();
-        for (let mi = 0; mi < Math.min(slots.length, GLOBAL_MEASURE_COUNT); mi++) {
+        for (let mi = 0; mi < Math.min(slots.length, measureCount); mi++) {
           // Use live in-progress events for the actively-recording measure.
           const events =
             liveRecording?.looper === looper && liveRecording.measureIndex === mi
@@ -214,9 +217,9 @@ function createLooperCoordinator(getLoopers: () => CompositeLooper[], getDrumUi:
           }
         }
         // If live recording is beyond current slot count, add its events too.
-        if (liveRecording?.looper === looper && liveRecording.measureIndex >= Math.min(slots.length, GLOBAL_MEASURE_COUNT)) {
+        if (liveRecording?.looper === looper && liveRecording.measureIndex >= Math.min(slots.length, measureCount)) {
           const mi = liveRecording.measureIndex;
-          if (mi < GLOBAL_MEASURE_COUNT) {
+          if (mi < measureCount) {
             for (const event of liveRecording.events) {
               const noteCount = event.midis.length;
               for (let s = event.startStep; s < Math.min(event.endStep, steps); s++) {
@@ -245,17 +248,23 @@ function stepDensityToOpacity(noteCount: number): number {
 // Each block contains mini step-slot spans that light up based on note density.
 // `update(currentMeasure, fillCounts, stepDensities)` refreshes all visuals.
 // `rebuild(stepsPerBlock)` redraws with a new step count.
-function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
+// When drum machine is visible, adds a pull handle to resize the timeline.
+function buildWildTunaTimeline(host: HTMLElement, measureCount: number, isDrumVisible: boolean, onMeasureCountChange?: (newCount: number) => void) {
   let stepsPerBlock = 16;
+  let currentMeasureCount = measureCount;
   const blocks: HTMLElement[] = [];
   const stepSpans: HTMLSpanElement[][] = [];
+  const container = document.createElement("div");
+  container.className = "wt-timeline-container";
 
   function buildBlocks() {
-    host.replaceChildren();
+    const blocksContainer = container.querySelector(".wt-timeline-blocks") as HTMLElement;
+    if (!blocksContainer) return;
+    blocksContainer.replaceChildren();
     blocks.length = 0;
     stepSpans.length = 0;
 
-    for (let i = 0; i < measureCount; i++) {
+    for (let i = 0; i < currentMeasureCount; i++) {
       const block = document.createElement("button");
       block.type = "button";
       block.className = "wt-timeline-block";
@@ -271,11 +280,75 @@ function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
       }
       stepSpans.push(spans);
 
-      host.appendChild(block);
+      blocksContainer.appendChild(block);
       blocks.push(block);
     }
   }
 
+  // Build DOM structure
+  const blocksContainer = document.createElement("div");
+  blocksContainer.className = "wt-timeline-blocks";
+  container.appendChild(blocksContainer);
+
+  // Add pull handle if drum is visible
+  if (isDrumVisible) {
+    const handleContainer = document.createElement("div");
+    handleContainer.className = "wt-timeline-handle-container";
+    const handle = document.createElement("div");
+    handle.className = "wt-timeline-handle";
+    handle.setAttribute("aria-label", "Resize timeline");
+    handle.title = "Drag to resize timeline (4-16 measures)";
+    handleContainer.appendChild(handle);
+    container.appendChild(handleContainer);
+
+    // Handle resizing
+    let isDragging = false;
+    let startY = 0;
+    let startMeasureCount = currentMeasureCount;
+
+    const onMouseDown = (e: MouseEvent | TouchEvent) => {
+      isDragging = true;
+      startY = (e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY) || 0;
+      startMeasureCount = currentMeasureCount;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("touchmove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+      document.addEventListener("touchend", onMouseUp);
+      e.preventDefault();
+    };
+
+    const onMouseMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDragging) return;
+      const currentY = (e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY) || 0;
+      const deltaY = currentY - startY;
+      // Each ~40px of drag = one line (4 measures)
+      const lineDelta = Math.round(deltaY / 40);
+      const newCount = Math.max(4, Math.min(16, startMeasureCount + lineDelta * 4));
+
+      if (newCount !== currentMeasureCount) {
+        currentMeasureCount = newCount;
+        buildBlocks();
+      }
+    };
+
+    const onMouseUp = () => {
+      isDragging = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("touchmove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.removeEventListener("touchend", onMouseUp);
+
+      // Notify that measure count changed
+      if (currentMeasureCount !== startMeasureCount) {
+        onMeasureCountChange?.(currentMeasureCount);
+      }
+    };
+
+    handle.addEventListener("mousedown", onMouseDown);
+    handle.addEventListener("touchstart", onMouseDown);
+  }
+
+  host.replaceChildren(container);
   buildBlocks();
 
   return {
@@ -295,6 +368,9 @@ function buildWildTunaTimeline(host: HTMLElement, measureCount: number) {
           span.classList.toggle("has-notes", opacity > 0);
         });
       });
+    },
+    getMeasureCount() {
+      return currentMeasureCount;
     },
   };
 }
@@ -456,7 +532,8 @@ export function createWildTunaMode(): ModeDefinition {
           return loopers;
         },
         () => drumUi,
-        () => drumUi?.getStepsPerBar() ?? 16
+        () => drumUi?.getStepsPerBar() ?? 16,
+        () => GLOBAL_MEASURE_COUNT
       );
 
       const onRecordingProgress = (looper: () => CompositeLooper | null) => (
@@ -650,7 +727,25 @@ export function createWildTunaMode(): ModeDefinition {
       await drumUi.enter();
 
       if (timelineHost) {
-        timelineUi = buildWildTunaTimeline(timelineHost, coordinator.getMaxMeasureCount());
+        timelineUi = buildWildTunaTimeline(
+          timelineHost,
+          coordinator.getMaxMeasureCount(),
+          !!drumUi,
+          (newCount) => {
+            // Update the global measure count
+            GLOBAL_MEASURE_COUNT = newCount;
+            // If transport is playing, adjust the loop to fit the new measure count
+            if (drumUi?.isPlaying()) {
+              // Get current measure index and wrap it
+              const currentMeasure = sessionTransport.getMeasureIndex() % newCount;
+              sessionTransport.setMeasureIndexBeforeNextBoundary(currentMeasure, newCount);
+            }
+            // Update coordinator so it uses new measure count
+            coordinator.getMaxMeasureCount();
+            // Refresh timeline visuals
+            timelineUi?.update(sessionTransport.getMeasureIndex() % newCount, coordinator.getFillCounts(), coordinator.getStepDensities());
+          }
+        );
         timelineHost.addEventListener("click", (event) => {
           const block = (event.target as Element)?.closest<HTMLElement>("[data-measure]");
           const idx = block ? parseInt(block.dataset.measure ?? "", 10) : NaN;
