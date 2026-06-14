@@ -134,6 +134,28 @@
 - **Resize handling**: Each fretboard viewport observes its parent container; the layout automatically sizes fretboards to fill available space.
 - **Cleanup**: On mode exit, disconnect resize observers, tear down UI instances, and close audio context.
 
+## Blues Jam mode notes
+- Entry point: `src/modes/blues-jam.ts` (DOM wiring, audio scheduling, visual loop).
+- Pure progression/theory helpers: `src/modes/blues-jam-logic.ts` (must stay UI-independent).
+- Markup: `public/index.html` (mode screen article). Styles: `public/styles/85-blues-jam.css`.
+- Self-contained Web Audio synthesis (no external samples), in the spirit of the metronome mode — drums (kick/snare/hi-hat), a selectable blues-rock bass, and optional chord comping.
+- **Default feel is straight blues-rock (ZZ Top / Aerosmith / Van Halen).** The selected bass style sets the groove feel (see the bass-style notes below); the drum backbeat follows it.
+- Bass lines are built across the whole progression in `resolveProgression`/`buildBassLine`, so each bar's final sounding eighth targets the following chord (wrapping from the last bar back to bar 1). The eight styles span relentless root pumps, octave pumps, the Texas box, a boogie walk, a unison blues riff, a pentatonic climb, a half-time two-feel, and a syncopated push.
+- **Bass voice is ported from the sibling `OutrunAxe` repo's Cliff Diver mode (`src/audio/eddie/EddieBass.ts`, the `option-1` variant).** It is a sine **sub** (the body) + a square **bite** layer (the edge, slightly detuned), both summed into a shared lowpass whose cutoff snaps from a peak (~2200 Hz) down to a floor (~320 Hz) over ~90 ms on the attack — that fast filter envelope is the characteristic pluck "bite". The voice constants live at the top of `playBassNote` in `src/modes/blues-jam.ts`; keep them in sync if the OutrunAxe voice is retuned.
+- **Chord comping (when the `Chords` box is ticked) must be clearly audible over the bass and drums.** The comp is voiced two octaves above the bass (`CHORD_ROOT_MIDI` = C4, vs bass C2) and highpass-filtered so it never masks against the bass; the master bus runs through a transparent safety limiter so stabs can punch through without clipping. Keep the comp register above the bass.
+- Controls: 12-key radiogroup, tempo slider (60–160 BPM), progression `<select>`, **bass-style `<select>`**, **Bass / Chord volume sliders**, a `Chords` checkbox, and a Play/Stop button. All selections persist to `localStorage` (`tuna.bluesJam.*`).
+- **Mixing:** bass notes route to a `bassBus` gain and chord stabs to a `chordBus` gain; the Bass Vol / Chord Vol sliders set those bus gains (0–100% → 0–1, applied live via `setTargetAtTime`). Both buses feed `masterGain` → safety limiter → destination. The Chord Vol slider is shown only while `Chords` is enabled.
+- Progressions (`BluesProgressionId`): `twelve-bar` (slow change), `twelve-bar-quick-change`, `sixteen-bar`, `eight-bar`, `minor-blues`. Every form's bar count is divisible by 4 so the grid stays 4 columns wide.
+- Major forms use dominant-7 voicings on I/IV/V; minor blues uses min7 on i/iv, a bVI major, and a dominant V.
+- **Bass styles (`BassStyleId`, `BASS_STYLES`):** `root-pump`, `octave-pump`, `box`, `boogie`, `blues-riff`, `pentatonic`, `two-feel`, `syncopated-push`. Each is an 8-slot eighth-note grid generated per bar by `buildBassLine(styleId, seed, nextRoot)` (`null` = rest); the last sounding slot leads chromatically into the next bar's root.
+- Each bass style declares a `feel` (`straight` | `shuffle` | `half`) that the scheduler uses to place off-beat eighths (straight = 0.5, shuffle = 2/3) and to shape the drum pattern via `scheduleDrums`: straight = driving rock backbeat (kick 1 & 3 + pushed "and" of 3), shuffle = swung boogie backbeat, half = spacious two-feel (kick on 1, snare on 3, quarter-note hats). There is intentionally no separate swing control — the bass style owns the feel.
+- Changing the bass style rebuilds only the bass lines (`rebuildBars`) and resets the transport phase; grid labels are unaffected.
+- **Grid:** 4 columns × N rows (8 bars → 2, 12 → 3, 16 → 4). Each cell shows the bar number + chord label; the currently-playing measure gets `.is-active`.
+- **Visual metronome:** 4 `.blues-beat-dot` spans (one per beat). Each dot swells from half a beat before its beat to half a beat after via a `--swell` CSS variable driven by a `requestAnimationFrame` loop off the audio clock; the on-beat dot also gets `.is-active`.
+- Audio scheduling uses a lookahead scheduler (like the metronome); the visual loop reads `audioContext.currentTime - playbackStartTime` so highlight/dots stay in sync with scheduled sound.
+- Changing key or progression while playing rebuilds the grid and resets the transport to bar 1; tempo and chord-toggle changes apply live.
+- `onExit` stops the transport, aborts listeners, and closes the audio context.
+
 ## Mobile audio routing
 - Audio output on mobile **must use the media channel**, not the ringer/notification channel.
 - This is enforced by setting `navigator.audioSession.type = "playback"` (in a try/catch) before creating the `AudioContext` — see `src/app/audio-context-service.ts`.

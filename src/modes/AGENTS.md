@@ -150,6 +150,21 @@ Each mode module exports a factory returning `ModeDefinition` (`src/modes/types.
 - Shared real-time routing lives in `src/app/audio-session.ts`; keep it narrow (instrument registration, active note lifecycle, subscriber fanout) and do not move geometry or looper timing into it.
 - **CSS:** Layout in `public/styles/00-foundation.css` (`.wild-tuna-composite` grid). Timeline block + step styles: `.wt-timeline-block`, `.wt-timeline-step` in the same file. Looper widget styles: `public/styles/60-circle-of-fifths.css`.
 
+### Blues Jam (`src/modes/blues-jam.ts` + `src/modes/blues-jam-logic.ts`)
+- Loops a blues backing track in a chosen key/tempo/progression/bass-style: drums + selectable blues-rock bass, with optional chord comping.
+- **Default feel is straight blues-rock (ZZ Top / Aerosmith / Van Halen).** Eight bass styles (`BASS_STYLES`): root-pump, octave-pump, box, boogie, blues-riff, pentatonic, two-feel, syncopated-push. Each is an 8-slot eighth-note grid from `buildBassLine(styleId, seed, nextRoot)` (`null` = rest), stitched across bars in `resolveProgression` with next-bar context — never build a line per-bar in isolation.
+- Each style declares a `feel` (`straight`/`shuffle`/`half`). The scheduler reads it to place off-beat eighths (0.5 vs 2/3) and to pick the drum pattern in `scheduleDrums`. The bass style owns the feel; do not add a separate swing control.
+- Bass voice is ported from the sibling `OutrunAxe` repo's Cliff Diver mode (`EddieBass` `option-1`): a sine sub + square bite layer summed into a shared lowpass with a fast cutoff envelope (peak→floor on the attack) = the pluck "bite". Constants live atop `playBassNote`.
+- **Mixing:** bass → `bassBus`, chord stabs → `chordBus`, both → `masterGain` → limiter. The Bass Vol / Chord Vol sliders set the bus gains live; the Chord Vol slider is only shown while `Chords` is enabled.
+- Pure theory (progression shapes, chord/bass voicings, grid layout) lives in `src/modes/blues-jam-logic.ts` and must stay UI-independent; the mode file owns DOM, audio scheduling, and the visual loop.
+- Self-contained Web Audio synthesis (no external samples), modeled on the metronome mode.
+- `onEnter`: read persisted state, wire controls, render the grid + metronome dots, sync UI.
+- `onExit`: stop transport, abort listeners, close the audio context.
+- Progressions: `twelve-bar`, `twelve-bar-quick-change`, `sixteen-bar`, `eight-bar`, `minor-blues`. Bar counts are divisible by 4 to keep the grid 4 columns wide.
+- Grid contract: 4 columns × `ceil(bars/4)` rows; each cell shows bar number + chord label; the active measure has `.is-active`.
+- Visual metronome contract: 4 dots, each swelling (`--swell`) from a half-beat before its beat to a half-beat after, driven from the audio clock; the on-beat dot is also `.is-active`.
+- Key/progression changes rebuild the grid and reset the transport phase while playing; tempo and chord toggle apply live.
+
 ## Guardrails
 
 - Keep cross-mode coupling out of mode files.
