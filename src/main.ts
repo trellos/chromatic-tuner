@@ -6,6 +6,7 @@ import { createFretboardMode, preloadFretboardAudioAssets } from "./modes/fretbo
 import { createKeyFinderMode } from "./modes/key-finder.js";
 import { createCircleOfFifthsMode } from "./modes/circle-of-fifths.js";
 import { createExtraJimmyMode } from "./modes/extra-jimmy.js";
+import { createBluesJamMode } from "./modes/blues-jam.js";
 import { createWildTunaMode } from "./modes/wild-tuna.js";
 import { runModeTransition } from "./mode-transition.js";
 import { createCircleOfFifthsUi } from "./ui/circle-of-fifths.js";
@@ -40,6 +41,7 @@ const MODE_REGISTRY: ModeDefinition[] = [
   createCircleOfFifthsMode(),
   createDrumMachineMode(),
   createExtraJimmyMode(),
+  createBluesJamMode(),
   createWildTunaMode(),
 ];
 

@@ -34,6 +34,7 @@
             <button class="mode-picker-item" role="menuitem" data-mode="circle-of-fifths" type="button">Circle of Fifths</button>
             <button class="mode-picker-item" role="menuitem" data-mode="drum-machine" type="button">Drum Machine</button>
             <button class="mode-picker-item" role="menuitem" data-mode="extra-jimmy" type="button">Extra Jimmy</button>
+            <button class="mode-picker-item" role="menuitem" data-mode="blues-jam" type="button">Blues Jam</button>
             <button class="mode-picker-item" role="menuitem" data-mode="wild-tuna" type="button">Wild Tuna</button>
           </div>
         </div>
@@ -406,6 +407,118 @@
               <div class="ej-neck-label" aria-hidden="true">HIGH</div>
               <div class="ej-neck-viewport"></div>
             </div>
+          </div>
+        </article>
+
+        <article
+          id="mode-screen-blues-jam"
+          class="mode-screen"
+          data-mode="blues-jam"
+          role="tabpanel"
+          aria-hidden="true"
+        >
+          <div class="blues-jam-layout">
+            <div class="blues-controls">
+              <div class="blues-control blues-control--key">
+                <span class="blues-control-label">Key</span>
+                <div class="blues-key-row" role="radiogroup" aria-label="Key" data-blues-key-row>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="C">C</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="C#">C#</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="D">D</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="D#">D#</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="E">E</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="F">F</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="F#">F#</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="G">G</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="G#">G#</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="A">A</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="A#">A#</button>
+                  <button type="button" role="radio" aria-checked="false" data-blues-key="B">B</button>
+                </div>
+              </div>
+
+              <div class="blues-control-row">
+                <div class="blues-control blues-control--tempo">
+                  <label class="blues-control-label" for="blues-tempo">Tempo <span class="blues-tempo-value" data-blues-tempo-value>100 BPM</span></label>
+                  <input
+                    id="blues-tempo"
+                    class="blues-tempo-slider"
+                    type="range"
+                    min="60"
+                    max="160"
+                    step="1"
+                    value="100"
+                    data-blues-tempo
+                  />
+                </div>
+
+                <div class="blues-control blues-control--progression">
+                  <label class="blues-control-label" for="blues-progression">Progression</label>
+                  <select id="blues-progression" class="blues-progression-select" data-blues-progression>
+                    <option value="twelve-bar">12 Bar</option>
+                    <option value="twelve-bar-quick-change">12 Bar Fast Change</option>
+                    <option value="sixteen-bar">16 Bar</option>
+                    <option value="eight-bar">8 Bar</option>
+                    <option value="minor-blues">Minor Blues</option>
+                  </select>
+                </div>
+
+                <div class="blues-control blues-control--bass">
+                  <label class="blues-control-label" for="blues-bass">Bass</label>
+                  <select id="blues-bass" class="blues-progression-select" data-blues-bass>
+                    <option value="root-pump">Root Pump</option>
+                    <option value="octave-pump">Octave Pump</option>
+                    <option value="box">Box Groove</option>
+                    <option value="boogie">Boogie Walk</option>
+                    <option value="blues-riff">Blues Riff</option>
+                    <option value="pentatonic">Pentatonic Climb</option>
+                    <option value="two-feel">Two-Feel</option>
+                    <option value="syncopated-push">Syncopated Push</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="blues-control-row blues-volumes">
+                <div class="blues-control blues-control--vol">
+                  <label class="blues-control-label" for="blues-bass-vol">Bass Vol <span class="blues-vol-value" data-blues-bass-vol-value>60%</span></label>
+                  <input
+                    id="blues-bass-vol"
+                    class="blues-tempo-slider"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="60"
+                    data-blues-bass-vol
+                  />
+                </div>
+                <div class="blues-control blues-control--vol" data-blues-chord-vol-control hidden>
+                  <label class="blues-control-label" for="blues-chord-vol">Chord Vol <span class="blues-vol-value" data-blues-chord-vol-value>85%</span></label>
+                  <input
+                    id="blues-chord-vol"
+                    class="blues-tempo-slider"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="85"
+                    data-blues-chord-vol
+                  />
+                </div>
+              </div>
+
+              <div class="blues-control-row blues-control-row--actions">
+                <label class="blues-chords-toggle">
+                  <input type="checkbox" data-blues-chords />
+                  <span>Chords</span>
+                </label>
+                <button type="button" class="primary-btn blues-toggle" data-blues-toggle>Play</button>
+              </div>
+            </div>
+
+            <div class="blues-grid" data-blues-grid aria-label="Blues progression chart" aria-live="polite"></div>
+
+            <div class="blues-metronome" data-blues-metronome aria-hidden="true"></div>
           </div>
         </article>
       </section>

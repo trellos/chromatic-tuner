@@ -6,6 +6,7 @@ export type ModeId =
   | "circle-of-fifths"
   | "drum-machine"
   | "extra-jimmy"
+  | "blues-jam"
   | "wild-tuna";
 
 // A mode is the high-level object that encapsulates one app screen's
