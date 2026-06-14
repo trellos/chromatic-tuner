@@ -41,6 +41,7 @@ export function createBluesJamMode(): ModeDefinition {
   const PROG_STORAGE = "tuna.bluesJam.progression";
   const CHORDS_STORAGE = "tuna.bluesJam.chords";
   const BASS_STORAGE = "tuna.bluesJam.bass";
+  const BASS_SOUND_STORAGE = "tuna.bluesJam.bassSound";
 
   const BASS_VOL_STORAGE = "tuna.bluesJam.bassVol";
   const CHORD_VOL_STORAGE = "tuna.bluesJam.chordVol";
@@ -49,6 +50,7 @@ export function createBluesJamMode(): ModeDefinition {
   let tempo = 100;
   let progressionId: BluesProgressionId = "twelve-bar";
   let bassStyleId: BassStyleId = "root-pump";
+  let bassSoundId: BassSoundId = "option-1";
   let chordsEnabled = false;
   let bassVolume = 0.6;
   let chordVolume = 0.85;
@@ -81,6 +83,7 @@ export function createBluesJamMode(): ModeDefinition {
   let tempoValueEl: HTMLElement | null = null;
   let progressionSelectEl: HTMLSelectElement | null = null;
   let bassSelectEl: HTMLSelectElement | null = null;
+  let bassSoundSelectEl: HTMLSelectElement | null = null;
   let chordsToggleEl: HTMLInputElement | null = null;
   let bassVolInputEl: HTMLInputElement | null = null;
   let bassVolValueEl: HTMLElement | null = null;
@@ -113,6 +116,10 @@ export function createBluesJamMode(): ModeDefinition {
       const storedBass = window.localStorage.getItem(BASS_STORAGE);
       if (storedBass && BASS_STYLES.some((s) => s.id === storedBass)) {
         bassStyleId = storedBass as BassStyleId;
+      }
+      const storedBassSound = window.localStorage.getItem(BASS_SOUND_STORAGE);
+      if (storedBassSound && BASS_VOICES.some((v) => v.id === storedBassSound)) {
+        bassSoundId = storedBassSound as BassSoundId;
       }
       chordsEnabled = window.localStorage.getItem(CHORDS_STORAGE) === "1";
       const storedBassVol = Number.parseFloat(
@@ -238,49 +245,107 @@ export function createBluesJamMode(): ModeDefinition {
     playNoiseHit(time, accent ? 0.06 : 0.035, accent ? 0.22 : 0.13, 7000);
   };
 
-  // Bass voice ported from OutrunAxe's Cliff Diver mode (EddieBass "option-1"):
-  // a sine SUB (the body) plus a square BITE layer (the edge), both run through a
-  // shared lowpass whose cutoff snaps from a peak down to a floor on the attack —
-  // that fast filter envelope is the characteristic pluck "bite". Routed to the
-  // bass bus so the Bass volume slider controls it.
-  const BASS_SUB_GAIN = 0.5;
-  const BASS_BITE_GAIN = 0.18;
-  const BASS_FILTER_FLOOR = 320;
-  const BASS_FILTER_PEAK = 2200;
-  const BASS_FILTER_DECAY = 0.09;
-  const BASS_FILTER_Q = 4;
-  const BASS_AMP_SUSTAIN_FRAC = 0.85;
-  const BASS_BITE_DETUNE = 6;
+  // Bass voices ported from OutrunAxe's Eddie modes (Battle / Cliff Diver use
+  // EddieBass). Every voice shares the same architecture — a sine SUB (the body)
+  // plus a BITE layer (the edge, slightly detuned) summed into a shared lowpass
+  // whose cutoff snaps from a peak down to a floor on the attack (that fast
+  // filter envelope is the pluck "bite") — and differs in wave blend, filter
+  // shape, and decay. option-6 adds an octave-up layer and a finger-pop noise
+  // transient for a slap-bass character. See OutrunAxe src/audio/eddie/EddieBass.ts.
+  type BassSoundId =
+    | "option-1"
+    | "option-2"
+    | "option-3"
+    | "option-4"
+    | "option-5"
+    | "option-6";
+
+  type BassVoice = {
+    id: BassSoundId;
+    label: string;
+    biteWave: OscillatorType;
+    subGain: number;
+    biteGain: number;
+    filterFloor: number;
+    filterPeak: number;
+    filterDecay: number;
+    filterQ: number;
+    ampSustainFrac: number;
+    biteDetune: number;
+    level: number; // per-voice output (EddieBass masterGain) for relative balance
+    octaveBite?: number;
+    transientGain?: number;
+    transientHpHz?: number;
+  };
+
+  const BASS_VOICES: BassVoice[] = [
+    {
+      id: "option-1", label: "Pluck Bass", biteWave: "square",
+      subGain: 0.5, biteGain: 0.18, filterFloor: 320, filterPeak: 2200,
+      filterDecay: 0.09, filterQ: 4, ampSustainFrac: 0.85, biteDetune: 6, level: 0.5,
+    },
+    {
+      id: "option-2", label: "Acid Growl", biteWave: "sawtooth",
+      subGain: 0.46, biteGain: 0.26, filterFloor: 240, filterPeak: 2800,
+      filterDecay: 0.18, filterQ: 7, ampSustainFrac: 0.92, biteDetune: 10, level: 0.48,
+    },
+    {
+      id: "option-3", label: "Staccato", biteWave: "square",
+      subGain: 0.55, biteGain: 0.14, filterFloor: 420, filterPeak: 1800,
+      filterDecay: 0.05, filterQ: 3, ampSustainFrac: 0.45, biteDetune: 4, level: 0.52,
+    },
+    {
+      id: "option-4", label: "Deep Rumble", biteWave: "triangle",
+      subGain: 0.62, biteGain: 0.1, filterFloor: 140, filterPeak: 520,
+      filterDecay: 0.3, filterQ: 2, ampSustainFrac: 1.0, biteDetune: 8, level: 0.5,
+    },
+    {
+      id: "option-5", label: "Techno Stab", biteWave: "sawtooth",
+      subGain: 0.5, biteGain: 0.3, filterFloor: 260, filterPeak: 1600,
+      filterDecay: 0.04, filterQ: 6, ampSustainFrac: 0.22, biteDetune: 6, level: 0.52,
+    },
+    {
+      id: "option-6", label: "Slap Bass", biteWave: "sawtooth",
+      subGain: 0.42, biteGain: 0.22, filterFloor: 300, filterPeak: 3200,
+      filterDecay: 0.07, filterQ: 5, ampSustainFrac: 0.5, biteDetune: 5, level: 0.5,
+      octaveBite: 0.1, transientGain: 0.5, transientHpHz: 2200,
+    },
+  ];
+
+  const getBassVoice = (id: BassSoundId): BassVoice =>
+    BASS_VOICES.find((v) => v.id === id) ?? BASS_VOICES[0]!;
 
   const playBassNote = (midi: number, time: number, duration: number) => {
     if (!audioContext || !bassBus) return;
+    const v = getBassVoice(bassSoundId);
     const freq = midiToFrequency(midi);
-    const ampDur = Math.max(0.08, duration * BASS_AMP_SUSTAIN_FRAC);
+    const ampDur = Math.max(0.08, duration * v.ampSustainFrac);
 
     // Shared per-note lowpass with a fast envelope = the bite.
     const filter = audioContext.createBiquadFilter();
     filter.type = "lowpass";
-    filter.Q.value = BASS_FILTER_Q;
-    filter.frequency.setValueAtTime(BASS_FILTER_PEAK, time);
-    filter.frequency.exponentialRampToValueAtTime(
-      BASS_FILTER_FLOOR,
-      time + BASS_FILTER_DECAY
-    );
+    filter.Q.value = v.filterQ;
+    filter.frequency.setValueAtTime(v.filterPeak, time);
+    filter.frequency.exponentialRampToValueAtTime(v.filterFloor, time + v.filterDecay);
 
     const amp = audioContext.createGain();
     amp.gain.setValueAtTime(0.0001, time);
     amp.gain.linearRampToValueAtTime(1.0, time + 0.008); // fast attack snap
     amp.gain.setValueAtTime(1.0, time + Math.min(0.05, ampDur * 0.3));
     amp.gain.exponentialRampToValueAtTime(0.0001, time + ampDur);
+    // Per-voice output level keeps the variants balanced before the bass bus.
+    const voiceOut = audioContext.createGain();
+    voiceOut.gain.value = v.level;
     filter.connect(amp);
-    amp.connect(bassBus);
+    amp.connect(voiceOut);
+    voiceOut.connect(bassBus);
 
     // Sub layer (the body).
     const sub = audioContext.createOscillator();
     sub.type = "sine";
     sub.frequency.setValueAtTime(freq, time);
     const subGain = audioContext.createGain();
-    subGain.gain.value = BASS_SUB_GAIN;
+    subGain.gain.value = v.subGain;
     sub.connect(subGain);
     subGain.connect(filter);
     sub.start(time);
@@ -288,15 +353,48 @@ export function createBluesJamMode(): ModeDefinition {
 
     // Bite layer (the edge), slightly detuned.
     const bite = audioContext.createOscillator();
-    bite.type = "square";
+    bite.type = v.biteWave;
     bite.frequency.setValueAtTime(freq, time);
-    bite.detune.setValueAtTime(BASS_BITE_DETUNE, time);
+    bite.detune.setValueAtTime(v.biteDetune, time);
     const biteGain = audioContext.createGain();
-    biteGain.gain.value = BASS_BITE_GAIN;
+    biteGain.gain.value = v.biteGain;
     bite.connect(biteGain);
     biteGain.connect(filter);
     bite.start(time);
     bite.stop(time + ampDur + 0.05);
+
+    // Optional octave-up layer (extra brightness / a slap harmonic).
+    if (v.octaveBite && v.octaveBite > 0) {
+      const oct = audioContext.createOscillator();
+      oct.type = v.biteWave;
+      oct.frequency.setValueAtTime(freq * 2, time);
+      oct.detune.setValueAtTime(v.biteDetune, time);
+      const octGain = audioContext.createGain();
+      octGain.gain.value = v.octaveBite;
+      oct.connect(octGain);
+      octGain.connect(filter);
+      oct.start(time);
+      oct.stop(time + ampDur + 0.05);
+    }
+
+    // Optional attack transient (finger-pop / pluck noise). Bypasses the body
+    // lowpass and rides its own quick envelope straight to the voice output so
+    // it stays bright and percussive.
+    if (v.transientGain && v.transientGain > 0 && noiseBuffer) {
+      const noise = audioContext.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const hp = audioContext.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = v.transientHpHz ?? 2000;
+      const ng = audioContext.createGain();
+      ng.gain.setValueAtTime(v.transientGain, time);
+      ng.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+      noise.connect(hp);
+      hp.connect(ng);
+      ng.connect(voiceOut);
+      noise.start(time);
+      noise.stop(time + 0.05);
+    }
   };
 
   const playChordStab = (midis: number[], time: number, duration: number) => {
@@ -530,6 +628,10 @@ export function createBluesJamMode(): ModeDefinition {
     if (bassSelectEl) bassSelectEl.value = bassStyleId;
   };
 
+  const syncBassSound = () => {
+    if (bassSoundSelectEl) bassSoundSelectEl.value = bassSoundId;
+  };
+
   const syncChordsToggle = () => {
     if (chordsToggleEl) chordsToggleEl.checked = chordsEnabled;
     // The chord volume slider is only relevant when chords are enabled.
@@ -619,6 +721,13 @@ export function createBluesJamMode(): ModeDefinition {
     resetPhase();
   };
 
+  const setBassSound = (next: BassSoundId) => {
+    if (next === bassSoundId) return;
+    bassSoundId = next;
+    persist(BASS_SOUND_STORAGE, bassSoundId);
+    // Pure tone change — picked up by the next scheduled note, no rebuild.
+  };
+
   const setChordsEnabled = (enabled: boolean) => {
     chordsEnabled = enabled;
     persist(CHORDS_STORAGE, enabled ? "1" : "0");
@@ -658,6 +767,7 @@ export function createBluesJamMode(): ModeDefinition {
       "[data-blues-progression]"
     );
     bassSelectEl = screenEl.querySelector<HTMLSelectElement>("[data-blues-bass]");
+    bassSoundSelectEl = screenEl.querySelector<HTMLSelectElement>("[data-blues-bass-sound]");
     chordsToggleEl = screenEl.querySelector<HTMLInputElement>("[data-blues-chords]");
     bassVolInputEl = screenEl.querySelector<HTMLInputElement>("[data-blues-bass-vol]");
     bassVolValueEl = screenEl.querySelector<HTMLElement>("[data-blues-bass-vol-value]");
@@ -695,6 +805,12 @@ export function createBluesJamMode(): ModeDefinition {
     bassSelectEl?.addEventListener(
       "change",
       () => setBassStyle(bassSelectEl?.value as BassStyleId),
+      { signal }
+    );
+
+    bassSoundSelectEl?.addEventListener(
+      "change",
+      () => setBassSound(bassSoundSelectEl?.value as BassSoundId),
       { signal }
     );
 
@@ -737,6 +853,7 @@ export function createBluesJamMode(): ModeDefinition {
     syncTempo();
     syncProgression();
     syncBass();
+    syncBassSound();
     syncChordsToggle();
     syncVolumes();
     setToggleLabel();
