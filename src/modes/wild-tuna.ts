@@ -548,6 +548,7 @@ export function createWildTunaMode(): ModeDefinition {
       circleLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
         getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
+        getMaxMeasures: () => coordinator.getMaxMeasureCount(),
         onPlaybackEvent: (event) => {
           _trackApi._emitPulse({ source: "circle", ...event, startedAt: performance.now(), origin: "playback" });
           void playCircleMidis(event.midis, event.durationMs, false);
@@ -560,6 +561,7 @@ export function createWildTunaMode(): ModeDefinition {
       fretboardLooper = createUiCompositeLooper({
         getMeasureDurationMs: () => ((60 / Math.max(1, drumUi?.getBpm() ?? 120)) * 4 * 1000),
         getStepsPerMeasure: () => drumUi?.getStepsPerBar() ?? 16,
+        getMaxMeasures: () => coordinator.getMaxMeasureCount(),
         onPlaybackEvent: (event) => {
           _trackApi._emitPulse({ source: "fretboard", ...event, startedAt: performance.now(), origin: "playback" });
           const targets = event.midis.map((midi) => ({ midi, stringIndex: 0 }));

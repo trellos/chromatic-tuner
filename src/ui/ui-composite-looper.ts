@@ -38,6 +38,8 @@ export type CompositeLooperOptions = {
   getMeasureDurationMs: () => number;
   /** Returns the current step resolution per measure (8 or 16). Defaults to 16 if omitted. */
   getStepsPerMeasure?: () => number;
+  /** Returns the maximum number of measures that can be recorded. Defaults to 4 if omitted. */
+  getMaxMeasures?: () => number;
   onPlaybackEvent: (event: {
     measureIndex: number;
     midis: number[];
@@ -82,6 +84,7 @@ function hasStoredContent(slots: MeasureSlot[]): boolean {
 
 export function createUiCompositeLooper(options: CompositeLooperOptions): CompositeLooper {
   const stepsPerMeasure = () => options.getStepsPerMeasure?.() ?? DEFAULT_STEPS_PER_MEASURE;
+  const getMaxMeasures = () => options.getMaxMeasures?.() ?? MAX_MEASURES;
 
   const rootEl = document.createElement("section");
   rootEl.className = "ui-composite-looper";
@@ -227,9 +230,9 @@ export function createUiCompositeLooper(options: CompositeLooperOptions): Compos
     currentRecordingEvents = [];
     recordedMeasuresInPass += 1;
     // Advance write index; wrap around the loop when overwriting existing content.
-    const writeCount = loopMeasureCount > 0 ? loopMeasureCount : MAX_MEASURES;
+    const writeCount = loopMeasureCount > 0 ? loopMeasureCount : getMaxMeasures();
     nextWriteMeasureIndex = (recordingMeasureIndex + 1) % writeCount;
-    if (recordedMeasuresInPass >= MAX_MEASURES && recordState === "recording") {
+    if (recordedMeasuresInPass >= getMaxMeasures() && recordState === "recording") {
       recordState = "stopping";
     }
   };
