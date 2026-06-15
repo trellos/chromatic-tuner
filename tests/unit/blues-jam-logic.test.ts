@@ -82,7 +82,7 @@ describe("blues-jam-logic", () => {
     expect(((nextRoot - approach) % 12 + 12) % 12).toBe(1);
   });
 
-  it("exposes eight bass styles with valid feels", () => {
+  it("exposes the bass styles with valid feels", () => {
     expect(BASS_STYLES.map((s) => s.id)).toEqual([
       "root-pump",
       "octave-pump",
@@ -92,11 +92,18 @@ describe("blues-jam-logic", () => {
       "pentatonic",
       "two-feel",
       "syncopated-push",
+      "slow-shuffle",
+      "boogie-drone",
+      "walking-blues",
+      "turnaround-lick",
+      "rolling-shuffle",
+      "half-time-swagger",
     ]);
     for (const style of BASS_STYLES) {
       expect(["straight", "shuffle", "half"]).toContain(style.feel);
     }
     expect(getBassStyle("box").feel).toBe("shuffle");
+    expect(getBassStyle("slow-shuffle").feel).toBe("shuffle");
     expect(getBassStyle("totally-unknown" as never).id).toBe("root-pump");
   });
 

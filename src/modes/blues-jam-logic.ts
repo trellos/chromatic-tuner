@@ -141,7 +141,13 @@ export type BassStyleId =
   | "blues-riff"
   | "pentatonic"
   | "two-feel"
-  | "syncopated-push";
+  | "syncopated-push"
+  | "slow-shuffle"
+  | "boogie-drone"
+  | "walking-blues"
+  | "turnaround-lick"
+  | "rolling-shuffle"
+  | "half-time-swagger";
 
 export type BassStyle = {
   id: BassStyleId;
@@ -158,6 +164,12 @@ export const BASS_STYLES: readonly BassStyle[] = [
   { id: "pentatonic", label: "Pentatonic Climb", feel: "straight" },
   { id: "two-feel", label: "Two-Feel", feel: "half" },
   { id: "syncopated-push", label: "Syncopated Push", feel: "straight" },
+  { id: "slow-shuffle", label: "Slow Shuffle", feel: "shuffle" },
+  { id: "boogie-drone", label: "Boogie Drone", feel: "shuffle" },
+  { id: "walking-blues", label: "Walking Blues", feel: "straight" },
+  { id: "turnaround-lick", label: "Turnaround Lick", feel: "straight" },
+  { id: "rolling-shuffle", label: "Rolling Shuffle", feel: "shuffle" },
+  { id: "half-time-swagger", label: "Half-Time Swagger", feel: "half" },
 ];
 
 export function getBassStyle(id: BassStyleId): BassStyle {
@@ -261,6 +273,24 @@ function buildBassLine(
     // Syncopated push: anticipates beat 3 via the "and" of 2.
     case "syncopated-push":
       return [r, null, r, r, null, fifth, r, app];
+    // Slow shuffle: sparse and heavy — root, root–5, a bluesy b7→5, fill out.
+    case "slow-shuffle":
+      return [r, null, r, fifth, null, b7, fifth, app];
+    // Boogie drone: hypnotic root pump with a swung 5–6–b7 lilt, re-rooting.
+    case "boogie-drone":
+      return [r, fifth, sixth, b7, r, fifth, sixth, app];
+    // Walking blues: busy descending blues-scale run that resolves up.
+    case "walking-blues":
+      return [r, b7, sixth, fifth, fourth, b3, r, app];
+    // Turnaround lick: steady root pulse capped by a pentatonic fill (5–b7–8).
+    case "turnaround-lick":
+      return [r, r, r, r, fifth, b7, octave, app];
+    // Rolling shuffle: bouncing root–5 then root–b7 gallop.
+    case "rolling-shuffle":
+      return [r, fifth, r, fifth, r, b7, fifth, app];
+    // Half-time swagger: laid-back root on 1, a b7 pickup into a fifth on 3.
+    case "half-time-swagger":
+      return [r, null, null, b7, fifth, null, null, null];
     default:
       return [r, r, r, r, r, r, fifth, app];
   }
