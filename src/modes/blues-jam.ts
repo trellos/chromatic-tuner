@@ -49,7 +49,7 @@ export function createBluesJamMode(): ModeDefinition {
   let key: BluesKey = "A";
   let tempo = 100;
   let progressionId: BluesProgressionId = "twelve-bar";
-  let bassStyleId: BassStyleId = "root-pump";
+  let bassStyleId: BassStyleId = "tight-pocket";
   let bassSoundId: BassSoundId = "option-1";
   let chordsEnabled = false;
   let bassVolume = 0.6;
