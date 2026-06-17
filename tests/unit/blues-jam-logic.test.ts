@@ -98,6 +98,9 @@ describe("blues-jam-logic", () => {
       "turnaround-lick",
       "rolling-shuffle",
       "half-time-swagger",
+      "tight-pocket",
+      "hard-stomp",
+      "deep-groove",
     ]);
     for (const style of BASS_STYLES) {
       expect(["straight", "shuffle", "half"]).toContain(style.feel);
@@ -139,6 +142,26 @@ describe("blues-jam-logic", () => {
     expect(bar!.bassLine[1]! - root).toBe(4); // major third
     expect(bar!.bassLine[2]! - root).toBe(7); // fifth
     expect(bar!.bassLine[3]! - root).toBe(9); // sixth
+  });
+
+  it("restrained styles are straight-feel, sparse, and root-anchored", () => {
+    for (const id of ["tight-pocket", "hard-stomp", "deep-groove"] as const) {
+      expect(getBassStyle(id).feel).toBe("straight");
+      const [bar] = resolveProgression("twelve-bar", "C", id);
+      const root = bar!.bassLine[0]!;
+      // Hard downbeat on the root.
+      expect(bar!.bassLine[0]).toBe(root);
+      // Restrained: at least three rests across the eighth-note grid.
+      const rests = bar!.bassLine.filter((n) => n == null).length;
+      expect(rests).toBeGreaterThanOrEqual(3);
+      // No octave bounce / no major sixth (the "dorky/bouncy" intervals).
+      const intervals = bar!.bassLine
+        .filter((n): n is number => n != null)
+        .map((n) => ((n - root) % 12 + 12) % 12);
+      expect(intervals).not.toContain(9); // major sixth
+      // No octave leap above the root.
+      expect(bar!.bassLine.some((n) => n != null && n - root === 12)).toBe(false);
+    }
   });
 
   it("keyToPitchClass and midiToFrequency behave", () => {
