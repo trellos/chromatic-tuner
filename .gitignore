@@ -29,3 +29,6 @@ coverage/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Design-concepting screenshot artifacts (transient)
+concepts/
