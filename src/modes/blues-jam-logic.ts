@@ -147,7 +147,10 @@ export type BassStyleId =
   | "walking-blues"
   | "turnaround-lick"
   | "rolling-shuffle"
-  | "half-time-swagger";
+  | "half-time-swagger"
+  | "tight-pocket"
+  | "hard-stomp"
+  | "deep-groove";
 
 export type BassStyle = {
   id: BassStyleId;
@@ -170,6 +173,11 @@ export const BASS_STYLES: readonly BassStyle[] = [
   { id: "turnaround-lick", label: "Turnaround Lick", feel: "straight" },
   { id: "rolling-shuffle", label: "Rolling Shuffle", feel: "shuffle" },
   { id: "half-time-swagger", label: "Half-Time Swagger", feel: "half" },
+  // Restrained / hard / slightly groovy — built for a tight ~140bpm pocket.
+  // Straight feel (no swing bounce), root-anchored, lots of space.
+  { id: "tight-pocket", label: "Tight Pocket", feel: "straight" },
+  { id: "hard-stomp", label: "Hard Stomp", feel: "straight" },
+  { id: "deep-groove", label: "Deep Groove", feel: "straight" },
 ];
 
 export function getBassStyle(id: BassStyleId): BassStyle {
@@ -291,6 +299,20 @@ function buildBassLine(
     // Half-time swagger: laid-back root on 1, a b7 pickup into a fifth on 3.
     case "half-time-swagger":
       return [r, null, null, b7, fifth, null, null, null];
+    // Tight pocket: hard downbeat, an anticipated root on the "and" of 2 that
+    // pulls into a planted root on 3, then space. The push gives the groove
+    // without any bounce; the wide rests keep it restrained.
+    case "tight-pocket":
+      return [r, null, null, r, r, null, null, app];
+    // Hard stomp: planted quarter-note roots on 1 and 2, a syncopated b7 grind
+    // on the "and" of 3 for blues grit, then a hard root on 4. Driving but
+    // root-locked — no melodic fluff, no swing.
+    case "hard-stomp":
+      return [r, null, r, null, null, b7, r, app];
+    // Deep groove: spacious off-beat roots on the "and" of 2 and the "and" of 3
+    // (the funk-blues pocket) landing a low fifth on 4. Sparse, syncopated, dark.
+    case "deep-groove":
+      return [r, null, null, r, null, r, fifth, app];
     default:
       return [r, r, r, r, r, r, fifth, app];
   }
