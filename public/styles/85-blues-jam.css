@@ -21,7 +21,7 @@
 
 .blues-control-label {
   align-items: baseline;
-  color: rgba(248, 250, 252, 0.75);
+  color: var(--ink-soft);
   display: flex;
   font-size: 12px;
   gap: 8px;
@@ -72,13 +72,13 @@
 }
 
 .blues-vol-value {
-  color: #f8fafc;
+  color: var(--ink);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
 
 .blues-tempo-value {
-  color: #f8fafc;
+  color: var(--ink);
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -154,6 +154,7 @@
 }
 
 .blues-grid-label {
+  color: var(--ink);
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.02em;

@@ -21,23 +21,23 @@
 }
 
 .key-finder-note-btn {
-  background: rgb(16 19 30 / 80%);
-  border: 1px solid rgb(88 103 144 / 60%);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--stroke);
   border-radius: 0.6rem;
-  color: rgb(217 227 255 / 90%);
+  color: var(--ink);
   min-height: 2rem;
 }
 
 .key-finder-note-btn.is-active {
-  background: rgb(96 165 250 / 32%);
-  border-color: rgb(123 177 255 / 80%);
+  background: rgba(43, 179, 184, 0.22);
+  border-color: var(--mode-accent-border);
 }
 
 .key-finder-clear {
-  background: rgb(16 19 30 / 92%);
-  border: 1px solid rgb(88 103 144 / 55%);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--stroke);
   border-radius: 0.8rem;
-  color: rgb(217 227 255 / 90%);
+  color: var(--ink);
   font: inherit;
   min-height: 100%;
   padding: 0 1rem;
