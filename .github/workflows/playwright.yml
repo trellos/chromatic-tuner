@@ -17,8 +17,25 @@ jobs:
         cache: npm
     - name: Install dependencies
       run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
+    - name: Install Playwright system deps
+      run: npx playwright install-deps
+    - name: Install Playwright browsers
+      # The browser CDN download can occasionally hang; bound each attempt and
+      # retry so a transient stall fails fast instead of eating the job budget.
+      timeout-minutes: 12
+      run: |
+        for i in 1 2 3; do
+          echo "::group::playwright browser install (attempt $i)"
+          if timeout 300 npx playwright install chromium webkit; then
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "::endgroup::"
+          echo "attempt $i failed or timed out; retrying after backoff..."
+          sleep $((i * 15))
+        done
+        echo "playwright browser install failed after 3 attempts" >&2
+        exit 1
     - name: Run critical desktop + mobile tuner UI checks
       run: >-
         npx playwright test tests/ui.spec.ts
